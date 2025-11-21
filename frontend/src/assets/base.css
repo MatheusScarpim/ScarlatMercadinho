@@ -1,0 +1,96 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg: #f6f8fb;
+  --surface: #ffffff;
+  --surface-2: #f0f5f7;
+  --primary: #10b49d;
+  --primary-strong: #0e9c87;
+  --text: #1f2937;
+  --muted: #5b6577;
+  --border: #d9e2ec;
+  --shadow: 0 18px 50px rgba(31, 41, 55, 0.12);
+  --radius: 12px;
+  --table-border: #e5edf4;
+}
+
+* {
+  box-sizing: border-box;
+  outline-color: var(--primary);
+}
+
+body {
+  margin: 0;
+  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  background: radial-gradient(circle at 16% 18%, rgba(16, 180, 157, 0.08), transparent 26%),
+    radial-gradient(circle at 80% 8%, rgba(14, 156, 135, 0.1), transparent 30%),
+    #f6f8fb;
+  color: var(--text);
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 160ms ease;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+input,
+select {
+  background: #fdfefe;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.glass {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: var(--radius);
+}
+
+.btn {
+  border: none;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.btn-primary {
+  background: linear-gradient(120deg, var(--primary), var(--primary-strong));
+  color: #fafdff;
+}
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.table-card {
+  padding: 0;
+}
+.table-card table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+.table-card th,
+.table-card td {
+  padding: 12px 14px;
+}
+.table-card thead {
+  color: var(--muted);
+}
+.table-card tbody tr + tr td {
+  border-top: 1px solid var(--table-border);
+}

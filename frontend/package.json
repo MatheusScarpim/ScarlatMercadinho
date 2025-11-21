@@ -1,0 +1,28 @@
+{
+  "name": "scarlat-mercadinho-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint \"src/**/*.{ts,tsx,vue}\""
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "pinia": "^2.2.6",
+    "vue": "^3.5.12",
+    "vue-chartjs": "^5.3.1",
+    "vue-router": "^4.4.5",
+    "chart.js": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "eslint": "^8.57.1",
+    "eslint-plugin-vue": "^9.28.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}

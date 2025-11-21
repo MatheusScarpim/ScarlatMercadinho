@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+.env.local
+*.log
+*.tmp
+.cache
+/.pnpm-store
+/.vscode
+/.idea
+frontend/node_modules
+backend/node_modules
+frontend/dist
+backend/dist
