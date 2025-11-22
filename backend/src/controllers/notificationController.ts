@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as notificationService from '../services/notificationService';
 import { NotificationType } from '../models/Notification';
+import { Types } from 'mongoose';
 
 /**
  * Lista todas as notificações com filtros opcionais
@@ -101,5 +102,49 @@ export const deleteOld = async (req: Request, res: Response): Promise<void> => {
   } catch (error) {
     console.error('Error deleting old notifications:', error);
     res.status(500).json({ message: 'Error deleting old notifications' });
+  }
+};
+
+/**
+ * Deleta todas as notificações
+ */
+export const deleteAll = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { Notification } = await import('../models/Notification');
+    const result = await Notification.deleteMany({});
+
+    res.json({
+      message: 'All notifications deleted',
+      deletedCount: result.deletedCount,
+    });
+  } catch (error) {
+    console.error('Error deleting all notifications:', error);
+    res.status(500).json({ message: 'Error deleting all notifications' });
+  }
+};
+
+/**
+ * Endpoint de teste para criar uma notificação de venda
+ * Útil para debug e verificar se o sistema de notificações está funcionando
+ */
+export const testSaleNotification = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const notification = await notificationService.notifySaleCompleted(
+      new Types.ObjectId(),
+      150.50,
+      5,
+      'PIX'
+    );
+
+    res.json({
+      message: 'Test notification created successfully',
+      notification,
+    });
+  } catch (error) {
+    console.error('Error creating test notification:', error);
+    res.status(500).json({
+      message: 'Error creating test notification',
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 };

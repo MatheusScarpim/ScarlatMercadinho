@@ -16,6 +16,12 @@
         <option value="true">Ativos</option>
         <option value="false">Inativos</option>
       </select>
+      <select v-model="filterLocation" @change="load">
+        <option value="">Todos os locais</option>
+        <option v-for="loc in locations" :key="loc._id" :value="loc.code">
+          {{ loc.name }} ({{ loc.code }})
+        </option>
+      </select>
     </div>
 
     <div class="card glass table-card">
@@ -25,7 +31,9 @@
             <th>Nome</th>
             <th>Barcode</th>
             <th>Preço</th>
-            <th>Estoque</th>
+            <th>Estoque (local)</th>
+            <th>Estoque total</th>
+            <th>Locais</th>
             <th>Status</th>
             <th>Ações</th>
           </tr>
@@ -36,6 +44,14 @@
             <td>{{ p.barcode }}</td>
             <td>R$ {{ p.salePrice.toFixed(2) }}</td>
             <td>{{ p.stockQuantity }}</td>
+            <td>{{ totalStock(p) }}</td>
+            <td>
+              <div class="loc-chips">
+                <span v-for="loc in formatLocations(p)" :key="loc.name" class="badge location">
+                  {{ loc.name }}: {{ loc.qty }}
+                </span>
+              </div>
+            </td>
             <td class="actions-cell">
               <span :class="p.active ? 'badge active' : 'badge inactive'">{{ p.active ? 'Ativo' : 'Inativo' }}</span>
             </td>
@@ -67,7 +83,6 @@
           </select>
         </label>
         <label>Estoque mínimo<input v-model.number="form.minimumStock" type="number" /></label>
-        <label>Quantidade inicial<input v-model.number="form.stockQuantity" type="number" /></label>
         <label class="checkbox-row span-2">
           <input type="checkbox" v-model="form.isWeighed" />
           <span>Pesável?</span>
@@ -83,17 +98,23 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
+
+const route = useRoute();
+const router = useRouter();
 
 const products = ref<any[]>([]);
 const total = ref(0);
 const pages = ref(1);
 const categories = ref<any[]>([]);
 const units = ref<any[]>([]);
+const locations = ref<any[]>([]);
 const search = ref('');
 const filterCategory = ref('');
 const filterActive = ref('');
+const filterLocation = ref('');
 const showForm = ref(false);
 const editingId = ref<string | null>(null);
 const form = reactive<any>({
@@ -104,7 +125,6 @@ const form = reactive<any>({
   category: '',
   unit: '',
   minimumStock: 0,
-  stockQuantity: 0,
   isWeighed: false
 });
 
@@ -114,6 +134,7 @@ async function load() {
       search: search.value,
       category: filterCategory.value || undefined,
       active: filterActive.value || undefined,
+      location: filterLocation.value || undefined,
       page: 1,
       limit: 20
     }
@@ -124,9 +145,10 @@ async function load() {
 }
 
 async function loadRefs() {
-  const [catRes, unitRes] = await Promise.all([api.get('/categories'), api.get('/units')]);
+  const [catRes, unitRes, locRes] = await Promise.all([api.get('/categories'), api.get('/units'), api.get('/locations')]);
   categories.value = catRes.data;
   units.value = unitRes.data;
+  locations.value = locRes.data;
   if (!form.category && categories.value.length) form.category = categories.value[0]._id;
   if (!form.unit && units.value.length) form.unit = units.value[0]._id;
 }
@@ -147,6 +169,8 @@ async function toggleActive(product: any) {
 }
 
 onMounted(() => {
+  const locQuery = typeof route.query.location === 'string' ? route.query.location : '';
+  filterLocation.value = locQuery;
   loadRefs();
   load();
 });
@@ -162,7 +186,6 @@ function openForm() {
     category: categories.value[0]?._id || '',
     unit: units.value[0]?._id || '',
     minimumStock: 0,
-    stockQuantity: 0,
     isWeighed: false
   });
 }
@@ -181,10 +204,21 @@ function startEdit(product: any) {
     category: product.category?._id || product.category,
     unit: product.unit?._id || product.unit,
     minimumStock: product.minimumStock,
-    stockQuantity: product.stockQuantity,
     isWeighed: product.isWeighed
   });
   showForm.value = true;
+}
+
+function totalStock(p: any) {
+  if (Array.isArray(p.stockByLocation)) {
+    return p.stockByLocation.reduce((sum: number, s: any) => sum + (s.quantity || 0), 0);
+  }
+  return p.stockQuantity;
+}
+
+function formatLocations(p: any) {
+  if (!Array.isArray(p.stockByLocation)) return [];
+  return p.stockByLocation.map((s: any) => ({ name: s.location || 'default', qty: s.quantity || 0 }));
 }
 </script>
 
@@ -250,6 +284,19 @@ function startEdit(product: any) {
   padding: 4px 8px;
   border-radius: 8px;
   font-size: 12px;
+}
+.loc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.badge.location {
+  background: #eef7f5;
+  color: var(--text);
+}
+.filters input,
+.filters select {
+  min-width: 180px;
 }
 .badge.active {
   background: rgba(16, 180, 157, 0.15);

@@ -12,6 +12,7 @@ export async function createPurchase(data: {
   items: { product: string; quantity: number; unitCost: number }[];
   notes?: string;
   createdBy: string;
+  location?: string;
 }) {
   const itemsWithTotal = data.items.map((item) => ({
     ...item,
@@ -26,7 +27,8 @@ export async function createPurchase(data: {
     items: itemsWithTotal,
     totalAmount,
     notes: data.notes,
-    createdBy: data.createdBy
+    createdBy: data.createdBy,
+    location: data.location || 'default'
   });
 
   // Create stock movements for each item
@@ -36,18 +38,24 @@ export async function createPurchase(data: {
       type: 'ENTRY',
       quantity: item.quantity,
       reason: 'COMPRA FORNECEDOR',
-      relatedPurchase: purchase._id
+      relatedPurchase: purchase._id,
+      location: purchase.location || 'default'
     });
   }
 
-  // Criar notificação para o admin
-  const supplier = await SupplierModel.findById(data.supplier);
-  if (supplier) {
-    await notifyPurchaseRegistered(
-      purchase._id,
-      supplier.name,
-      totalAmount
-    );
+  // Criar notificação para o admin (não deve quebrar o fluxo se falhar)
+  try {
+    const supplier = await SupplierModel.findById(data.supplier);
+    if (supplier) {
+      await notifyPurchaseRegistered(
+        purchase._id,
+        supplier.name,
+        totalAmount
+      );
+      console.log(`[NOTIFICATION] Purchase registered notification created for purchase ${purchase._id}`);
+    }
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Failed to create purchase notification:', error);
   }
 
   return purchase;

@@ -6,6 +6,7 @@ export type SaleStatus = 'OPEN' | 'COMPLETED' | 'CANCELED';
 export interface SaleDocument extends Document {
   origin: SaleOrigin;
   status: SaleStatus;
+  location?: string;
   totalItems: number;
   subtotal: number;
   discountTotal: number;
@@ -22,6 +23,7 @@ const saleSchema = new Schema(
   {
     origin: { type: String, enum: ['KIOSK', 'ADMIN_PANEL'], default: 'KIOSK' },
     status: { type: String, enum: ['OPEN', 'COMPLETED', 'CANCELED'], default: 'OPEN' },
+    location: { type: String, default: 'default' },
     totalItems: { type: Number, default: 0 },
     subtotal: { type: Number, default: 0 },
     discountTotal: { type: Number, default: 0 },

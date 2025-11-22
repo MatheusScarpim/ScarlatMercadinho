@@ -27,18 +27,20 @@ defineProps<{
   background: rgba(0, 0, 0, 0.35);
   display: grid;
   place-items: center;
-  padding: 20px;
+  min-height: 100vh;
+  padding: 16px;
   z-index: 50;
 }
 .modal {
-  width: min(760px, 95%);
-  max-height: 90vh;
+  width: min(1200px, 95%);
+  max-height: 85vh;
   overflow: auto;
   padding: 24px;
   border-radius: 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  transform: translateY(-12%);
 }
 .modal-header {
   display: flex;

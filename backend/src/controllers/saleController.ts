@@ -4,7 +4,7 @@ import { SaleItemModel } from '../models/SaleItem';
 import { SaleModel } from '../models/Sale';
 
 export async function createSale(req: Request, res: Response) {
-  const sale = await saleService.createSale(req.body.origin);
+  const sale = await saleService.createSale(req.body.origin, req.body.location || 'default');
   res.status(201).json(sale);
 }
 

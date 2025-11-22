@@ -41,13 +41,12 @@ export async function getOverview(req: Request, res: Response) {
     { $group: { _id: '$paymentMethod', total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }
   ]);
 
-  const productMatch: any = {};
+  const productMatch: any = { 'sale.status': saleStatus };
   if (from || to) {
     productMatch['sale.createdAt'] = {};
     if (from) productMatch['sale.createdAt'].$gte = new Date(from as string);
     if (to) productMatch['sale.createdAt'].$lte = new Date(to as string);
   }
-  productMatch['sale.status'] = saleStatus;
 
   const topProducts = await SaleItemModel.aggregate([
     {

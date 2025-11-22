@@ -12,5 +12,9 @@ router.get('/unread-count', notificationController.getUnreadCount);
 router.put('/mark-all-read', notificationController.markAllAsRead);
 router.put('/:id/read', notificationController.markAsRead);
 router.delete('/old', notificationController.deleteOld);
+router.delete('/all', notificationController.deleteAll);
+
+// Endpoint de teste (desenvolvimento)
+router.post('/test/sale', notificationController.testSaleNotification);
 
 export default router;

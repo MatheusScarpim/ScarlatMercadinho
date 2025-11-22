@@ -6,10 +6,11 @@ import { registerMovement } from './stockService';
 import { notifySaleCompleted } from './notificationService';
 import { ApiError } from '../utils/apiError';
 
-export async function createSale(origin: 'KIOSK' | 'ADMIN_PANEL' = 'KIOSK') {
+export async function createSale(origin: 'KIOSK' | 'ADMIN_PANEL' = 'KIOSK', location: string = 'default') {
   return SaleModel.create({
     origin,
     status: 'OPEN',
+    location,
     totalItems: 0,
     subtotal: 0,
     discountTotal: 0,
@@ -91,7 +92,8 @@ export async function completeSale(saleId: string, data: { paymentMethod: string
       type: 'EXIT',
       quantity: item.quantity,
       reason: 'VENDA AUTOATENDIMENTO',
-      relatedSale: sale._id
+      relatedSale: sale._id,
+      location: sale.location || 'default'
     });
   }
   sale.status = 'COMPLETED';
@@ -101,13 +103,19 @@ export async function completeSale(saleId: string, data: { paymentMethod: string
   sale.completedAt = new Date();
   await sale.save();
 
-  // Criar notificação para o admin
-  await notifySaleCompleted(
-    sale._id,
-    sale.totalAmount,
-    sale.totalItems,
-    data.paymentMethod
-  );
+  // Criar notificação para o admin (não deve quebrar o fluxo se falhar)
+  try {
+    await notifySaleCompleted(
+      sale._id,
+      sale.totalAmount,
+      sale.totalItems,
+      data.paymentMethod,
+      sale.location
+    );
+    console.log(`[NOTIFICATION] Sale completed notification created for sale ${sale._id}`);
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Failed to create sale notification:', error);
+  }
 
   return sale;
 }

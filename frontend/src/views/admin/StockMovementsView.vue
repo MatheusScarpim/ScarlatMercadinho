@@ -8,6 +8,12 @@
         <option value="EXIT">Saída</option>
         <option value="ADJUSTMENT">Ajuste</option>
       </select>
+      <select v-model="location" @change="load">
+        <option value="">Todos os locais</option>
+        <option v-for="loc in locations" :key="loc._id" :value="loc.code">
+          {{ loc.name }} ({{ loc.code }})
+        </option>
+      </select>
       <input v-model="productId" placeholder="ID do produto" @keyup.enter="load" />
       <button class="btn btn-primary" @click="load">Filtrar</button>
     </div>
@@ -20,6 +26,7 @@
             <th>Tipo</th>
             <th>Quantidade</th>
             <th>Motivo</th>
+            <th>Local</th>
           </tr>
         </thead>
         <tbody>
@@ -29,6 +36,7 @@
             <td>{{ typeLabel(m.type) }}</td>
             <td>{{ m.quantity }}</td>
             <td>{{ m.reason }}</td>
+            <td>{{ m.location || 'default' }}</td>
           </tr>
         </tbody>
       </table>
@@ -43,9 +51,17 @@ import api from '../../services/api';
 const movements = ref<any[]>([]);
 const type = ref('');
 const productId = ref('');
+const locations = ref<any[]>([]);
+const location = ref('');
 
 async function load() {
-  const { data } = await api.get('/stock-movements', { params: { type: type.value || undefined, productId: productId.value || undefined } });
+  const { data } = await api.get('/stock-movements', {
+    params: {
+      type: type.value || undefined,
+      productId: productId.value || undefined,
+      location: location.value || undefined
+    }
+  });
   movements.value = data;
 }
 
@@ -57,7 +73,15 @@ function typeLabel(t: string) {
   return map[t] || t;
 }
 
-onMounted(load);
+async function loadRefs() {
+  const { data } = await api.get('/locations');
+  locations.value = data;
+}
+
+onMounted(() => {
+  loadRefs();
+  load();
+});
 </script>
 
 <style scoped>

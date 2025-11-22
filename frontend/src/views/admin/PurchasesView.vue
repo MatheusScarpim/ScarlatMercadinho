@@ -2,25 +2,46 @@
   <div>
     <div class="header">
       <h3>Compras / Entradas</h3>
-      <button class="btn btn-primary" @click="showForm = true">Nova compra</button>
+      <button class="btn btn-primary" @click="openForm">Nova compra</button>
     </div>
 
-    <BaseModal :open="showForm" title="Nova compra" :onClose="() => (showForm = false)">
+    <BaseModal :open="showForm" title="Nova compra" :onClose="closeForm">
       <form @submit.prevent="save" class="modal-form">
-        <div class="form-grid">
-          <label>Fornecedor
+        <div class="top-row">
+          <div class="field-block">
+            <label>Fornecedor</label>
             <select v-model="form.supplier" required>
               <option v-for="s in suppliers" :key="s._id" :value="s._id">{{ s.name }}</option>
             </select>
-          </label>
-          <label>Emissão<input type="date" v-model="form.issueDate" required /></label>
-          <label>Chegada<input type="date" v-model="form.arrivalDate" required /></label>
-          <label>Nota / Pedido<input v-model="form.invoiceNumber" placeholder="Opcional" /></label>
+          </div>
+          <div class="field-block">
+            <label>Local</label>
+            <select v-model="form.location" required>
+              <option v-for="loc in locations" :key="loc._id" :value="loc.code">
+                {{ loc.name }} ({{ loc.code }})
+              </option>
+            </select>
+          </div>
+          <div class="field-block">
+            <label>Emissão</label>
+            <input type="date" v-model="form.issueDate" required />
+          </div>
+          <div class="field-block">
+            <label>Chegada</label>
+            <input type="date" v-model="form.arrivalDate" required />
+          </div>
+          <div class="field-block">
+            <label>Nota / Pedido</label>
+            <input v-model="form.invoiceNumber" placeholder="Opcional" />
+          </div>
         </div>
 
         <div class="items glass">
           <div class="item-header">
-            <span>Itens da compra</span>
+            <div>
+              <p class="eyebrow">Itens da compra</p>
+              <h4>Produtos</h4>
+            </div>
             <button class="btn btn-ghost" type="button" @click="addItem">+ Adicionar item</button>
           </div>
           <div class="item-row head">
@@ -42,14 +63,15 @@
           </div>
         </div>
 
-        <div class="summary">
-          <span>Total:</span>
-          <strong>R$ {{ total.toFixed(2) }}</strong>
-        </div>
-
-        <div class="modal-actions">
-          <button class="btn btn-ghost" type="button" @click="showForm = false">Cancelar</button>
-          <button class="btn btn-primary" type="submit">Salvar compra</button>
+        <div class="footer-bar">
+          <div class="summary">
+            <span>Total</span>
+            <strong>R$ {{ total.toFixed(2) }}</strong>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost" type="button" @click="closeForm">Cancelar</button>
+            <button class="btn btn-primary" type="submit">Salvar compra</button>
+          </div>
         </div>
       </form>
     </BaseModal>
@@ -83,11 +105,14 @@ import BaseModal from '../../components/BaseModal.vue';
 const purchases = ref<any[]>([]);
 const products = ref<any[]>([]);
 const suppliers = ref<any[]>([]);
+const locations = ref<any[]>([]);
 const showForm = ref(false);
+const today = new Date().toISOString().slice(0, 10);
 const form = reactive<any>({
   supplier: '',
-  issueDate: '',
-  arrivalDate: '',
+  location: '',
+  issueDate: today,
+  arrivalDate: today,
   invoiceNumber: '',
   items: [{ product: '', quantity: 1, unitCost: 0 }]
 });
@@ -106,10 +131,16 @@ async function load() {
   purchases.value = data;
 }
 async function loadRefs() {
-  const [prodRes, supRes] = await Promise.all([api.get('/products'), api.get('/suppliers')]);
-  products.value = prodRes.data;
+  const [prodRes, supRes, locRes] = await Promise.all([
+    api.get('/products', { params: { page: 1, limit: 200, active: true } }),
+    api.get('/suppliers'),
+    api.get('/locations')
+  ]);
+  products.value = prodRes.data.data || prodRes.data;
   suppliers.value = supRes.data;
+  locations.value = locRes.data;
   if (!form.supplier && suppliers.value.length) form.supplier = suppliers.value[0]._id;
+  if (!form.location && locations.value.length) form.location = locations.value[0].code;
   if (form.items.length && !form.items[0].product && products.value.length) form.items[0].product = products.value[0]._id;
 }
 
@@ -131,6 +162,22 @@ onMounted(() => {
   load();
   loadRefs();
 });
+
+function openForm() {
+  Object.assign(form, {
+    supplier: suppliers.value[0]?._id || '',
+    location: locations.value[0]?.code || '',
+    issueDate: today,
+    arrivalDate: today,
+    invoiceNumber: '',
+    items: [{ product: products.value[0]?._id || '', quantity: 1, unitCost: 0 }]
+  });
+  showForm.value = true;
+}
+
+function closeForm() {
+  showForm.value = false;
+}
 </script>
 
 <style scoped>
@@ -144,13 +191,16 @@ onMounted(() => {
   padding: 16px;
   border-radius: var(--radius);
 }
-.form-grid {
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+.top-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px;
-}
-.modal-form {
-  gap: 14px;
+  gap: 12px;
 }
 .items {
   display: grid;
@@ -158,6 +208,8 @@ onMounted(() => {
   margin-top: 10px;
   padding: 10px;
   border-radius: var(--radius);
+  max-height: 360px;
+  overflow-y: auto;
 }
 .item-header {
   display: flex;
@@ -178,10 +230,22 @@ onMounted(() => {
   font-weight: 600;
 }
 .summary {
-  margin-top: 10px;
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+}
+.summary strong {
+  font-size: 20px;
+}
+.footer-bar {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
 }
 .btn {
   border: none;
@@ -202,5 +266,13 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+@media (max-width: 900px) {
+  .top-row {
+    grid-template-columns: 1fr;
+  }
+  .item-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

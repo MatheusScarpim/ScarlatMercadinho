@@ -16,6 +16,7 @@ export interface PurchaseDocument extends Document {
   totalAmount: number;
   notes?: string;
   createdBy: Types.ObjectId;
+  location?: string;
 }
 
 const purchaseItemSchema = new Schema(
@@ -37,7 +38,8 @@ const purchaseSchema = new Schema(
     items: { type: [purchaseItemSchema], required: true },
     totalAmount: { type: Number, required: true },
     notes: { type: String },
-    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true }
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    location: { type: String, default: 'default' }
   },
   { timestamps: true }
 );

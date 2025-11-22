@@ -10,6 +10,7 @@ import PurchasesView from '../views/admin/PurchasesView.vue';
 import StockMovementsView from '../views/admin/StockMovementsView.vue';
 import SalesView from '../views/admin/SalesView.vue';
 import DashboardView from '../views/admin/DashboardView.vue';
+import LocationsView from '../views/admin/LocationsView.vue';
 import { useAuthStore } from '../stores/auth';
 
 const router = createRouter({
@@ -29,7 +30,8 @@ const router = createRouter({
         { path: 'suppliers', component: SuppliersView },
         { path: 'purchases', component: PurchasesView },
         { path: 'stock-movements', component: StockMovementsView },
-        { path: 'sales', component: SalesView }
+        { path: 'sales', component: SalesView },
+        { path: 'locations', component: LocationsView }
       ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/kiosk' }

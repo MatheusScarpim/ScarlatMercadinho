@@ -28,6 +28,12 @@ const productSchema = new Schema(
     costPrice: { type: Number, required: true },
     salePrice: { type: Number, required: true },
     stockQuantity: { type: Number, default: 0 },
+    stockByLocation: [
+      {
+        location: { type: String, default: 'default' },
+        quantity: { type: Number, default: 0 }
+      }
+    ],
     minimumStock: { type: Number, default: 0 },
     active: { type: Boolean, default: true },
     isWeighed: { type: Boolean, default: false }

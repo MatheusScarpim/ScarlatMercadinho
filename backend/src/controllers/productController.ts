@@ -14,9 +14,10 @@ export async function listProducts(req: Request, res: Response) {
   const filterQuery = { ...req.query } as any;
   delete filterQuery.page;
   delete filterQuery.limit;
+  const location = typeof req.query.location === 'string' ? req.query.location : undefined;
 
   const [items, total] = await Promise.all([
-    productService.searchProducts(filterQuery, skip, limit),
+    productService.searchProducts(filterQuery, skip, limit, location),
     productService.countProducts(filterQuery)
   ]);
   res.json({ data: items, total, page, pages: Math.ceil(total / limit) });
@@ -41,7 +42,8 @@ export async function deleteProduct(req: Request, res: Response) {
 }
 
 export async function findByBarcode(req: Request, res: Response) {
-  const product = await productService.findByBarcode(req.params.barcode);
+  const location = typeof req.query.location === 'string' ? req.query.location : undefined;
+  const product = await productService.findByBarcode(req.params.barcode, location);
   if (!product) return res.status(404).json({ message: 'Produto não encontrado' });
   res.json(product);
 }

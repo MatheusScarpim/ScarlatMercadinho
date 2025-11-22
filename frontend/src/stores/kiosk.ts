@@ -14,35 +14,45 @@ export const useKioskStore = defineStore('kiosk', {
   state: () => ({
     saleId: '',
     cart: [] as CartItem[],
-    message: ''
+    message: '',
+    selectedLocation: (localStorage.getItem('kioskLocation') as string) || ''
   }),
   getters: {
     subtotal: (state) => state.cart.reduce((sum, i) => sum + i.price * i.quantity, 0),
     totalItems: (state) => state.cart.reduce((sum, i) => sum + i.quantity, 0)
   },
   actions: {
+    setLocation(location: string) {
+      this.selectedLocation = location;
+      localStorage.setItem('kioskLocation', location);
+      this.resetCart();
+    },
     async ensureSale() {
+      const location = this.selectedLocation || import.meta.env.VITE_KIOSK_LOCATION || 'default';
       if (!this.saleId) {
-        const { data } = await api.post('/sales', { origin: 'KIOSK' });
+        const { data } = await api.post('/sales', { origin: 'KIOSK', location });
         this.saleId = data._id;
       }
     },
     async addByBarcode(barcode: string) {
       try {
-        const { data: product } = await api.get(`/products/barcode/${barcode}`);
+        const location = this.selectedLocation || import.meta.env.VITE_KIOSK_LOCATION || 'default';
+        const { data: product } = await api.get(`/products/barcode/${barcode}`, { params: { location } });
         await this.ensureSale();
         const existing = this.cart.find((c) => c.productId === product._id);
         if (existing) {
           existing.quantity += 1;
           const { data } = await api.post(`/sales/${this.saleId}/items`, {
             productId: product._id,
-            quantity: 1
+            quantity: 1,
+            location
           });
           existing.saleItemId = data.item._id;
         } else {
           const { data } = await api.post(`/sales/${this.saleId}/items`, {
             productId: product._id,
-            quantity: 1
+            quantity: 1,
+            location
           });
           this.cart.push({
             saleItemId: data.item._id,
@@ -63,10 +73,12 @@ export const useKioskStore = defineStore('kiosk', {
       const existing = this.cart.find((c) => c.productId === product._id);
       if (existing) {
         existing.quantity += 1;
-        const { data } = await api.post(`/sales/${this.saleId}/items`, { productId: product._id, quantity: 1 });
+        const location = this.selectedLocation || import.meta.env.VITE_KIOSK_LOCATION || 'default';
+        const { data } = await api.post(`/sales/${this.saleId}/items`, { productId: product._id, quantity: 1, location });
         existing.saleItemId = data.item._id;
       } else {
-        const { data } = await api.post(`/sales/${this.saleId}/items`, { productId: product._id, quantity: 1 });
+        const location = this.selectedLocation || import.meta.env.VITE_KIOSK_LOCATION || 'default';
+        const { data } = await api.post(`/sales/${this.saleId}/items`, { productId: product._id, quantity: 1, location });
         this.cart.push({
           saleItemId: data.item._id,
           productId: product._id,

@@ -12,6 +12,7 @@
           <tr>
             <th>Data</th>
             <th>Origem</th>
+            <th>Local</th>
             <th>Pagamento</th>
             <th>Status</th>
             <th>Total</th>
@@ -21,6 +22,7 @@
           <tr v-for="s in sales" :key="s._id">
             <td>{{ formatDate(s.createdAt) }}</td>
             <td>{{ originLabel(s.origin) }}</td>
+            <td>{{ s.location || 'default' }}</td>
             <td>{{ paymentLabel(s.paymentMethod) }}</td>
             <td>{{ statusLabel(s.status) }}</td>
             <td>R$ {{ s.totalAmount?.toFixed(2) }}</td>

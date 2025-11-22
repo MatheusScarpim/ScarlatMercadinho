@@ -11,6 +11,7 @@
         <RouterLink to="/admin/suppliers">Fornecedores</RouterLink>
         <RouterLink to="/admin/categories">Categorias</RouterLink>
         <RouterLink to="/admin/units">Unidades</RouterLink>
+        <RouterLink to="/admin/locations">Locais</RouterLink>
         <RouterLink to="/admin/purchases">Compras</RouterLink>
         <RouterLink to="/admin/stock-movements">Estoque</RouterLink>
         <RouterLink to="/admin/sales">Vendas</RouterLink>
@@ -39,7 +40,11 @@
       <div v-if="showNotifications" class="notif-panel glass">
         <div class="notif-header">
           <strong>Notificações</strong>
-          <button class="btn btn-ghost" @click="notifications.markAllRead()">Marcar todas lidas</button>
+          <div class="notif-actions">
+            <button class="btn btn-ghost btn-sm" @click="notifications.markAllRead()">Marcar lidas</button>
+            <button class="btn btn-ghost btn-sm btn-danger" @click="clearAllNotifications" title="Limpar todas">🗑️</button>
+            <button class="btn-close" @click="showNotifications = false" title="Fechar">×</button>
+          </div>
         </div>
         <div v-if="!items.length" class="empty">Sem notificações</div>
         <div
@@ -49,7 +54,8 @@
           @click="notifications.markRead(n._id)"
         >
           <div class="notif-title">{{ n.title }}</div>
-          <div class="notif-message">{{ n.message }}</div>
+          <div class="notif-message">{{ translateMessage(n.message) }}</div>
+          <div v-if="n.location" class="notif-location">Local: {{ n.location }}</div>
           <small>{{ new Date(n.createdAt).toLocaleString() }}</small>
         </div>
       </div>
@@ -80,7 +86,36 @@ function logout() {
 function toggleNotifications() {
   showNotifications.value = !showNotifications.value;
   if (showNotifications.value) {
-    notifications.fetchAll();
+    notifications.fetchAll().catch(() => {
+      // Erro já tratado pelo interceptor
+      showNotifications.value = false;
+    });
+  }
+}
+
+// Traduz termos em inglês nas mensagens antigas
+function translateMessage(message: string): string {
+  const translations: Record<string, string> = {
+    'CREDIT_CARD': 'Cartão de Crédito',
+    'DEBIT_CARD': 'Cartão de Débito',
+    'PIX': 'PIX',
+    'CASH': 'Dinheiro',
+    'VOUCHER': 'Voucher'
+  };
+
+  let translatedMessage = message;
+  for (const [key, value] of Object.entries(translations)) {
+    translatedMessage = translatedMessage.replace(new RegExp(key, 'g'), value);
+  }
+  return translatedMessage;
+}
+
+// Limpa todas as notificações com confirmação
+function clearAllNotifications() {
+  if (confirm('Tem certeza que deseja limpar todas as notificações? Esta ação não pode ser desfeita.')) {
+    notifications.deleteAll().catch(() => {
+      alert('Erro ao limpar notificações');
+    });
   }
 }
 
@@ -219,6 +254,38 @@ header {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+}
+.notif-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.btn-sm {
+  font-size: 12px;
+  padding: 6px 8px;
+}
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+.btn-close {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+.btn-close:hover {
+  background: rgba(0, 0, 0, 0.05);
 }
 .notif-item {
   padding: 8px;

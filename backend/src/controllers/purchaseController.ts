@@ -6,7 +6,8 @@ import { PurchaseModel } from '../models/Purchase';
 export async function create(req: AuthRequest, res: Response) {
   const purchase = await createPurchase({
     ...req.body,
-    createdBy: req.user!.userId
+    createdBy: req.user!.userId,
+    location: req.body.location || 'default'
   });
   res.status(201).json(purchase);
 }
@@ -20,7 +21,9 @@ export async function list(req: AuthRequest, res: Response) {
     if (from) filter.createdAt.$gte = new Date(from as string);
     if (to) filter.createdAt.$lte = new Date(to as string);
   }
-  const purchases = await PurchaseModel.find(filter).populate('supplier createdBy').sort({ createdAt: -1 });
+  const purchases = await PurchaseModel.find(filter)
+    .populate('supplier createdBy items.product')
+    .sort({ createdAt: -1 });
   res.json(purchases);
 }
 

@@ -8,12 +8,21 @@ interface CreateNotificationParams {
   relatedSale?: Types.ObjectId | string;
   relatedPurchase?: Types.ObjectId | string;
   relatedProduct?: Types.ObjectId | string;
+  location?: string;
 }
 
 /**
  * Cria uma nova notificação para o admin
  */
 export const createNotification = async (params: CreateNotificationParams) => {
+  console.log('[NOTIFICATION] Creating notification:', {
+    type: params.type,
+    title: params.title,
+    relatedSale: params.relatedSale,
+    relatedPurchase: params.relatedPurchase,
+    relatedProduct: params.relatedProduct,
+  });
+
   const notification = await Notification.create({
     type: params.type,
     title: params.title,
@@ -21,9 +30,11 @@ export const createNotification = async (params: CreateNotificationParams) => {
     relatedSale: params.relatedSale,
     relatedPurchase: params.relatedPurchase,
     relatedProduct: params.relatedProduct,
+    location: params.location,
     read: false,
   });
 
+  console.log('[NOTIFICATION] Notification created successfully:', notification._id);
   return notification;
 };
 
@@ -109,19 +120,38 @@ export const deleteOldNotifications = async (daysOld: number = 30) => {
 };
 
 /**
+ * Traduz métodos de pagamento para português
+ */
+const translatePaymentMethod = (method: string): string => {
+  const translations: Record<string, string> = {
+    'CREDIT_CARD': 'Cartão de Crédito',
+    'DEBIT_CARD': 'Cartão de Débito',
+    'PIX': 'PIX',
+    'CASH': 'Dinheiro',
+    'VOUCHER': 'Voucher'
+  };
+
+  return translations[method] || method;
+};
+
+/**
  * Cria notificação específica para venda concluída
  */
 export const notifySaleCompleted = async (
   saleId: Types.ObjectId | string,
   totalAmount: number,
   totalItems: number,
-  paymentMethod: string
+  paymentMethod: string,
+  location?: string
 ) => {
+  const paymentMethodTranslated = translatePaymentMethod(paymentMethod);
+
   return createNotification({
     type: 'SALE_COMPLETED',
     title: 'Nova Venda Concluída',
-    message: `Uma venda de R$ ${totalAmount.toFixed(2)} foi concluída com ${totalItems} item(ns). Método de pagamento: ${paymentMethod}.`,
+    message: `Venda de R$ ${totalAmount.toFixed(2)} concluída com ${totalItems} item(ns). Pagamento: ${paymentMethodTranslated}. Local: ${location || 'default'}.`,
     relatedSale: saleId,
+    location,
   });
 };
 

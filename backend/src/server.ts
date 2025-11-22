@@ -16,6 +16,7 @@ import stockMovementRoutes from './routes/stockMovementRoutes';
 import saleRoutes from './routes/saleRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import metricsRoutes from './routes/metricsRoutes';
+import locationRoutes from './routes/locationRoutes';
 import { createAdminSeed } from './services/authService';
 
 const app = express();
@@ -36,6 +37,7 @@ app.use('/stock-movements', stockMovementRoutes);
 app.use('/sales', saleRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/metrics', metricsRoutes);
+app.use('/locations', locationRoutes);
 
 app.use(errorHandler);
 

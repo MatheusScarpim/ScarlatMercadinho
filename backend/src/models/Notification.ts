@@ -9,6 +9,7 @@ export interface NotificationDocument extends Document {
   relatedSale?: Types.ObjectId;
   relatedPurchase?: Types.ObjectId;
   relatedProduct?: Types.ObjectId;
+  location?: string;
   read: boolean;
   readAt?: Date;
   createdAt: Date;
@@ -41,6 +42,11 @@ const notificationSchema = new Schema<NotificationDocument>(
     relatedProduct: {
       type: Schema.Types.ObjectId,
       ref: 'Product',
+    },
+    location: {
+      type: String,
+      default: 'default',
+      index: true,
     },
     read: {
       type: Boolean,

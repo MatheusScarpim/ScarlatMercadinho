@@ -1,18 +1,16 @@
 <template>
   <div class="kiosk">
-    <input
-      class="scan-input"
-      ref="barcodeInput"
-      v-model="barcode"
-      @keyup.enter="handleBarcode"
-      aria-label="Leitor de código de barras oculto"
-    />
+    <input class="scan-input" ref="barcodeInput" v-model="barcode" @keyup.enter="handleBarcode" aria-label="Leitor oculto" />
+
     <section class="workspace">
       <div class="right glass">
         <div class="cart-top">
           <h3>Carrinho</h3>
           <span class="chip">{{ totalItems }} itens</span>
-          <button class="ghost sm" @click="openBarcode">Digitar código</button>
+          <div class="top-actions">
+            <button class="ghost sm" @click="openBarcode">Digitar código</button>
+            <button class="ghost sm" @click="showLocationModal = true">Trocar local</button>
+          </div>
         </div>
         <div class="cart">
           <div v-for="item in cart" :key="item.saleItemId" class="cart-item">
@@ -46,18 +44,36 @@
       </div>
     </section>
 
+    <!-- Modal escolha de local -->
+    <div v-if="showLocationModal" class="modal">
+      <div class="modal-box glass">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Selecione o quiosque</p>
+            <h3>Escolha o local</h3>
+          </div>
+          <button class="ghost" @click="showLocationModal = false" :disabled="!chosenLocation">Fechar</button>
+        </div>
+        <div class="field">
+          <label>Local</label>
+          <select v-model="chosenLocation">
+            <option value="" disabled>Selecione...</option>
+            <option v-for="loc in locations" :key="loc._id" :value="loc.code">{{ loc.name }} ({{ loc.code }})</option>
+          </select>
+        </div>
+        <div class="actions modal-actions">
+          <button class="primary" :disabled="!chosenLocation" @click="confirmLocation">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="manualBarcodeOpen" class="modal">
       <div class="modal-box glass">
         <div class="modal-header">
           <h3>Digite o código de barras</h3>
           <button class="ghost" @click="closeBarcode">Fechar</button>
         </div>
-        <input
-          id="manual-barcode"
-          v-model="manualBarcode"
-          placeholder="Código de barras"
-          @keyup.enter="confirmManualBarcode"
-        />
+        <input id="manual-barcode" v-model="manualBarcode" placeholder="Código de barras" @keyup.enter="confirmManualBarcode" />
         <div class="actions">
           <button class="ghost" @click="closeBarcode">Voltar</button>
           <button class="primary" @click="confirmManualBarcode">Confirmar</button>
@@ -72,7 +88,7 @@
             <p class="eyebrow">finalizar compra</p>
             <h3>Confirme o pagamento</h3>
           </div>
-          <button class="ghost" @click="closePayment">Fechar</button>
+            <button class="ghost" @click="closePayment">Fechar</button>
         </div>
 
         <div class="payment-total">
@@ -110,7 +126,7 @@
     <div v-if="paymentSuccess" class="modal success">
       <div class="modal-box glass success-box">
         <h3>Compra concluída</h3>
-        <p class="muted">Pagamento registrado. Obrigado pela preferência!</p>
+        <p class="muted">Pagamento registrado. Obrigado!</p>
         <div class="payment-total">
           <span>Total</span>
           <strong>R$ {{ subtotal.toFixed(2) }}</strong>
@@ -126,6 +142,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, nextTick } from 'vue';
 import { useKioskStore } from '../stores/kiosk';
+import api from '../services/api';
 
 const store = useKioskStore();
 const barcode = ref('');
@@ -147,6 +164,28 @@ const cart = computed(() => store.cart);
 const subtotal = computed(() => store.subtotal);
 const totalItems = computed(() => store.totalItems);
 const paymentOpen = ref(false);
+const locations = ref<any[]>([]);
+const chosenLocation = ref(store.selectedLocation || '');
+const showLocationModal = ref(true);
+
+async function loadLocations() {
+  try {
+    const { data } = await api.get('/locations');
+    locations.value = data;
+    if (!chosenLocation.value && data.length) chosenLocation.value = data[0].code;
+  } catch (err) {
+    locations.value = [];
+    if (!chosenLocation.value) chosenLocation.value = 'default';
+  }
+}
+
+function confirmLocation() {
+  if (!chosenLocation.value) return;
+  store.setLocation(chosenLocation.value);
+  showLocationModal.value = false;
+  focusBarcode();
+}
+
 function paymentLabel(pay: string) {
   const map: Record<string, string> = {
     CASH: 'Dinheiro',
@@ -197,7 +236,14 @@ function focusBarcode() {
   setTimeout(() => barcodeInput.value?.focus(), 50);
 }
 
-onMounted(() => focusBarcode());
+onMounted(() => {
+  loadLocations().finally(() => {
+    if (store.selectedLocation) {
+      showLocationModal.value = false;
+      focusBarcode();
+    }
+  });
+});
 
 function openBarcode() {
   manualBarcodeOpen.value = true;
@@ -266,6 +312,10 @@ function closeSuccess() {
   justify-content: space-between;
   gap: 10px;
   padding-bottom: 14px;
+}
+.top-actions {
+  display: flex;
+  gap: 8px;
 }
 .chip {
   background: rgba(16, 180, 157, 0.12);
@@ -363,10 +413,6 @@ button.link {
 .muted {
   color: var(--muted);
 }
-.warning {
-  color: #f16c7f;
-  margin-top: 8px;
-}
 .modal {
   position: fixed;
   inset: 0;
@@ -384,13 +430,6 @@ button.link {
   width: min(420px, 90%);
   text-align: center;
   padding: 22px;
-}
-.success-box h3 {
-  margin-bottom: 4px;
-}
-.success-box p {
-  margin-top: 0;
-  margin-bottom: 12px;
 }
 .modal-header {
   display: flex;
@@ -422,6 +461,8 @@ button.link {
   }
 }
 </style>
+
+<style>
 .modal-box.payment {
   width: min(640px, 100%);
 }
@@ -461,3 +502,4 @@ button.link {
 .pay-chip:hover {
   border-color: var(--primary);
 }
+</style>

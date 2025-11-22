@@ -5,6 +5,7 @@ export interface StockMovementDocument extends Document {
   type: 'ENTRY' | 'EXIT' | 'ADJUSTMENT';
   quantity: number;
   reason: string;
+  location: string;
   relatedPurchase?: Types.ObjectId;
   relatedSale?: Types.ObjectId;
   user?: Types.ObjectId;
@@ -16,6 +17,7 @@ const stockMovementSchema = new Schema(
     type: { type: String, enum: ['ENTRY', 'EXIT', 'ADJUSTMENT'], required: true },
     quantity: { type: Number, required: true },
     reason: { type: String, required: true },
+    location: { type: String, default: 'default' },
     relatedPurchase: { type: Schema.Types.ObjectId, ref: 'Purchase' },
     relatedSale: { type: Schema.Types.ObjectId, ref: 'Sale' },
     user: { type: Schema.Types.ObjectId, ref: 'User' }
