@@ -17,6 +17,7 @@ import saleRoutes from './routes/saleRoutes';
 import notificationRoutes from './routes/notificationRoutes';
 import metricsRoutes from './routes/metricsRoutes';
 import locationRoutes from './routes/locationRoutes';
+import paymentRoutes from './routes/paymentRoutes';
 import { createAdminSeed } from './services/authService';
 
 const app = express();
@@ -35,6 +36,7 @@ app.use('/products', productRoutes);
 app.use('/purchases', purchaseRoutes);
 app.use('/stock-movements', stockMovementRoutes);
 app.use('/sales', saleRoutes);
+app.use('/payments', paymentRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/metrics', metricsRoutes);
 app.use('/locations', locationRoutes);

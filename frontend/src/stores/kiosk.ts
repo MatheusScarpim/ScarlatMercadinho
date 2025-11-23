@@ -65,19 +65,18 @@ export const useKioskStore = defineStore('kiosk', {
         }
         this.message = '';
       } catch (err: any) {
-        this.message = err?.response?.data?.message || 'Produto não encontrado';
+        this.message = err?.response?.data?.message || 'Produto nao encontrado';
       }
     },
     async addByProduct(product: any) {
       await this.ensureSale();
       const existing = this.cart.find((c) => c.productId === product._id);
+      const location = this.selectedLocation || import.meta.env.VITE_KIOSK_LOCATION || 'default';
       if (existing) {
         existing.quantity += 1;
-        const location = this.selectedLocation || import.meta.env.VITE_KIOSK_LOCATION || 'default';
         const { data } = await api.post(`/sales/${this.saleId}/items`, { productId: product._id, quantity: 1, location });
         existing.saleItemId = data.item._id;
       } else {
-        const location = this.selectedLocation || import.meta.env.VITE_KIOSK_LOCATION || 'default';
         const { data } = await api.post(`/sales/${this.saleId}/items`, { productId: product._id, quantity: 1, location });
         this.cart.push({
           saleItemId: data.item._id,
@@ -102,7 +101,41 @@ export const useKioskStore = defineStore('kiosk', {
       this.cart = [];
       this.message = '';
     },
-    async complete(paymentMethod: string, apartmentNote?: string) {
+    async startPayment(paymentMethod: string, apartmentNote?: string) {
+      if (!this.saleId) return { completed: false };
+
+      if (paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD' || paymentMethod === 'PIX') {
+        const { data } = await api.post(`/payments/sales/${this.saleId}`, {
+          method: paymentMethod
+        });
+
+        const provider = data?.providerResponse || {};
+        if (paymentMethod === 'PIX') {
+          return { completed: false, provider };
+        }
+
+        const paymentState =
+          provider?.payment?.state ||
+          provider?.payment?.status ||
+          provider?.status ||
+          provider?.status_detail;
+
+        const approvedStates = ['APPROVED', 'approved', 'FINISHED', 'finished', 'success', 'closed'];
+
+        if (!approvedStates.includes(paymentState)) {
+          return { completed: false, provider };
+        }
+
+        await api.post(`/sales/${this.saleId}/complete`, { paymentMethod, apartmentNote });
+        this.resetCart();
+        return { completed: true, provider };
+      }
+
+      await api.post(`/sales/${this.saleId}/complete`, { paymentMethod, apartmentNote });
+      this.resetCart();
+      return { completed: true };
+    },
+    async finalizeSale(paymentMethod: string, apartmentNote?: string) {
       if (!this.saleId) return;
       await api.post(`/sales/${this.saleId}/complete`, { paymentMethod, apartmentNote });
       this.resetCart();

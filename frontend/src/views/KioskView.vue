@@ -88,7 +88,7 @@
             <p class="eyebrow">finalizar compra</p>
             <h3>Confirme o pagamento</h3>
           </div>
-            <button class="ghost" @click="closePayment">Fechar</button>
+          <button class="ghost" @click="closePayment">Fechar</button>
         </div>
 
         <div class="payment-total">
@@ -114,22 +114,81 @@
               {{ opt.label }}
             </button>
           </div>
+          <p v-if="paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD'" class="muted sm">
+            Na maquininha: aperte o verde para pagar ou o vermelho para cancelar.
+          </p>
+        </div>
+
+        <div v-if="paymentMethod === 'PIX' && pixData.paymentId" class="pix-block glass">
+          <p class="muted">Escaneie o QR para pagar com Pix.</p>
+          <div class="pix-qr">
+            <img v-if="pixData.qrCodeBase64" :src="`data:image/png;base64,${pixData.qrCodeBase64}`" alt="QR Pix" />
+            <p v-else class="muted qr-text">{{ pixData.qrCode }}</p>
+          </div>
+          <p class="muted sm">ID pagamento: {{ pixData.paymentId }}</p>
+        </div>
+
+        <p v-if="paymentError" class="warning">{{ paymentError }}</p>
+
+        <div v-if="paymentProcessing" class="payment-wait">
+          <div class="spinner" aria-hidden="true"></div>
+          <div>
+            <p>{{ paymentStatusText || 'Processando pagamento...' }}</p>
+            <p class="muted sm" v-if="paymentMethod === 'PIX'">Aguardando confirmacao do Pix.</p>
+            <p class="muted sm" v-else>
+              Confirme na maquininha: verde para pagar, vermelho para cancelar.
+            </p>
+          </div>
         </div>
 
         <div class="actions modal-actions">
-          <button class="ghost" @click="closePayment">Voltar</button>
-          <button class="primary" @click="confirmPayment">Confirmar pagamento</button>
+          <button class="ghost" @click="cancelPayment">Cancelar pagamento</button>
+          <button class="primary" @click="confirmPayment" :disabled="paymentProcessing">
+            {{ paymentProcessing ? 'Aguardando...' : 'Confirmar pagamento' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showTerminalHint" class="modal">
+      <div class="modal-box glass">
+        <div class="modal-header">
+          <h3>Confirme na maquininha</h3>
+          <button class="ghost" @click="closeTerminalHint">Fechar</button>
+        </div>
+        <p class="muted">Pressione o botão verde na maquininha para pagar.</p>
+        <p class="muted">Para cancelar, pressione o botão vermelho.</p>
+        <div class="actions modal-actions">
+          <button class="ghost" @click="closeTerminalHint">Voltar</button>
+          <button class="primary" @click="confirmTerminalHint">Já apertei o verde</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showTerminalHint" class="modal">
+      <div class="modal-box glass">
+        <div class="modal-header">
+          <h3>Confirme na maquininha</h3>
+          <button class="ghost" @click="closeTerminalHint">Fechar</button>
+        </div>
+        <p class="muted emphasis">
+          {{ terminalHintMode === 'pay'
+            ? 'Pressione o botão verde na maquininha para pagar.'
+            : 'Para cancelar, pressione o botão vermelho na maquininha.' }}
+        </p>
+        <div class="actions modal-actions">
+          <button class="primary" @click="closeTerminalHint">Ok, entendi</button>
         </div>
       </div>
     </div>
 
     <div v-if="paymentSuccess" class="modal success">
       <div class="modal-box glass success-box">
-        <h3>Compra concluída</h3>
+        <h3>Compra concluida</h3>
         <p class="muted">Pagamento registrado. Obrigado!</p>
         <div class="payment-total">
           <span>Total</span>
-          <strong>R$ {{ subtotal.toFixed(2) }}</strong>
+          <strong>R$ {{ paymentTotal.toFixed(2) }}</strong>
         </div>
         <div class="actions modal-actions">
           <button class="primary" @click="closeSuccess">Fechar</button>
@@ -150,14 +209,24 @@ const barcodeInput = ref<HTMLInputElement | null>(null);
 const manualBarcodeOpen = ref(false);
 const manualBarcode = ref('');
 const apartmentNote = ref('');
-const paymentMethod = ref('CASH');
+const paymentMethod = ref('PIX');
 const paymentSuccess = ref(false);
+const paymentProcessing = ref(false);
+const paymentStatusText = ref('');
+const paymentError = ref('');
+const paymentTotal = ref(0);
+const showTerminalHint = ref(false);
+const terminalHintMode = ref<'pay' | 'cancel'>('pay');
+const pixData = ref<{ qrCode: string | null; qrCodeBase64: string | null; paymentId: string | null }>({
+  qrCode: null,
+  qrCodeBase64: null,
+  paymentId: null
+});
+const pixStatus = ref('');
 const paymentOptions = [
-  { value: 'CASH', label: 'Dinheiro' },
-  { value: 'CREDIT_CARD', label: 'Crédito' },
-  { value: 'DEBIT_CARD', label: 'Débito' },
-  { value: 'PIX', label: 'Pix' },
-  { value: 'OTHER', label: 'Outros' }
+  { value: 'CREDIT_CARD', label: 'Credito' },
+  { value: 'DEBIT_CARD', label: 'Debito' },
+  { value: 'PIX', label: 'Pix' }
 ];
 
 const cart = computed(() => store.cart);
@@ -173,7 +242,7 @@ async function loadLocations() {
     const { data } = await api.get('/locations');
     locations.value = data;
     if (!chosenLocation.value && data.length) chosenLocation.value = data[0].code;
-  } catch (err) {
+  } catch {
     locations.value = [];
     if (!chosenLocation.value) chosenLocation.value = 'default';
   }
@@ -188,11 +257,9 @@ function confirmLocation() {
 
 function paymentLabel(pay: string) {
   const map: Record<string, string> = {
-    CASH: 'Dinheiro',
-    CREDIT_CARD: 'Cartão crédito',
-    DEBIT_CARD: 'Cartão débito',
-    PIX: 'Pix',
-    OTHER: 'Outros'
+    CREDIT_CARD: 'Cartao credito',
+    DEBIT_CARD: 'Cartao debito',
+    PIX: 'Pix'
   };
   return map[pay] || pay;
 }
@@ -217,19 +284,146 @@ function cancel() {
   store.resetCart();
 }
 
+async function cancelPayment() {
+  paymentProcessing.value = false;
+  paymentError.value = '';
+  paymentStatusText.value = '';
+  if (paymentMethod.value === 'CREDIT_CARD' || paymentMethod.value === 'DEBIT_CARD') {
+    terminalHintMode.value = 'cancel';
+    showTerminalHint.value = true;
+    return;
+  }
+  closePayment();
+}
+
+function confirmTerminalHint() {
+  showTerminalHint.value = false;
+}
+
+function closeTerminalHint() {
+  showTerminalHint.value = false;
+}
+
 function openPayment() {
   if (!cart.value.length) return;
+  paymentError.value = '';
+  paymentTotal.value = subtotal.value;
+  showTerminalHint.value = false;
+  terminalHintMode.value = 'pay';
   paymentOpen.value = true;
 }
 
 function closePayment() {
   paymentOpen.value = false;
+  pixData.value = { qrCode: null, qrCodeBase64: null, paymentId: null };
+  pixStatus.value = '';
+  showTerminalHint.value = false;
 }
 
 async function confirmPayment() {
-  await store.complete(paymentMethod.value, apartmentNote.value);
-  paymentOpen.value = false;
-  paymentSuccess.value = true;
+  showTerminalHint.value = false;
+  if (paymentMethod.value === 'CREDIT_CARD' || paymentMethod.value === 'DEBIT_CARD') {
+    terminalHintMode.value = 'pay';
+    showTerminalHint.value = true; // mostra instrução do botão verde enquanto envia
+  }
+  paymentError.value = '';
+  paymentProcessing.value = true;
+  const isMachine = paymentMethod.value === 'CREDIT_CARD' || paymentMethod.value === 'DEBIT_CARD';
+  paymentStatusText.value = isMachine ? 'Aguardando confirmacao na maquininha...' : 'Gerando pagamento...';
+
+  try {
+    if (paymentMethod.value === 'PIX') {
+      const result: any = await store.startPayment('PIX', apartmentNote.value);
+      const provider = result?.provider || {};
+      pixData.value = {
+        qrCode: provider.qrCode || null,
+        qrCodeBase64: provider.qrCodeBase64 || null,
+        paymentId: provider.paymentId || null
+      };
+      paymentStatusText.value = 'Aguardando pagamento PIX...';
+      await pollPixStatus(provider.paymentId);
+    } else {
+      const result: any = await store.startPayment(paymentMethod.value, apartmentNote.value);
+      const provider = result?.provider || {};
+      const state =
+        provider?.payment?.state ||
+        provider?.payment?.status ||
+        provider?.state ||
+        provider?.status ||
+        provider?.status_detail ||
+        '';
+      const approvedStates = ['APPROVED', 'approved', 'FINISHED', 'finished', 'success', 'closed'];
+      if (approvedStates.includes(state)) {
+        paymentOpen.value = false;
+        paymentTotal.value = subtotal.value || paymentTotal.value;
+        paymentSuccess.value = true;
+      } else if (provider?.intentId || provider?.payment?.id) {
+        await pollPointStatus(provider.intentId || provider.payment?.id);
+      } else {
+        throw new Error('Estado do pagamento desconhecido');
+      }
+    }
+  } catch (err: any) {
+    paymentError.value = err?.response?.data?.message || err?.message || 'Erro ao processar pagamento';
+  } finally {
+    paymentProcessing.value = false;
+  }
+}
+
+async function pollPixStatus(paymentId?: string) {
+  if (!paymentId) throw new Error('ID do pagamento PIX nao retornado');
+  pixStatus.value = 'pending';
+  let attempts = 0;
+  while (true) {
+    if (!paymentOpen.value) return; // cancelado pelo usuario
+    const { data } = await api.get(`/payments/status/${paymentId}`);
+    const status = (data?.status || data?.status_detail || '').toLowerCase();
+    if (['approved', 'accredited', 'completed'].includes(status)) {
+      pixStatus.value = 'approved';
+      await store.finalizeSale('PIX', apartmentNote.value);
+      paymentOpen.value = false;
+      paymentTotal.value = subtotal.value || paymentTotal.value;
+      paymentSuccess.value = true;
+      return;
+    }
+    if (['rejected', 'cancelled', 'canceled', 'expired'].includes(status)) {
+      pixStatus.value = 'rejected';
+      throw new Error(`Pagamento PIX ${status}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000 + attempts * 300));
+    attempts++;
+  }
+}
+
+async function pollPointStatus(intentId: string) {
+  if (paymentMethod.value !== 'CREDIT_CARD' && paymentMethod.value !== 'DEBIT_CARD') {
+    return;
+  }
+  paymentStatusText.value = 'Aguardando confirmacao na maquininha...';
+  let attempts = 0;
+  while (true) {
+    if (!paymentOpen.value) return;
+    const { data } = await api.get(`/payments/point/${intentId}`);
+    const state = (data?.state || data?.status || '').toLowerCase();
+    if (['approved', 'finished', 'closed', 'approved'].includes(state)) {
+      paymentOpen.value = false;
+      paymentTotal.value = subtotal.value || paymentTotal.value;
+      paymentSuccess.value = true;
+      return;
+    }
+    if (['rejected', 'cancelled', 'canceled', 'expired'].includes(state)) {
+      // Se o terminal foi cancelado/rejeitado, só avisa sem erro (apenas para cartão)
+      if (paymentMethod.value === 'PIX') {
+        return;
+      }
+      terminalHintMode.value = 'cancel';
+      showTerminalHint.value = true;
+      paymentProcessing.value = false;
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000 + attempts * 300));
+    attempts++;
+  }
 }
 
 function focusBarcode() {
@@ -267,6 +461,9 @@ async function confirmManualBarcode() {
 
 function setPayment(opt: string) {
   paymentMethod.value = opt;
+  showTerminalHint.value = false;
+  terminalHintMode.value = 'pay';
+  paymentStatusText.value = '';
 }
 
 function closeSuccess() {
@@ -413,6 +610,63 @@ button.link {
 .muted {
   color: var(--muted);
 }
+.warning {
+  color: #f16c7f;
+  margin-top: 8px;
+}
+.emphasis {
+  font-size: 16px;
+  font-weight: 600;
+}
+.payment-wait {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.pix-block {
+  margin: 12px 0;
+  padding: 12px;
+}
+.pix-qr {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  max-width: 260px;
+  margin: 0 auto;
+}
+.pix-qr img {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+}
+.qr-text {
+  word-break: break-all;
+  text-align: center;
+}
+.spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  animation: spin 0.9s linear infinite;
+}
+.sm {
+  font-size: 12px;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .modal {
   position: fixed;
   inset: 0;
@@ -423,7 +677,7 @@ button.link {
   z-index: 20;
 }
 .modal-box {
-  width: min(540px, 100%);
+  width: min(900px, 100%);
   padding: 18px;
 }
 .modal.success .modal-box {
@@ -464,7 +718,9 @@ button.link {
 
 <style>
 .modal-box.payment {
-  width: min(640px, 100%);
+  width: min(900px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 .payment-total {
   background: var(--surface-2);

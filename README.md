@@ -10,11 +10,14 @@ Sistema completo de autoatendimento (quiosque) e painel administrativo para gest
 - `backend/`
   - Config: `.env`, `src/config/*`
   - Models: Users, Units, Suppliers, Categories, Products, Purchases, Sales, SaleItems, StockMovements, Notifications
+- Pagamentos internos (Mercado Pago): `POST /payments/sales/:saleId` (method: `PIX`, `CREDIT_CARD`, `DEBIT_CARD`), `GET /payments/status/:paymentId`
   - Controllers/Services/Routes: auth, products, units, categories, suppliers, purchases, sales, stock-movements, notifications, metrics
+- Pagamentos internos (Mercado Pago): `POST /payments/sales/:saleId` (method: `PIX`, `CREDIT_CARD`, `DEBIT_CARD`), `GET /payments/status/:paymentId`
   - Middlewares: auth (JWT), error handler
 - `frontend/`
   - Páginas: `KioskView` (autoatendimento), `Login`, admin (`Dashboard`, `Products`, `Units`, `Categories`, `Suppliers`, `Purchases`, `StockMovements`, `Sales`)
   - stores: `auth`, `kiosk`, `notifications`
+- Pagamentos internos (Mercado Pago): `POST /payments/sales/:saleId` (method: `PIX`, `CREDIT_CARD`, `DEBIT_CARD`), `GET /payments/status/:paymentId`
   - componentes: `BaseModal`
 
 ## Backend
@@ -28,6 +31,10 @@ Crie `backend/.env` a partir de `.env.example`:
 MONGODB_URI=mongodb://root:root@localhost:27017/mercadinho?authSource=admin
 JWT_SECRET=supersecret
 PORT=3000
+MERCADO_PAGO_ACCESS_TOKEN=
+MERCADO_PAGO_POINT_DEVICE_ID=
+MERCADO_PAGO_SANDBOX=true
+
 ```
 
 ### Instalar e rodar
@@ -46,6 +53,7 @@ Seed inicial: admin@example.com / admin123
 - Movimentações: `GET /stock-movements`, `POST /stock-movements` (ajustes)
 - Métricas: `GET /metrics?from=...&to=...&status=COMPLETED`
 - Notificações: `GET /notifications`, `/unread-count`, `PUT /mark-all-read`, `PUT /:id/read`
+- Pagamentos internos (Mercado Pago): `POST /payments/sales/:saleId` (method: `PIX`, `CREDIT_CARD`, `DEBIT_CARD`), `GET /payments/status/:paymentId`
 
 > Rotas admin exigem JWT no header Authorization: Bearer.
 
@@ -73,6 +81,7 @@ Abra `http://localhost:5173`.
 - **/admin/stock-movements**: histórico de entradas/saídas/ajustes
 - **/admin/sales**: listagem paginada de vendas
 - Notificações: botão no header do admin com painel (ler/marcar lidas)
+- Pagamentos internos (Mercado Pago): `POST /payments/sales/:saleId` (method: `PIX`, `CREDIT_CARD`, `DEBIT_CARD`), `GET /payments/status/:paymentId`
 
 ## Padrões e observações
 - Paginado: produtos e vendas já aceitam `page/limit`.
