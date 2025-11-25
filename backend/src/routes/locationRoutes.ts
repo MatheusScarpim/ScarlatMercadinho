@@ -4,11 +4,13 @@ import { authMiddleware, adminOnly } from '../middlewares/auth';
 
 const router = Router();
 
-router.use(authMiddleware, adminOnly);
-router.post('/', controller.createLocation);
+// Listar/consultar locais não exige login (usado no quiosque)
 router.get('/', controller.listLocations);
 router.get('/:id', controller.getLocation);
-router.put('/:id', controller.updateLocation);
-router.delete('/:id', controller.deleteLocation);
+
+// Demais operações continuam restritas
+router.post('/', authMiddleware, adminOnly, controller.createLocation);
+router.put('/:id', authMiddleware, adminOnly, controller.updateLocation);
+router.delete('/:id', authMiddleware, adminOnly, controller.deleteLocation);
 
 export default router;
