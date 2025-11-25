@@ -14,5 +14,30 @@ services:
       - mongo-data:/data/db
     command: ["--bind_ip_all"]
 
+  backend:
+    build: ./backend
+    container_name: mercadinho-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    ports:
+      - "4000:4000"
+    depends_on:
+      - mongo
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://backend:4000}
+        VITE_LOCATION_PASSWORD: ${VITE_LOCATION_PASSWORD:-1234}
+    container_name: mercadinho-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
 volumes:
   mongo-data:
