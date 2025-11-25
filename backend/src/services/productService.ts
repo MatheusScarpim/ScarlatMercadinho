@@ -30,12 +30,12 @@ export async function searchProducts(
   location?: string
 ) {
   const filter = buildFilter(params);
-  const docs = await ProductModel.find(filter).skip(skip).limit(limit).populate('unit category mainSupplier');
+  const docs = await ProductModel.find(filter).skip(skip).limit(limit).populate('category mainSupplier');
   return location ? docs.map((d) => applyLocation(d, location)) : docs;
 }
 
 export async function findByBarcode(barcode: string, location?: string) {
-  const doc = await ProductModel.findOne({ barcode, active: true }).populate('unit category');
+  const doc = await ProductModel.findOne({ barcode, active: true }).populate('category');
   return location && doc ? applyLocation(doc, location) : doc;
 }
 

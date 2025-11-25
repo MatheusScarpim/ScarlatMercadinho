@@ -3,7 +3,13 @@ import { ProductModel } from '../models/Product';
 import * as productService from '../services/productService';
 
 export async function createProduct(req: Request, res: Response) {
-  const product = await ProductModel.create({ ...req.body });
+  const category = (req.body.category?._id as string) || (req.body.category as string);
+
+  if (!category || (typeof category === 'string' && !category.trim())) {
+    return res.status(400).json({ message: 'Campo category é obrigatório.' });
+  }
+
+  const product = await ProductModel.create({ ...req.body, category });
   res.status(201).json(product);
 }
 
@@ -24,7 +30,7 @@ export async function listProducts(req: Request, res: Response) {
 }
 
 export async function getProduct(req: Request, res: Response) {
-  const product = await ProductModel.findById(req.params.id).populate('unit category mainSupplier');
+  const product = await ProductModel.findById(req.params.id).populate('category mainSupplier');
   if (!product) return res.status(404).json({ message: 'Not found' });
   res.json(product);
 }

@@ -5,7 +5,6 @@ export interface ProductDocument extends Document {
   description?: string;
   barcode: string;
   sku?: string;
-  unit: Types.ObjectId;
   category: Types.ObjectId;
   mainSupplier?: Types.ObjectId;
   costPrice: number;
@@ -23,7 +22,6 @@ const productSchema = new Schema(
     description: { type: String },
     barcode: { type: String, required: true, unique: true, index: true },
     sku: { type: String },
-    unit: { type: Schema.Types.ObjectId, ref: 'Unit', required: true },
     category: { type: Schema.Types.ObjectId, ref: 'Category', required: true },
     mainSupplier: { type: Schema.Types.ObjectId, ref: 'Supplier' },
     costPrice: { type: Number, required: true },
