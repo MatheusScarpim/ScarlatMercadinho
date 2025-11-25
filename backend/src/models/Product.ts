@@ -11,6 +11,7 @@ export interface ProductDocument extends Document {
   costPrice: number;
   salePrice: number;
   stockQuantity: number;
+  stockByLocation: { location: string; quantity: number }[];
   minimumStock: number;
   active: boolean;
   isWeighed: boolean;

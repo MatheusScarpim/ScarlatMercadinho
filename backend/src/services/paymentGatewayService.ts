@@ -6,6 +6,10 @@ import { SaleItemModel } from '../models/SaleItem';
 
 type PointPaymentType = 'credit' | 'debit';
 
+function errorMessage(err: unknown) {
+  return err instanceof Error ? err.message : String(err);
+}
+
 function getMpClient() {
   if (!env.mpAccessToken) {
     throw new ApiError(500, 'MERCADO_PAGO_ACCESS_TOKEN not configured');
@@ -189,7 +193,7 @@ export async function cancelPointPaymentIntent(intentId: string) {
       return await cancelOrderTransaction(orderId, transactionId);
     }
   } catch (err) {
-    console.log('[point-cancel] no order/transaction, fallback', err?.message || err);
+    console.log('[point-cancel] no order/transaction, fallback', errorMessage(err));
   }
 
   const baseWithDevice = env.mpPointDeviceId
@@ -259,8 +263,8 @@ export async function cancelPointPaymentIntent(intentId: string) {
           continue;
         }
       }
-    } catch (err: any) {
-      console.log('[point-cancel] delete loop error', err?.message || err);
+    } catch (err) {
+      console.log('[point-cancel] delete loop error', errorMessage(err));
     }
     attempts++;
     await new Promise((resolve) => setTimeout(resolve, 700));
