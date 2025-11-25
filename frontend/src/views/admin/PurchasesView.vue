@@ -2,7 +2,10 @@
   <div>
     <div class="header">
       <h3>Compras / Entradas</h3>
-      <button class="btn btn-primary" @click="openForm">Nova compra</button>
+      <div class="header-actions">
+        <button class="btn btn-ghost" @click="exportPurchases">Exportar Excel</button>
+        <button class="btn btn-primary" @click="openForm">Nova compra</button>
+      </div>
     </div>
 
     <BaseModal :open="showForm" title="Nova compra" :onClose="closeForm">
@@ -47,8 +50,8 @@
           <div class="item-row head">
             <div>Produto</div>
             <div>Qtd</div>
-            <div>Custo unit.</div>
-            <div>Total</div>
+            <div>Custo unit. (R$)</div>
+            <div>Total (R$)</div>
             <div></div>
           </div>
           <div class="item-row" v-for="(item, idx) in form.items" :key="idx">
@@ -57,7 +60,13 @@
               <option v-for="p in products" :key="p._id" :value="p._id">{{ p.name }}</option>
             </select>
             <input type="number" v-model.number="item.quantity" min="1" placeholder="Qtde" />
-            <input type="number" step="0.01" v-model.number="item.unitCost" min="0" placeholder="Custo unit." />
+            <input
+              type="number"
+              step="0.01"
+              v-model.number="item.unitCost"
+              min="0"
+              placeholder="Custo unit. (R$)"
+            />
             <div class="item-total">R$ {{ (item.quantity * item.unitCost || 0).toFixed(2) }}</div>
             <button class="btn btn-ghost" type="button" @click="removeItem(idx)">x</button>
           </div>
@@ -65,7 +74,7 @@
 
         <div class="footer-bar">
           <div class="summary">
-            <span>Total</span>
+            <span>Total (R$)</span>
             <strong>R$ {{ total.toFixed(2) }}</strong>
           </div>
           <div class="modal-actions">
@@ -82,7 +91,7 @@
           <tr>
             <th>Data</th>
             <th>Fornecedor</th>
-            <th>Total</th>
+            <th>Total (R$)</th>
           </tr>
         </thead>
         <tbody>
@@ -101,6 +110,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
+import { exportToCsv } from '../../utils/export';
 
 const purchases = ref<any[]>([]);
 const products = ref<any[]>([]);
@@ -178,6 +188,19 @@ function openForm() {
 function closeForm() {
   showForm.value = false;
 }
+
+async function exportPurchases() {
+  const { data } = await api.get('/purchases', { params: { limit: 2000, page: 1 } });
+  const list = data.data || data;
+  const headers = ['Data', 'Fornecedor', 'Local', 'Total (R$)'];
+  const rows = list.map((p: any) => [
+    formatDate(p.createdAt),
+    p.supplier?.name || '-',
+    p.location || '-',
+    p.totalAmount?.toFixed ? p.totalAmount.toFixed(2) : p.totalAmount
+  ]);
+  exportToCsv('compras.csv', headers, rows);
+}
 </script>
 
 <style scoped>
@@ -185,6 +208,11 @@ function closeForm() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .card {
   margin-top: 12px;

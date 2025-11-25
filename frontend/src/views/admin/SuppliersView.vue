@@ -2,7 +2,10 @@
   <div>
     <div class="header">
       <h3>Fornecedores</h3>
-      <button class="btn btn-primary" @click="openForm">Novo fornecedor</button>
+      <div class="header-actions">
+        <button class="btn btn-ghost" @click="exportSuppliers">Exportar Excel</button>
+        <button class="btn btn-primary" @click="openForm">Novo fornecedor</button>
+      </div>
     </div>
     <div class="card glass table-wrap">
       <table>
@@ -44,6 +47,7 @@
 import { onMounted, reactive, ref } from 'vue';
 import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
+import { exportToCsv } from '../../utils/export';
 
 const suppliers = ref<any[]>([]);
 const showForm = ref(false);
@@ -74,6 +78,19 @@ async function toggle(s: any) {
 
 onMounted(load);
 
+async function exportSuppliers() {
+  const { data } = await api.get('/suppliers');
+  const headers = ['Nome', 'Contato', 'Email', 'Telefone', 'Status'];
+  const rows = data.map((s: any) => [
+    s.name,
+    s.contactName || '-',
+    s.email || '-',
+    s.phone || '-',
+    s.active ? 'Ativo' : 'Inativo'
+  ]);
+  exportToCsv('fornecedores.csv', headers, rows);
+}
+
 function openForm() {
   showForm.value = true;
 }
@@ -88,6 +105,11 @@ function closeForm() {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .glass {
   background: rgba(255, 255, 255, 0.02);

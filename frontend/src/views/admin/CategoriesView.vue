@@ -2,7 +2,10 @@
   <div>
     <div class="header">
       <h3>Categorias</h3>
-      <button class="btn btn-primary" @click="openForm">Nova categoria</button>
+      <div class="header-actions">
+        <button class="btn btn-ghost" @click="exportCategories">Exportar Excel</button>
+        <button class="btn btn-primary" @click="openForm">Nova categoria</button>
+      </div>
     </div>
     <div class="card glass table-card">
       <table>
@@ -37,6 +40,7 @@
 import { onMounted, reactive, ref } from 'vue';
 import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
+import { exportToCsv } from '../../utils/export';
 
 const categories = ref<any[]>([]);
 const form = reactive({ name: '' });
@@ -61,6 +65,13 @@ async function toggle(c: any) {
 
 onMounted(load);
 
+async function exportCategories() {
+  const { data } = await api.get('/categories');
+  const headers = ['Nome', 'Status'];
+  const rows = data.map((c: any) => [c.name, c.active ? 'Ativo' : 'Inativo']);
+  exportToCsv('categorias.csv', headers, rows);
+}
+
 function openForm() {
   showForm.value = true;
 }
@@ -75,6 +86,11 @@ function closeForm() {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .card {
   margin-top: 12px;

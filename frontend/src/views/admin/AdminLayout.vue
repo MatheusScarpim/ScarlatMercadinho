@@ -10,7 +10,6 @@
         <RouterLink to="/admin/products">Produtos</RouterLink>
         <RouterLink to="/admin/suppliers">Fornecedores</RouterLink>
         <RouterLink to="/admin/categories">Categorias</RouterLink>
-        <RouterLink to="/admin/units">Unidades</RouterLink>
         <RouterLink to="/admin/locations">Locais</RouterLink>
         <RouterLink to="/admin/purchases">Compras</RouterLink>
         <RouterLink to="/admin/stock-movements">Estoque</RouterLink>
@@ -182,7 +181,7 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   width: 100%;
 }
@@ -194,7 +193,7 @@ header {
 .content {
   margin-top: 12px;
   padding: 16px;
-  max-width: 1200px;
+  max-width: 1400px;
   width: 100%;
   margin-left: auto;
   margin-right: auto;

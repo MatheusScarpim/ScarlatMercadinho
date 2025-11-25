@@ -2,7 +2,10 @@
   <div>
     <div class="header">
       <h3>Unidades</h3>
-      <button class="btn btn-primary" @click="openForm">Nova unidade</button>
+      <div class="header-actions">
+        <button class="btn btn-ghost" @click="exportUnits">Exportar Excel</button>
+        <button class="btn btn-primary" @click="openForm">Nova unidade</button>
+      </div>
     </div>
     <div class="card glass table-card">
       <table>
@@ -42,6 +45,7 @@
 import { onMounted, reactive, ref } from 'vue';
 import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
+import { exportToCsv } from '../../utils/export';
 
 const units = ref<any[]>([]);
 const form = reactive({ name: '', abbreviation: '' });
@@ -67,6 +71,13 @@ async function toggle(u: any) {
 
 onMounted(load);
 
+async function exportUnits() {
+  const { data } = await api.get('/units', { params: { page: 1, limit: 2000 } });
+  const headers = ['Nome', 'Sigla', 'Status'];
+  const rows = data.map((u: any) => [u.name, u.abbreviation, u.active ? 'Ativo' : 'Inativo']);
+  exportToCsv('unidades.csv', headers, rows);
+}
+
 function openForm() {
   showForm.value = true;
 }
@@ -81,6 +92,11 @@ function closeForm() {
   align-items: center;
   gap: 12px;
   justify-content: space-between;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .card {
   margin-top: 12px;

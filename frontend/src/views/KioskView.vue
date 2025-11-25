@@ -52,7 +52,7 @@
             <p class="eyebrow">Selecione o quiosque</p>
             <h3>Escolha o local</h3>
           </div>
-          <button class="ghost" @click="showLocationModal = false" :disabled="!chosenLocation">Fechar</button>
+          <button class="ghost" @click="closeLocationModal" :disabled="!chosenLocation">Fechar</button>
         </div>
         <div class="field">
           <label>Local</label>
@@ -61,8 +61,20 @@
             <option v-for="loc in locations" :key="loc._id" :value="loc.code">{{ loc.name }} ({{ loc.code }})</option>
           </select>
         </div>
+        <div class="field">
+          <label>Senha de troca</label>
+          <input
+            type="password"
+            v-model="locationPasswordInput"
+            placeholder="Digite a senha"
+            @input="locationPasswordError = ''"
+          />
+          <p v-if="locationPasswordError" class="warning sm">{{ locationPasswordError }}</p>
+        </div>
         <div class="actions modal-actions">
-          <button class="primary" :disabled="!chosenLocation" @click="confirmLocation">Confirmar</button>
+          <button class="primary" :disabled="!chosenLocation || !locationPasswordInput" @click="confirmLocation">
+            Confirmar
+          </button>
         </div>
       </div>
     </div>
@@ -235,7 +247,10 @@ const totalItems = computed(() => store.totalItems);
 const paymentOpen = ref(false);
 const locations = ref<any[]>([]);
 const chosenLocation = ref(store.selectedLocation || '');
-const showLocationModal = ref(true);
+const showLocationModal = ref(!store.selectedLocation);
+const locationPasswordInput = ref('');
+const locationPasswordError = ref('');
+const LOCATION_PASSWORD = import.meta.env.VITE_LOCATION_PASSWORD || '1234';
 
 async function loadLocations() {
   try {
@@ -250,9 +265,19 @@ async function loadLocations() {
 
 function confirmLocation() {
   if (!chosenLocation.value) return;
+  if (locationPasswordInput.value !== LOCATION_PASSWORD) {
+    locationPasswordError.value = 'Senha inválida';
+    return;
+  }
   store.setLocation(chosenLocation.value);
-  showLocationModal.value = false;
+  closeLocationModal();
   focusBarcode();
+}
+
+function closeLocationModal() {
+  showLocationModal.value = false;
+  locationPasswordInput.value = '';
+  locationPasswordError.value = '';
 }
 
 function paymentLabel(pay: string) {
@@ -500,7 +525,7 @@ function closeSuccess() {
   padding: 14px;
   min-height: 320px;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 .cart-top {
@@ -525,12 +550,12 @@ function closeSuccess() {
   margin-top: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  max-height: 70vh;
-  min-height: 360px;
+  max-height: 80vh;
+  min-height: 480px;
   overflow: auto;
   position: relative;
   background: var(--surface);
-  padding: 16px;
+  padding: 20px;
 }
 .cart-item {
   display: grid;

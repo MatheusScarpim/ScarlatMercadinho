@@ -2,7 +2,10 @@
   <div>
     <div class="header">
       <h3>Locais</h3>
-      <button class="btn btn-primary" @click="openForm">Novo local</button>
+      <div class="header-actions">
+        <button class="btn btn-ghost" @click="exportLocations">Exportar Excel</button>
+        <button class="btn btn-primary" @click="openForm">Novo local</button>
+      </div>
     </div>
 
     <div class="card glass table-card">
@@ -12,8 +15,8 @@
             <th>Nome</th>
             <th>Código</th>
             <th>Descrição</th>
-            <th>Status</th>
-            <th>Ações</th>
+            <th class="status-col">Status</th>
+            <th class="actions-col">Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -21,10 +24,10 @@
             <td>{{ loc.name }}</td>
             <td>{{ loc.code }}</td>
             <td>{{ loc.description || '—' }}</td>
-            <td>
+            <td class="status-col">
               <span :class="['badge', loc.active ? 'active' : 'inactive']">{{ loc.active ? 'Ativo' : 'Inativo' }}</span>
             </td>
-            <td class="actions-cell">
+            <td class="actions-cell actions-col">
               <button class="btn btn-ghost" @click="goToStock(loc)">Ver estoque</button>
               <button class="btn btn-ghost" @click="startEdit(loc)">Editar</button>
               <button class="btn btn-ghost alert" @click="toggle(loc)">{{ loc.active ? 'Inativar' : 'Ativar' }}</button>
@@ -66,6 +69,7 @@ import { onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
+import { exportToCsv } from '../../utils/export';
 
 const router = useRouter();
 
@@ -127,6 +131,18 @@ function goToStock(loc: any) {
 }
 
 onMounted(load);
+
+async function exportLocations() {
+  const { data } = await api.get('/locations');
+  const headers = ['Nome', 'Código', 'Descrição', 'Status'];
+  const rows = data.map((loc: any) => [
+    loc.name,
+    loc.code,
+    loc.description || '-',
+    loc.active ? 'Ativo' : 'Inativo'
+  ]);
+  exportToCsv('locais.csv', headers, rows);
+}
 </script>
 
 <style scoped>
@@ -135,18 +151,32 @@ onMounted(load);
   align-items: center;
   justify-content: space-between;
 }
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .card {
   margin-top: 12px;
   padding: 16px;
+}
+.btn-ghost.alert {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+.status-col {
+  text-align: center;
+  width: 110px;
+}
+.actions-col {
+  text-align: right;
+  width: 180px;
 }
 .actions-cell {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-}
-.btn-ghost.alert {
-  border-color: #ef4444;
-  color: #ef4444;
+  justify-content: flex-end;
 }
 .badge {
   padding: 4px 8px;

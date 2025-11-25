@@ -15,6 +15,7 @@
         </option>
       </select>
       <input v-model="productId" placeholder="ID do produto" @keyup.enter="load" />
+      <button class="btn btn-ghost" @click="exportMovements">Exportar Excel</button>
       <button class="btn btn-primary" @click="load">Filtrar</button>
     </div>
     <div class="card glass table-card">
@@ -47,6 +48,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import api from '../../services/api';
+import { exportToCsv } from '../../utils/export';
 
 const movements = ref<any[]>([]);
 const type = ref('');
@@ -82,6 +84,28 @@ onMounted(() => {
   loadRefs();
   load();
 });
+
+async function exportMovements() {
+  const { data } = await api.get('/stock-movements', {
+    params: {
+      type: type.value || undefined,
+      productId: productId.value || undefined,
+      location: location.value || undefined,
+      limit: 2000,
+      page: 1
+    }
+  });
+  const headers = ['Data', 'Produto', 'Tipo', 'Quantidade', 'Motivo', 'Local'];
+  const rows = data.map((m: any) => [
+    formatDate(m.createdAt),
+    m.product?.name || '-',
+    typeLabel(m.type),
+    m.quantity,
+    m.reason || '-',
+    m.location || 'default'
+  ]);
+  exportToCsv('movimentacoes.csv', headers, rows);
+}
 </script>
 
 <style scoped>
