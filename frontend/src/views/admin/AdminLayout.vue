@@ -14,6 +14,8 @@
         <RouterLink to="/admin/purchases">Compras</RouterLink>
         <RouterLink to="/admin/stock-movements">Estoque</RouterLink>
         <RouterLink to="/admin/sales">Vendas</RouterLink>
+        <RouterLink to="/admin/nfce">NFC-e</RouterLink>
+        <RouterLink to="/admin/settings">Configurações</RouterLink>
       </nav>
       <button class="logout" @click="logout">Sair</button>
     </aside>

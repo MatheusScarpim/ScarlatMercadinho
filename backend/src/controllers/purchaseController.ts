@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth';
-import { createPurchase } from '../services/purchaseService';
+import { createPurchase, getPurchasesWithDetails } from '../services/purchaseService';
 import { PurchaseModel } from '../models/Purchase';
 
 export async function create(req: AuthRequest, res: Response) {
@@ -31,4 +31,9 @@ export async function get(req: AuthRequest, res: Response) {
   const purchase = await PurchaseModel.findById(req.params.id).populate('supplier createdBy items.product');
   if (!purchase) return res.status(404).json({ message: 'Not found' });
   res.json(purchase);
+}
+
+export async function listWithDetails(req: AuthRequest, res: Response) {
+  const purchases = await getPurchasesWithDetails();
+  res.json(purchases);
 }

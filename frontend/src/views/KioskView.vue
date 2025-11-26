@@ -126,9 +126,10 @@
               {{ opt.label }}
             </button>
           </div>
-          <p v-if="paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD'" class="muted sm">
-            Na maquininha: aperte o verde para pagar ou o vermelho para cancelar.
-          </p>
+          <div v-if="paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD'" class="payment-hint">
+            <strong>Na maquininha:</strong> aperte o botão <span class="highlight success">verde</span> para pagar ou o
+            <span class="highlight danger">vermelho</span> para cancelar.
+          </div>
         </div>
 
         <div v-if="paymentMethod === 'PIX' && pixData.paymentId" class="pix-block glass">
@@ -431,8 +432,10 @@ async function pollPointStatus(intentId: string) {
     const { data } = await api.get(`/payments/point/${intentId}`);
     const state = (data?.state || data?.status || '').toLowerCase();
     if (['approved', 'finished', 'closed', 'approved'].includes(state)) {
+      const totalPaid = subtotal.value || paymentTotal.value;
+      await store.finalizeSale(paymentMethod.value, apartmentNote.value);
       paymentOpen.value = false;
-      paymentTotal.value = subtotal.value || paymentTotal.value;
+      paymentTotal.value = totalPaid;
       paymentSuccess.value = true;
       return;
     }
@@ -638,6 +641,28 @@ button.link {
 .warning {
   color: #f16c7f;
   margin-top: 8px;
+}
+.payment-hint {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #f59e0b;
+  background: #fffbeb;
+  border-radius: 10px;
+  color: #92400e;
+  font-weight: 600;
+}
+.payment-hint .highlight {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+.payment-hint .highlight.success {
+  background: #dcfce7;
+  color: #166534;
+}
+.payment-hint .highlight.danger {
+  background: #fee2e2;
+  color: #991b1b;
 }
 .emphasis {
   font-size: 16px;

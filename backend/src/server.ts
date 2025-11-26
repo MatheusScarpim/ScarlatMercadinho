@@ -18,6 +18,9 @@ import notificationRoutes from './routes/notificationRoutes';
 import metricsRoutes from './routes/metricsRoutes';
 import locationRoutes from './routes/locationRoutes';
 import paymentRoutes from './routes/paymentRoutes';
+import nfceRoutes from './routes/nfceRoutes';
+import cosmosRoutes from './routes/cosmosRoutes';
+import settingsRoutes from './routes/settingsRoutes';
 import { createAdminSeed } from './services/authService';
 
 const app = express();
@@ -40,6 +43,9 @@ app.use('/payments', paymentRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/metrics', metricsRoutes);
 app.use('/locations', locationRoutes);
+app.use('/nfce', nfceRoutes);
+app.use('/cosmos', cosmosRoutes);
+app.use('/settings', settingsRoutes);
 
 app.use(errorHandler);
 

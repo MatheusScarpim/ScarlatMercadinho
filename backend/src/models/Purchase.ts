@@ -5,6 +5,7 @@ interface PurchaseItem {
   quantity: number;
   unitCost: number;
   totalCost: number;
+  expiryDate?: Date | null;
 }
 
 export interface PurchaseDocument extends Document {
@@ -24,7 +25,8 @@ const purchaseItemSchema = new Schema(
     product: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
     quantity: { type: Number, required: true },
     unitCost: { type: Number, required: true },
-    totalCost: { type: Number, required: true }
+    totalCost: { type: Number, required: true },
+    expiryDate: { type: Date, default: null }
   },
   { _id: false }
 );

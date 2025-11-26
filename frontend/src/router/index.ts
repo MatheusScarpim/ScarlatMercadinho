@@ -11,6 +11,8 @@ import StockMovementsView from '../views/admin/StockMovementsView.vue';
 import SalesView from '../views/admin/SalesView.vue';
 import DashboardView from '../views/admin/DashboardView.vue';
 import LocationsView from '../views/admin/LocationsView.vue';
+import NfceView from '../views/admin/NfceView.vue';
+import SettingsView from '../views/admin/SettingsView.vue';
 import { useAuthStore } from '../stores/auth';
 
 const router = createRouter({
@@ -31,7 +33,9 @@ const router = createRouter({
         { path: 'purchases', component: PurchasesView },
         { path: 'stock-movements', component: StockMovementsView },
         { path: 'sales', component: SalesView },
-        { path: 'locations', component: LocationsView }
+        { path: 'locations', component: LocationsView },
+        { path: 'settings', component: SettingsView },
+        { path: 'nfce', component: NfceView }
       ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/kiosk' }

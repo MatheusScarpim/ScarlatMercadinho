@@ -6,6 +6,7 @@ const router = Router();
 
 router.use(authMiddleware);
 router.post('/', controller.create);
+router.get('/with-details', controller.listWithDetails);
 router.get('/', controller.list);
 router.get('/:id', controller.get);
 
