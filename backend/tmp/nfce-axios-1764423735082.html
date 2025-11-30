@@ -1,0 +1,379 @@
+
+
+<!DOCTYPE html>
+<html lang="pt-br" dir="ltr">
+<head id="Head"><title>
+	Consulta NFC-e - Secretaria da Fazenda - Governo do Estado de São Paulo
+</title>
+
+
+    
+
+    <!-- Main Metas -->
+    <meta charset="utf-8" /><meta name="author" content="humans.txt" />
+    <!-- Ajustar -->
+    <meta name="description" content="Secretaria&#32;da&#32;Fazenda&#32;-&#32;Governo&#32;do&#32;Estado&#32;de&#32;São&#32;Paulo" /><meta name="keywords" content="Secretaria,&#32;Fazenda,&#32;Governo,&#32;Estado,&#32;São&#32;Paulo,&#32;Ambiente&#32;de&#32;Pagamentos,&#32;DARE,&#32;JUCESP" /><meta name="viewport" content="width&#32;=&#32;device-width,&#32;initial-scale&#32;=&#32;1.0,&#32;minimum-scale&#32;=&#32;0.5,&#32;maximum-scale&#32;=&#32;2.0,&#32;user-scalable&#32;=&#32;yes" />
+
+    <!--[if lt IE 9]>
+        <meta http-equiv="X-UA-Compatible" content="IE=8" />
+    <![endif]-->
+
+
+    <link rel="shortcut&#32;icon" href="../favicon.ico" type="image/x-icon" /><link rel="icon" type="image/x-icon" href="../favicon.ico" />
+
+    <!-- CSS -->
+    <link rel="stylesheet" media="all" href="../Content/reset.css?v=1.0" /><link rel="stylesheet" media="all" href="../Content/structure.css?v=1.0" title="default" /><link rel="alternate&#32;stylesheet" media="all" href="../Content/contrast.css?v=1.0" title="contrast" /><link rel="stylesheet" media="all" href="../Content/botoes.css?v=1.0" /><link rel="stylesheet" media="all" href="../Xsl/nfe_v310_3/estilos/xslt.css" type="text/css" /><link rel="stylesheet" media="all" href="../Content/sefaz_nfce_complemento.css" type="text/css" /><link href="../Content/consultaPublica/common.css" rel="stylesheet" type="text/css" /><link href="../Content/consultaPublica/internalMaster.css" rel="stylesheet" type="text/css" /><link href="../Content/consultaPublica/consultaPublicaNFe.css" rel="stylesheet" type="text/css" /><link href="../Content/consultaPublica/sistema.css" rel="stylesheet" type="text/css" /><link href="../Content/consultaPublica/nfe-vis.css" rel="stylesheet" type="text/css" /><link href="../Content/themes/blitzer/jquery-ui-1.8.24.custom.css" rel="stylesheet" type="text/css" /><link rel="stylesheet" media="all" href="../Content/botoes.css?v=1.0" />
+    <!-- botões -->
+
+    <!-- Edicao do Conteudo -->
+    <link rel="stylesheet" media="all" href="../Content/conteudo.css" />
+
+    <!-- CSS3 Styles -->
+    <link rel="stylesheet" media="all" href="../Content/css3-styles.css?v=1.0" />
+
+    <!--[if IE]>
+            <link rel="stylesheet" media="all" href="../Content/ie-hacks.css?v=1.0" />
+        <![endif]-->
+
+    <!--[if lt IE 9]>
+        <script src='/NFCeConsultaPublica/Scripts/html5.js'></script>
+    <![endif]-->
+
+    
+    <script src="https://www.google.com/recaptcha/api.js?hl=pt-BR" async defer></script>
+
+
+    <script type="text/javascript">
+        function IniciarDialog() {
+
+            $('#divSucessoMaster').dialog({
+                autoOpen: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Ok": function () {
+                        trigger = "SIM";
+                        $(this).dialog("close");
+                    }
+                },
+                open: function (event, ui) {
+                    $(this).parents(".ui-dialog:first").find(".ui-widget-header").removeClass("ui-widget-header").addClass("ui-widget-header-info");
+                },
+                close: function (event, ui) {
+                    $('#hdfMsgConfirmacao').val("S");
+                    __doPostBack('btnDisparaPageLoad', 'CONFIRMACAO');
+                }
+            });
+
+            $('#divAlertaMaster').dialog({
+                autoOpen: false,
+                resizable: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Ok": function () {
+                        $(this).dialog("close");
+                    }
+                },
+                open: function (event, ui) {
+                    $(this).parents(".ui-dialog:first").find(".ui-widget-header").removeClass("ui-widget-header").addClass("ui-widget-header-info");
+                },
+            });
+
+            $('#divAlertaProsseguirMaster').dialog({
+                autoOpen: false,
+                resizable: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Ok": function () {
+                        __doPostBack('btnDisparaPageLoad', 'PROSSEGUIR');
+                        $(this).dialog("close");
+                    }
+                },
+                open: function (event, ui) {
+                    $(this).parents(".ui-dialog:first").find(".ui-widget-header").removeClass("ui-widget-header").addClass("ui-widget-header-info");
+                },
+            });
+
+            $('#divErroMaster').dialog({
+                autoOpen: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Ok": function () {
+                        $(this).dialog("close");
+                    }
+                }
+            });
+
+            $('#divErroProsseguirMaster').dialog({
+                autoOpen: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Ok": function () {
+                        __doPostBack('btnDisparaPageLoad', 'PROSSEGUIR');
+                        $(this).dialog("close");
+                    }
+                }
+            });
+
+            $('#divConfirmaMaster').dialog({
+                autoOpen: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Sim": function () {
+                        trigger = "SIM";
+                        $('#hdfMsgConfirmacao').val("S");
+                        $(this).dialog("close");
+                    },
+                    "Não": function () {
+                        trigger = "NAO";
+                        $('#hdfMsgConfirmacao').val("N");
+                        $(this).dialog("close");
+                    }
+                },
+                close: function (event, ui) {
+                    if (trigger == undefined)
+                        $('#hdfMsgConfirmacao').val("N");
+                    __doPostBack('btnDisparaPageLoad', 'CONFIRMACAO');
+                }
+            });
+
+            $('#divConfirmaMasterSair').dialog({
+                autoOpen: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Sim": function () {
+                        trigger = "SIM";
+                        $('#hdfMsgConfirmacaoSair').val("S");
+                        $(this).dialog("close");
+                    },
+                    "Não": function () {
+                        trigger = "NAO";
+                        $('#hdfMsgConfirmacaoSair').val("N");
+                        $(this).dialog("close");
+                    }
+                },
+                close: function (event, ui) {
+                    if (trigger == undefined)
+                        $("#hdfMsgConfirmacaoSair").val("N");
+                    __doPostBack('btnDisparaPageLoad', 'CONFIRMACAO_SAIR');
+                }
+            });
+        }
+
+        function openDialog(idDialog) {
+            IniciarDialog();
+            $('#' + idDialog).dialog('open');
+        }
+    </script>
+
+</head>
+<body>
+    <form method="post" action="./ConsultaPublica.aspx?p=35251006057223031131650340000092251340165652%7C3%7C1&amp;_=1764423734858" id="ctl00">
+<input type="hidden" name="ctl26_HiddenField" id="ctl26_HiddenField" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="6POxKNR8+ZOtT7EyQpGxKlYPAq0oz800gc9UynI6+ZOSWeHpmjt4Cm0nm3UwDLNZxg4mrXzvW4tJ7q0C3zGAtmNVTa9e7FahTbwwhbE/Q6KliBb9n2RbeHp1T8SNLW0RtcQSGJZnRGtVQsjYO6aHR90eOMKFFh3/SATd6JhrqW5cBX/v6TgDhHacVn8BQjV281XUz2b686lifKzC+M8JqJzempGrx6jFiS9X5N+bTwJfJoQnG12UJ4CFzqfE4o0QYEOeqo/UF/l3wZXQfPvT7xelajy2MOw0eFzqB508kXSn++HoUVW7rXY7fYmmZ3FsoS1KCnG8hoF74hmsTMeYISL19ysL1OzcFN7+aA7IZYnuYRXxYG6Xn9Pgbk1HIXor1mD6r8tMskooY9ks5L0eNBBUNP3m7apjr7bA5qTs0562OuLcjJKbEZo7RzWU1pu8aDJuDCl3KzPpJzxi4/kMa3gQbITH9smdLEIjjqm9C9l5kWTNDrmfQoyHl02MdAdP8XXcP+x1STqv/uE8WBmy2B8S7SOMjFT9V42MhH1XhvQJIx4Nu2y2j46MijqLpstWj0QhFrDqW1u9QBp/j4xobuDY+1M1/LjSTenu5WEslc9CLxQFic1FxLcjIF5tlgqjxaYRhSqsfDvpjHXNYQ2QJURFxTQziFh12Y0Z8rGJBaM=" />
+
+
+<script src="/NFCeConsultaPublica/ScriptResource.axd?d=x6wALODbMJK5e0eRC_p1LZkI1i-QHAd9OD0UgN4auycWCqDIU4Uweja1-veozV2DVmz3toyeZcxVEyUxw_iSyLSXTMh1svgXZv_EJSw2mv6QQhM9h1u9mRgBbET9zMg80&amp;t=610a7411" type="text/javascript"></script>
+<script src="../Scripts/jquery-1.8.2.min.js" type="text/javascript"></script>
+<script src="../Scripts/jquery-ui-1.8.24.min.js" type="text/javascript"></script>
+<script src="/NFCeConsultaPublica/bundles/WebFormsJs?v=Fmpof4YW_hu5GitZg8e3W6dXIcQB4aq0W4ynnfJiZp81" type="text/javascript"></script>
+<script src="/NFCeConsultaPublica/Paginas/ConsultaPublica.aspx?_TSM_HiddenField_=ctl26_HiddenField&amp;_TSM_CombinedScripts_=%3B%3BAjaxControlToolkit%2C%20Version%3D4.5.7.429%2C%20Culture%3Dneutral%2C%20PublicKeyToken%3D28f01b0e84b6d53e%3Apt-BR%3Ab20ddc19-01a3-41dd-b1ec-7855917d2ecf%3A475a4ef5%3Aeffe2a26%3A3ac3e789" type="text/javascript"></script>
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="8B6F79F1" />
+<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="QgwS9vnYTM8GHUK7MClS+PcIZmldX4pNYrc2N5VrYiJ5QbxHzYz3dlMHKkjoOnFDGVen+AnZDLNdzXEhoX5x7PdaXvAr07Xt25dMmnve9ZTp6J+d9W75mFmyOUm8lz2vOEIOErW7WvOP9WA21d7oeLW7cBCjHj0YX92rgw0hMQYXu30wH4rs5YP4LjIpnRQsu1/Chv2EiFPH3QrDrroNRwkWCzT8Gdtp3wy5sAfxYsuogIQyiYtBcRMeQGIswr4Ce3P0g5eHFV4F+H+vFqHHayktonQiXQNw2JNltFVGV4TX+e5Bbyf1WaT7E9/UxeAMC0U9txTCKAWa++O8mDu0MQ==" />
+        
+
+        <header id="HeaderSefaz" role="banner" class="naoImprimir">
+
+            <hgroup>
+                <h1 class="hide" title="Secretaria da Fazenda - Governo do Estado de São Paulo">Secretaria da Fazenda - Governo do Estado de São Paulo</h1>
+                <h2 class="naoImprimir" title="Nota Fiscal de Consumidor Eletrônica">Nota Fiscal de Consumidor Eletrônica</h2>
+            </hgroup>
+
+            <!-- accessibility bar -->
+            <nav role="navigation">
+                <span class="hide">Menu de Acesso</span>
+                <ul class="access naoImprimir">
+                    <li class="wheelchair"><a href="#" title="Menu de Acessibilidade"><span></span>Acessibilidade</a></li>
+                    <li class="hide skip-menu"><a href="#menu">Ir para Menu</a></li>
+                    <li class="skip-content"><a href="#ConteudoPrincipal" title="Ir para Conteúdo"><span></span>Ir para Conteúdo</a></li>
+                    <li class="contraste"><a href="#" title="Contraste"><span></span>Contraste</a></li>
+                    <li class="txt-size-menos"><a href="#" class="decreaseFont" title="Diminuir Fonte"><span></span><em class="hide">Tamanho da Fonte: menor</em></a></li>
+                    <li class="txt-size-mais"><a href="#" class="increaseFont" title="Aumentar Fonte"><span></span><em class="hide">Tamanho da Fonte : maior</em></a></li>
+                    
+                </ul>
+            </nav>
+            <!-- /accessibility bar -->
+
+            <!-- Menu Web Form -->
+
+            
+
+            
+            
+
+            <!-- OS ITENS DE MENU PODEM SER ENCONTRADOS NO ARQUIVO WEB.SITEMAP NO ROOT DA APLICAÇÃO -->
+            
+
+            
+
+            
+            
+            
+            <!-- /menu principal -->
+
+            <!-- breadcrumb -->
+            
+            <!-- /breadcrumb -->
+
+            <!-- Div necessária para não 'sumir' o banner do estado de SP quando não tem menu-->
+            
+
+        </header>
+        <!-- END HEADER -->
+
+        <!-- Divs de mensagens - Início -->
+        <div id="UpdatePanelMensagens">
+	
+                <script type="text/javascript">
+                    Sys.WebForms.PageRequestManager.getInstance().add_endRequest(EndRequestHandler);
+                    Sys.WebForms.PageRequestManager.getInstance().add_pageLoaded(LoadRequestHandler);
+                    function EndRequestHandler(sender, args) {
+                        IniciarDialog();
+                    }
+                    function LoadRequestHandler(sender, args) {
+                        IniciarDialog();
+                    }
+                </script>
+                <input type="hidden" name="ctl00$hdfNegacaoAtual" id="hdfNegacaoAtual" />
+                <input type="hidden" name="ctl00$hdfConfirmacaoAtual" id="hdfConfirmacaoAtual" />
+                <input type="hidden" name="ctl00$hdfProsseguimentoAtual" id="hdfProsseguimentoAtual" />
+                <input type="hidden" name="ctl00$hdfMsgConfirmacao" id="hdfMsgConfirmacao" />
+                <input type="hidden" name="ctl00$hdfMsgConfirmacaoSair" id="hdfMsgConfirmacaoSair" />
+                <input type="hidden" name="ctl00$hdfMsgConfirmacaoRecusa" id="hdfMsgConfirmacaoRecusa" />
+            
+</div>
+
+        <input name="ctl00$txtMotivoRecusa" type="text" id="txtMotivoRecusa" style="display: none" />
+
+        <div id="divSucessoMaster" title="Sucesso" style="display: none">
+            <strong><span id="spnSucessoMaster" class="corTextoMensagem"></span></strong>
+        </div>
+
+        <div id="divAlertaMaster" title="Alerta" style="display: none">
+            <span id="spnAlertaMaster" class="corTextoMensagem"></span>
+        </div>
+
+        <div id="divAlertaProsseguirMaster" title="Alerta" style="display: none">
+            <span id="spnAlertaProsseguirMaster" class="corTextoMensagem"></span>
+        </div>
+
+        <div id="divConfirmaMaster" title="Confirmar" style="display: none">
+            <strong><span id="spnConfirmar" class="corTextoMensagem"></span></strong>
+        </div>
+
+        <div id="divConfirmaMasterSair" title="Sair" style="display: none">
+            <strong><span id="spnConfirmarSair"></span></strong>
+        </div>
+
+        <div id="divErroMaster" title="Erro" style="display: none">
+            <strong><span id="spnErroMaster" class="corTextoErro"></span></strong>
+        </div>
+
+        <div id="divErroProsseguirMaster" title="Erro" style="display: none">
+            <strong><span id="spnErroProsseguirMaster" class="corTextoErro"></span></strong>
+        </div>
+
+        <div id="divConfirmaRecusaMaster" title="Informar o Motivo do Indeferimento" style="display: none">
+            <textarea name="ctl00$txtMotivoRecusaTemp" rows="10" cols="47" id="txtMotivoRecusaTemp" onblur="copiarValorRecusa(this.value,&#32;10000);" onkeyup="habilitarConfirmaRecusa(this.id)" onkeypress="return&#32;imposeMaxLength(this,&#32;10000);">
+</textarea>
+        </div>
+
+        <input type="submit" name="ctl00$btnDisparaPageLoad" value="" id="btnDisparaPageLoad" style="display: none" />
+        <!-- Divs de mensagens - fim -->
+
+        <!-- CONTAINER -->
+        <section id="ConteudoPrincipal" class="container" role="main">
+            
+    <div class="panelConsulta">
+	
+        <h1></h1>
+        <div class="box-padrao" style="margin-bottom: 0">
+            <h3 style="text-align: left">Consulta Pública</h3>
+            <div id="wrapper" style="width: 560px; margin-left: 100px">
+                <h6 style="text-align: left; font-style: italic; font-size: smaller">Forneça os Dados Abaixo (todos são obrigatórios)</h6>
+                <div id="div1" style="float: left; width: 310px; margin-top: 20px;">
+                    <div class="chaveAcesso">Chave de Acesso: </div>
+                    <input name="ctl00$Conteudo$txtChaveAcesso" type="text" maxlength="44" id="Conteudo_txtChaveAcesso" alt="chave&#32;de&#32;44&#32;caracteres" style="width: 310px; float: left" />
+                    
+                    <br />
+                </div>
+                
+            </div>
+            
+            <p />
+            <div style="margin: 10px 0 0 0px; clear: both; float: left;">
+                <div style="width: 50%; float: left; margin-left: 84px">
+                    <input type="submit" name="ctl00$Conteudo$btnConsultaResumida" value="Consultar" id="Conteudo_btnConsultaResumida" class="primario&#32;|&#32;consultar" />
+                </div>
+                <div style="width: 50%; float: left; margin-left: 98px">
+                    <br />
+                </div>
+                <div id="Conteudo_divReCaptcha" style="width:&#32;50%;&#32;float:&#32;left;&#32;margin-left:&#32;98px">
+                    <div class="g-recaptcha" data-sitekey="6Le-PrMUAAAAABVqWmdkUJK1zdOThsHKiL78gOPp" ></div>
+                </div>
+            </div>
+        </div>
+    
+</div>
+
+        </section>
+        <!-- END CONTAINER -->
+
+        <!-- FOOTER -->
+        <div id="footer" class="naoImprimir">
+            <div id="tf_rodape_versao" style="font-size: 10px; color: gray; float:right">
+                Versão do Site: 1.0.3.0-P32
+            </div>
+            <footer role="contentinfo" class="naoImprimir">
+                <div class="naoImprimir">
+                    <p>Secretaria da Fazenda do Estado de São Paulo</p>
+                    <address>Av. Rangel Pestana, 300 - São Paulo / SP - 01017-911 - PABX (11)3243-3400</address>
+                </div>
+                <div class="selos naoImprimir">
+                    <img src='/NFCeConsultaPublica/img/footer-selo-dasilva.png' alt="Aprovado AAA" width="80" height="40">
+                    <img src='/NFCeConsultaPublica/img/footer-selo-wcag.png' alt="Aprovado AAA" width="80" height="40">
+                </div>
+            </footer>
+        </div>
+        <!-- END FOOTER -->
+
+    
+
+<script type="text/javascript">
+//<![CDATA[
+(function() {var fn = function() {$get("ctl26_HiddenField").value = '';Sys.Application.remove_init(fn);};Sys.Application.add_init(fn);})();Sys.Application.add_init(function() {
+    $create(Sys.Extended.UI.FilteredTextBoxBehavior, {"FilterType":2,"id":"Conteudo_ftbeTbxIdNFe"}, null, null, $get("Conteudo_txtChaveAcesso"));
+});
+//]]>
+</script>
+</form>
+
+    <!-- Scripts Unificados -->
+    <script src='/NFCeConsultaPublica/Scripts/scripts.js'></script>
+    <noscript>Seu navegador não da suporte a JavaScript. Por favor atualize-o!</noscript>
+
+</body>
+</html>

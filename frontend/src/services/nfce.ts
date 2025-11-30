@@ -7,25 +7,29 @@ export interface NfceItem {
   unidade: string | null;
   valorUnitario: number | null;
   valorTotal: number | null;
-   ncm: string | null;
-   cest: string | null;
-   cfop: string | null;
-   eanComercial: string | null;
-   icms: {
-     baseCalculo: number | null;
-     aliquota: number | null;
-     valor: number | null;
-   };
-   pis: {
-     baseCalculo: number | null;
-     aliquota: number | null;
-     valor: number | null;
-   };
-   cofins: {
-     baseCalculo: number | null;
-     aliquota: number | null;
-     valor: number | null;
-   };
+  ncm: string | null;
+  cest: string | null;
+  cfop: string | null;
+  eanComercial: string | null;
+  icms: {
+    baseCalculo: number | null;
+    aliquota: number | null;
+    valor: number | null;
+    icmsStRetido?: number | null;
+    fcpStRetido?: number | null;
+    icmsEfetivo?: number | null;
+  };
+  pis: {
+    baseCalculo: number | null;
+    aliquota: number | null;
+    valor: number | null;
+  };
+  cofins: {
+    baseCalculo: number | null;
+    aliquota: number | null;
+    valor: number | null;
+  };
+  valorAproxTributos?: number | null;
 }
 
 export interface NfcePagamento {

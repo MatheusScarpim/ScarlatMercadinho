@@ -1,6 +1,6 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-export type NotificationType = 'SALE_COMPLETED' | 'LOW_STOCK' | 'PURCHASE_REGISTERED' | 'SYSTEM_ALERT';
+export type NotificationType = 'SALE_COMPLETED' | 'LOW_STOCK' | 'PURCHASE_REGISTERED' | 'SYSTEM_ALERT' | 'EXPIRING_PRODUCT' | 'EXPIRED_PRODUCT';
 
 export interface NotificationDocument extends Document {
   type: NotificationType;
@@ -20,7 +20,7 @@ const notificationSchema = new Schema<NotificationDocument>(
   {
     type: {
       type: String,
-      enum: ['SALE_COMPLETED', 'LOW_STOCK', 'PURCHASE_REGISTERED', 'SYSTEM_ALERT'],
+      enum: ['SALE_COMPLETED', 'LOW_STOCK', 'PURCHASE_REGISTERED', 'SYSTEM_ALERT', 'EXPIRING_PRODUCT', 'EXPIRED_PRODUCT'],
       required: true,
     },
     title: {

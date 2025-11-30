@@ -5,6 +5,8 @@ interface PurchaseItem {
   quantity: number;
   unitCost: number;
   totalCost: number;
+  salePrice?: number;
+  batchCode?: string;
   expiryDate?: Date | null;
 }
 
@@ -26,6 +28,8 @@ const purchaseItemSchema = new Schema(
     quantity: { type: Number, required: true },
     unitCost: { type: Number, required: true },
     totalCost: { type: Number, required: true },
+    salePrice: { type: Number },
+    batchCode: { type: String },
     expiryDate: { type: Date, default: null }
   },
   { _id: false }

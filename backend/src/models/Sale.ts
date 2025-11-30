@@ -14,6 +14,11 @@ export interface SaleDocument extends Document {
   paymentMethod?: string;
   apartmentNote?: string;
   notes?: string;
+  customer?: {
+    cpf?: string;
+    phone?: string;
+    email?: string;
+  };
   createdAt: Date;
   completedAt?: Date;
   canceledAt?: Date;
@@ -31,6 +36,11 @@ const saleSchema = new Schema(
     paymentMethod: { type: String },
     apartmentNote: { type: String },
     notes: { type: String },
+    customer: {
+      cpf: { type: String },
+      phone: { type: String },
+      email: { type: String }
+    },
     createdAt: { type: Date, default: Date.now },
     completedAt: { type: Date },
     canceledAt: { type: Date }

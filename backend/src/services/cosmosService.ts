@@ -203,19 +203,29 @@ async function ensureProductFromAi(params: {
   description: string | null;
   categoryId: string | null;
   averagePrice: string | null;
+  imageUrl?: string | null;
 }) {
-  const { ean, name, description, categoryId, averagePrice } = params;
+  const { ean, name, description, categoryId, averagePrice, imageUrl } = params;
   const existing = await ProductModel.findOne({ barcode: ean });
-  if (existing) return existing._id.toString();
+  if (existing) {
+    const safeImage = imageUrl || existing.imageUrl || `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
+    if (safeImage && existing.imageUrl !== safeImage) {
+      existing.imageUrl = safeImage;
+      await existing.save();
+    }
+    return existing._id.toString();
+  }
 
   const sale = Number(averagePrice ?? '');
   const salePrice = Number.isFinite(sale) && sale > 0 ? sale : 0;
+  const safeImage = imageUrl || `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
 
   const created = await ProductModel.create({
     name: name || description || 'Produto sem nome',
     description: description || name,
     barcode: ean,
     category: categoryId,
+    imageUrl: safeImage,
     costPrice: 0,
     salePrice,
     stockQuantity: 0,
@@ -239,6 +249,7 @@ async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookup
     description: aiResult.description,
     categoryId: ensuredCategory.id,
     averagePrice: aiResult.averagePrice,
+    imageUrl: aiResult.averagePrice ? `https://cdn-cosmos.bluesoft.com.br/products/${aiResult.ean}` : null,
   });
 
   const created = await GtinLookupModel.create({
@@ -248,7 +259,7 @@ async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookup
     globalProductCategory: ensuredCategory.name ?? globalProductCategory,
     categoryId: ensuredCategory.id ?? null,
     categoryName: ensuredCategory.name ?? globalProductCategory,
-    imageUrl: null,
+    imageUrl: `https://cdn-cosmos.bluesoft.com.br/products/${aiResult.ean}`,
     averagePrice: aiResult.averagePrice,
     sourceUrl: 'openai',
   });
@@ -266,6 +277,7 @@ export async function fetchCosmosProduct(ean: string, nameHint?: string): Promis
       description: existing.description,
       categoryId: ensuredCategory.id,
       averagePrice: existing.averagePrice,
+      imageUrl: existing.imageUrl || `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
     });
 
     return {

@@ -3,6 +3,30 @@ import { ProductModel } from '../models/Product';
 import { StockMovementModel } from '../models/StockMovement';
 import { notifyLowStock } from './notificationService';
 
+async function computeCurrentStock(productId: Types.ObjectId | string, location: string) {
+  const rows = await StockMovementModel.aggregate([
+    { $match: { product: new Types.ObjectId(productId), location } },
+    {
+      $group: {
+        _id: '$product',
+        quantity: {
+          $sum: {
+            $switch: {
+              branches: [
+                { case: { $eq: ['$type', 'ENTRY'] }, then: '$quantity' },
+                { case: { $eq: ['$type', 'EXIT'] }, then: { $multiply: [-1, '$quantity'] } },
+                { case: { $eq: ['$type', 'ADJUSTMENT'] }, then: '$quantity' }
+              ],
+              default: 0
+            }
+          }
+        }
+      }
+    }
+  ]);
+  return rows[0]?.quantity || 0;
+}
+
 export async function registerMovement(input: {
   productId: Types.ObjectId | string;
   type: 'ENTRY' | 'EXIT' | 'ADJUSTMENT';
@@ -13,10 +37,20 @@ export async function registerMovement(input: {
   relatedSale?: Types.ObjectId | string;
   userId?: Types.ObjectId | string;
 }) {
-  const { productId, type, quantity } = input;
+  const { productId, type } = input;
+  const location = (input.location || 'default').toString();
+  const quantity = Number(input.quantity);
+  if (!Number.isFinite(quantity)) {
+    throw new Error('Quantidade inválida para movimentação de estoque');
+  }
+
   const product = await ProductModel.findById(productId);
   if (!product) throw new Error('Product not found for stock movement');
-  const location = input.location || 'default';
+
+  if (!Array.isArray(product.stockByLocation)) {
+    product.stockByLocation = [];
+  }
+
   const stockEntry =
     product.stockByLocation.find((s: any) => s.location === location) ||
     (() => {
@@ -26,29 +60,27 @@ export async function registerMovement(input: {
     })();
 
   if (type === 'ENTRY') {
-    stockEntry.quantity += quantity;
+    stockEntry.quantity = Number(stockEntry.quantity || 0) + quantity;
   } else if (type === 'EXIT') {
-    stockEntry.quantity -= quantity;
+    stockEntry.quantity = Number(stockEntry.quantity || 0) - quantity;
   } else if (type === 'ADJUSTMENT') {
     stockEntry.quantity = quantity;
   }
 
+  product.markModified('stockByLocation');
   product.stockQuantity = (product.stockByLocation as any).reduce(
-    (sum: number, s: any) => sum + s.quantity,
+    (sum: number, s: any) => sum + Number(s.quantity || 0),
     0
   );
   await product.save();
+  await ProductModel.updateOne(
+    { _id: productId },
+    { stockByLocation: product.stockByLocation, stockQuantity: product.stockQuantity }
+  );
 
-  // Verificar se estoque está baixo após EXIT ou ADJUSTMENT
   if ((type === 'EXIT' || type === 'ADJUSTMENT') && product.stockQuantity <= product.minimumStock) {
-    // Criar notificação de estoque baixo (não deve quebrar o fluxo se falhar)
     try {
-      await notifyLowStock(
-        product._id,
-        product.name,
-        product.stockQuantity,
-        product.minimumStock
-      );
+      await notifyLowStock(product._id, product.name, product.stockQuantity, product.minimumStock);
       console.log(`[NOTIFICATION] Low stock notification created for product ${product.name}`);
     } catch (error) {
       console.error('[NOTIFICATION ERROR] Failed to create low stock notification:', error);
@@ -65,4 +97,49 @@ export async function registerMovement(input: {
     user: input.userId,
     location
   });
+}
+
+export async function transferStock(input: {
+  productId: Types.ObjectId | string;
+  from: string;
+  to: string;
+  quantity: number;
+  userId?: Types.ObjectId | string;
+  reason?: string;
+}) {
+  const qty = Number(input.quantity);
+  if (!input.productId) throw new Error('productId is required');
+  if (!input.from || !input.to) throw new Error('from and to locations are required');
+  if (input.from === input.to) throw new Error('Origem e destino devem ser diferentes');
+  if (!Number.isFinite(qty) || qty <= 0) throw new Error('Quantidade deve ser maior que zero');
+
+  const product = await ProductModel.findById(input.productId);
+  if (!product) throw new Error('Produto não encontrado');
+
+  const available = await computeCurrentStock(product._id, input.from);
+  if (available < qty) {
+    throw new Error('Estoque insuficiente na origem');
+  }
+
+  const reason = input.reason || 'TRANSFERENCIA ENTRE LOCAIS';
+
+  const exitMovement = await registerMovement({
+    productId: input.productId,
+    type: 'EXIT',
+    quantity: qty,
+    reason,
+    location: input.from,
+    userId: input.userId
+  });
+
+  const entryMovement = await registerMovement({
+    productId: input.productId,
+    type: 'ENTRY',
+    quantity: qty,
+    reason,
+    location: input.to,
+    userId: input.userId
+  });
+
+  return { exitMovement, entryMovement };
 }

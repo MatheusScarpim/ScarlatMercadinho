@@ -187,3 +187,43 @@ export const notifyPurchaseRegistered = async (
     relatedPurchase: purchaseId,
   });
 };
+
+/**
+ * Cria notificação para produto próximo do vencimento
+ */
+export const notifyExpiringProduct = async (
+  productId: Types.ObjectId | string,
+  productName: string,
+  daysUntilExpiry: number,
+  location: string,
+  quantity: number
+) => {
+  const urgency = daysUntilExpiry <= 3 ? 'CRÍTICO' : daysUntilExpiry <= 7 ? 'URGENTE' : 'ATENÇÃO';
+  const icon = daysUntilExpiry <= 3 ? '🔴' : daysUntilExpiry <= 7 ? '🟠' : '🟡';
+
+  return createNotification({
+    type: 'EXPIRING_PRODUCT',
+    title: `${icon} ${urgency}: Produto Próximo do Vencimento`,
+    message: `O produto "${productName}" vence em ${daysUntilExpiry} dia(s). Quantidade: ${quantity} un. Local: ${location}.`,
+    relatedProduct: productId,
+    location,
+  });
+};
+
+/**
+ * Cria notificação para produto vencido
+ */
+export const notifyExpiredProduct = async (
+  productId: Types.ObjectId | string,
+  productName: string,
+  location: string,
+  quantity: number
+) => {
+  return createNotification({
+    type: 'EXPIRED_PRODUCT',
+    title: '⚠️ PRODUTO VENCIDO',
+    message: `O produto "${productName}" está VENCIDO e não deve ser vendido. Quantidade: ${quantity} un. Local: ${location}. Remova do estoque imediatamente.`,
+    relatedProduct: productId,
+    location,
+  });
+};

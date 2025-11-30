@@ -30,28 +30,50 @@ async function recalcTotals(saleId: string) {
 
 export async function addItem(
   saleId: string,
-  payload: { productId: string; quantity: number; discount?: number; weight?: number }
+  payload: { productId: string; quantity: number; discount?: number; weight?: number; location?: string }
 ) {
   const sale = await SaleModel.findById(saleId);
   if (!sale || sale.status !== 'OPEN') throw new ApiError(400, 'Sale not open');
   const product = await ProductModel.findById(payload.productId);
   if (!product) throw new ApiError(404, 'Product not found');
+  const location = sale.location || payload.location;
+
+  // aplica melhor preço considerando lote/desconto
+  let unitPrice = product.salePrice;
+  let autoDiscount = 0;
+  try {
+    if (location) {
+      const { getBestPriceForProduct } = await import('./batchService');
+      const batchPriceInfo = await getBestPriceForProduct(product._id, location);
+      unitPrice = batchPriceInfo.hasBatch ? batchPriceInfo.price : product.salePrice;
+      // Não aplicamos desconto extra ao total: preço do lote já está em unitPrice.
+    }
+  } catch (err) {
+    console.error('[SALE] Erro ao calcular preco com lote:', err);
+  }
+
   const existing = await SaleItemModel.findOne({ sale: saleId, product: payload.productId });
   if (existing) {
     existing.quantity += payload.quantity;
-    existing.total = existing.quantity * existing.unitPrice - existing.discount;
+    const rawDiscount = payload.discount ?? existing.discount ?? 0;
+    const maxDiscount = existing.quantity * unitPrice;
+    existing.discount = Math.min(Math.max(rawDiscount || 0, 0), maxDiscount);
+    existing.unitPrice = unitPrice;
+    existing.total = Math.max(0, existing.quantity * existing.unitPrice - (existing.discount || 0));
     if (payload.weight) existing.weight = (existing.weight || 0) + payload.weight;
     await existing.save();
     const totals = await recalcTotals(saleId);
     return { item: existing, totals };
   } else {
-    const discount = payload.discount || 0;
-    const total = product.salePrice * payload.quantity - discount;
+    const rawDiscount = payload.discount ?? 0;
+    const maxDiscount = payload.quantity * unitPrice;
+    const discount = Math.min(rawDiscount || 0, maxDiscount);
+    const total = Math.max(0, unitPrice * payload.quantity - discount);
     const item = await SaleItemModel.create({
       sale: saleId,
       product: product.id,
       quantity: payload.quantity,
-      unitPrice: product.salePrice,
+      unitPrice,
       discount,
       total,
       isWeighed: product.isWeighed,
@@ -68,11 +90,31 @@ export async function updateItem(saleId: string, itemId: string, payload: { quan
   const item = await SaleItemModel.findById(itemId);
   if (!item) throw new ApiError(404, 'Item not found');
   item.quantity = payload.quantity;
-  item.discount = payload.discount ?? item.discount;
-  item.total = item.quantity * item.unitPrice - item.discount;
+  const maxDiscount = item.quantity * item.unitPrice;
+  const rawDiscount = payload.discount ?? item.discount ?? 0;
+  item.discount = Math.min(Math.max(rawDiscount, 0), maxDiscount);
+  item.total = Math.max(0, item.quantity * item.unitPrice - item.discount);
   await item.save();
   const totals = await recalcTotals(saleId);
   return { item, totals };
+}
+
+export async function sanitizeSaleItems(saleId: string) {
+  const items = await SaleItemModel.find({ sale: saleId });
+  let changed = false;
+  for (const item of items) {
+    const maxDiscount = item.quantity * item.unitPrice;
+    const newDiscount = Math.min(Math.max(item.discount || 0, 0), maxDiscount);
+    const newTotal = Math.max(0, item.quantity * item.unitPrice - newDiscount);
+    if (newDiscount !== item.discount || newTotal !== item.total) {
+      item.discount = newDiscount;
+      item.total = newTotal;
+      await item.save();
+      changed = true;
+    }
+  }
+  const totals = await recalcTotals(saleId);
+  return { items, totals, changed };
 }
 
 export async function removeItem(saleId: string, itemId: string) {
@@ -129,6 +171,21 @@ export async function cancelSale(saleId: string) {
   }
   sale.status = 'CANCELED';
   sale.canceledAt = new Date();
+  await sale.save();
+  return sale;
+}
+
+export async function setCustomer(
+  saleId: string,
+  data: { cpf?: string; phone?: string; email?: string }
+) {
+  const sale = await SaleModel.findById(saleId);
+  if (!sale || sale.status !== 'OPEN') throw new ApiError(400, 'Sale not open');
+  sale.customer = {
+    cpf: data.cpf || undefined,
+    phone: data.phone || undefined,
+    email: data.email || undefined
+  };
   await sale.save();
   return sale;
 }

@@ -11,11 +11,12 @@
   },
   "dependencies": {
     "axios": "^1.7.7",
+    "chart.js": "^4.4.3",
+    "jsqr": "^1.4.0",
     "pinia": "^2.2.6",
     "vue": "^3.5.12",
     "vue-chartjs": "^5.3.1",
-    "vue-router": "^4.4.5",
-    "chart.js": "^4.4.3"
+    "vue-router": "^4.4.5"
   },
   "devDependencies": {
     "@types/node": "^22.7.4",

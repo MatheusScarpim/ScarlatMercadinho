@@ -13,6 +13,8 @@ import DashboardView from '../views/admin/DashboardView.vue';
 import LocationsView from '../views/admin/LocationsView.vue';
 import NfceView from '../views/admin/NfceView.vue';
 import SettingsView from '../views/admin/SettingsView.vue';
+import ExpiringProductsView from '../views/admin/ExpiringProductsView.vue';
+import FiscalView from '../views/admin/FiscalView.vue';
 import { useAuthStore } from '../stores/auth';
 
 const router = createRouter({
@@ -35,7 +37,9 @@ const router = createRouter({
         { path: 'sales', component: SalesView },
         { path: 'locations', component: LocationsView },
         { path: 'settings', component: SettingsView },
-        { path: 'nfce', component: NfceView }
+        { path: 'nfce', component: NfceView },
+        { path: 'expiring-products', component: ExpiringProductsView },
+        { path: 'fiscal', component: FiscalView }
       ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/kiosk' }

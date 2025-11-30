@@ -7,6 +7,7 @@ export interface ProductDocument extends Document {
   sku?: string;
   category: Types.ObjectId;
   mainSupplier?: Types.ObjectId;
+  imageUrl?: string | null;
   costPrice: number;
   salePrice: number;
   stockQuantity: number;
@@ -24,6 +25,7 @@ const productSchema = new Schema(
     sku: { type: String },
     category: { type: Schema.Types.ObjectId, ref: 'Category', required: true },
     mainSupplier: { type: Schema.Types.ObjectId, ref: 'Supplier' },
+    imageUrl: { type: String, default: null },
     costPrice: { type: Number, required: true },
     salePrice: { type: Number, required: true },
     stockQuantity: { type: Number, default: 0 },

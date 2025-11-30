@@ -33,6 +33,11 @@ export async function cancelSale(req: Request, res: Response) {
   res.json(sale);
 }
 
+export async function setCustomer(req: Request, res: Response) {
+  const sale = await saleService.setCustomer(req.params.id, req.body);
+  res.json(sale);
+}
+
 export async function getSale(req: Request, res: Response) {
   const sale = await SaleModel.findById(req.params.id);
   if (!sale) return res.status(404).json({ message: 'Not found' });

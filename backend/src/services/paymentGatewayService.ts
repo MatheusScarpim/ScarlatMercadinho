@@ -3,6 +3,7 @@ import { env } from '../config/env';
 import { ApiError } from '../utils/apiError';
 import { SaleModel } from '../models/Sale';
 import { SaleItemModel } from '../models/SaleItem';
+import { sanitizeSaleItems } from './saleService';
 
 type PointPaymentType = 'credit' | 'debit';
 
@@ -34,6 +35,24 @@ async function getSaleItemsWithProducts(saleId: string) {
   return items;
 }
 
+function safeTotalAmount(items: any[], totals?: { totalAmount?: number }) {
+  const rawTotal = totals && Number.isFinite(totals.totalAmount) ? totals.totalAmount : calcTotal(items);
+  const total = Math.max(0, Number(Number(rawTotal || 0).toFixed(2)));
+  if (total <= 0) {
+    console.warn('[PAYMENTS] Total calculado zero/negativo', {
+      rawTotal,
+      items: items.map((i) => ({
+        product: (i as any).product?._id || (i as any).product,
+        unitPrice: i.unitPrice,
+        qty: i.quantity,
+        discount: i.discount,
+        total: i.total
+      }))
+    });
+  }
+  return total;
+}
+
 function buildDescription(items: any[]) {
   return items
     .map((item) => {
@@ -50,8 +69,12 @@ function calcTotal(items: any[]) {
 
 export async function createPixPaymentIntent(saleId: string) {
   await ensureSaleOpen(saleId);
+  const { totals } = await sanitizeSaleItems(saleId);
   const items = await getSaleItemsWithProducts(saleId);
-  const totalAmount = Number(calcTotal(items).toFixed(2));
+  const totalAmount = safeTotalAmount(items, totals);
+  if (totalAmount <= 0) {
+    throw new ApiError(400, 'transaction_amount must be positive');
+  }
   const description = buildDescription(items);
 
   const payment = new MercadoPagoPayment(getMpClient());
@@ -113,8 +136,12 @@ export async function createPointPaymentIntent(
   paymentType: PointPaymentType
 ) {
   await ensureSaleOpen(saleId);
+  const { totals } = await sanitizeSaleItems(saleId);
   const items = await getSaleItemsWithProducts(saleId);
-  const totalAmount = Number(calcTotal(items).toFixed(2));
+  const totalAmount = safeTotalAmount(items, totals);
+  if (totalAmount <= 0) {
+    throw new ApiError(400, 'transaction_amount must be positive');
+  }
   const description = buildDescription(items);
 
   if (!env.mpPointDeviceId) {

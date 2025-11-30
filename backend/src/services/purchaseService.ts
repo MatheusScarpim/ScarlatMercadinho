@@ -7,6 +7,7 @@ import { ProductModel } from '../models/Product';
 import { getMarginPercent } from './settingsService';
 import { CategoryModel } from '../models/Category';
 import { GtinLookupModel } from '../models/GtinLookup';
+import { createOrUpdateBatch } from './batchService';
 
 const AUTO_CATEGORY_NAME = 'AUTOMATICO';
 
@@ -28,6 +29,7 @@ async function ensureProductForItem(item: {
   barcode?: string;
   unitCost: number;
   marginMultiplier: number;
+  salePrice?: number;
 }) {
   if (item.product) return item.product;
   const barcode = (item.barcode || '').trim();
@@ -39,13 +41,19 @@ async function ensureProductForItem(item: {
   }
 
   const categoryId = await ensureAutoCategory();
+  const defaultImage = barcode ? `https://cdn-cosmos.bluesoft.com.br/products/${barcode}` : null;
   const created = await ProductModel.create({
     name,
     description: name,
     barcode: barcode || `AUTO-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
     category: categoryId,
+    imageUrl: defaultImage,
     costPrice: item.unitCost,
-    salePrice: Number((item.unitCost * item.marginMultiplier).toFixed(2)),
+    salePrice: Number(
+      Number.isFinite(item.salePrice)
+        ? (item.salePrice as number)
+        : (item.unitCost * item.marginMultiplier).toFixed(2)
+    ),
     stockQuantity: 0,
     stockByLocation: [],
     minimumStock: 0,
@@ -89,6 +97,8 @@ export async function createPurchase(data: {
     barcode?: string;
     quantity: number;
     unitCost: number;
+    salePrice?: number;
+    batchCode?: string;
     expiryDate?: Date | null;
   }[];
   notes?: string;
@@ -112,24 +122,31 @@ export async function createPurchase(data: {
   const itemsWithTotal = [];
   for (const item of data.items) {
     const totalCost = item.quantity * item.unitCost;
+    const normalizedSale = Number.isFinite(Number(item.salePrice)) ? Number(item.salePrice) : undefined;
     const productId = await ensureProductForItem({
       product: item.product,
       name: item.name,
       barcode: item.barcode,
       unitCost: item.unitCost,
       marginMultiplier: multiplier,
+      salePrice: normalizedSale,
     });
     itemsWithTotal.push({
       ...item,
       product: productId,
       totalCost,
+      salePrice: normalizedSale,
+      batchCode: item.batchCode,
       expiryDate: item.expiryDate || null,
     });
 
     const product = await ProductModel.findById(productId);
     if (product) {
       product.costPrice = item.unitCost;
-      product.salePrice = Number((item.unitCost * multiplier).toFixed(2));
+      const saleValue = Number.isFinite(normalizedSale)
+        ? (normalizedSale as number)
+        : Number((item.unitCost * multiplier).toFixed(2));
+      product.salePrice = saleValue;
       await product.save();
     }
   }
@@ -156,6 +173,19 @@ export async function createPurchase(data: {
       relatedPurchase: purchase._id,
       location: purchase.location,
     });
+
+    // Cria lote se houver data de validade
+    if (item.expiryDate) {
+      await createOrUpdateBatch({
+        productId: item.product as Types.ObjectId,
+        location: purchase.location,
+        quantity: item.quantity,
+        batchCode: item.batchCode,
+        expiryDate: item.expiryDate,
+        purchasePrice: item.unitCost,
+        purchaseId: purchase._id
+      });
+    }
   }
 
   try {

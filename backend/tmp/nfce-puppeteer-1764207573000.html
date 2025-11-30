@@ -1,0 +1,376 @@
+<!DOCTYPE html><html lang="pt-br" dir="ltr" class=""><head id="Head"><title>
+	Consulta NFC-e QR Code - Secretaria da Fazenda - Governo do Estado de São Paulo
+</title>
+
+
+    
+
+    <!-- Main Metas -->
+    <meta charset="utf-8"><meta name="author" content="humans.txt">
+    <!-- Ajustar -->
+    <meta name="description" content="Secretaria da Fazenda - Governo do Estado de São Paulo"><meta name="keywords" content="Secretaria, Fazenda, Governo, Estado, São Paulo, Ambiente de Pagamentos, DARE, JUCESP"><meta name="viewport" content="width = device-width, initial-scale = 1.0, minimum-scale = 0.5, maximum-scale = 2.0, user-scalable = yes">
+
+    <!--[if lt IE 9]>
+        <meta http-equiv="X-UA-Compatible" content="IE=8" />
+    <![endif]-->
+
+
+    <link rel="shortcut icon" href="../favicon.ico" type="image/x-icon"><link rel="icon" type="image/x-icon" href="../favicon.ico">
+
+    <!-- CSS -->
+    <link rel="stylesheet" media="all" href="../Content/reset.css?v=1.0"><link rel="stylesheet" media="all" href="../Content/structure.css?v=1.0" title="default"><link rel="alternate stylesheet" media="all" href="../Content/contrast.css?v=1.0" title="contrast"><link rel="stylesheet" media="all" href="../Content/botoes.css?v=1.0"><link rel="stylesheet" media="all" href="../Xsl/nfe_v310_3/estilos/xslt.css" type="text/css"><link rel="stylesheet" media="all" href="../Content/sefaz_nfce_complemento.css" type="text/css"><link href="../Content/consultaPublica/common.css" rel="stylesheet" type="text/css"><link href="../Content/consultaPublica/internalMaster.css" rel="stylesheet" type="text/css"><link href="../Content/consultaPublica/consultaPublicaNFe.css" rel="stylesheet" type="text/css"><link href="../Content/consultaPublica/sistema.css" rel="stylesheet" type="text/css"><link href="../Content/consultaPublica/nfe-vis.css" rel="stylesheet" type="text/css"><link href="../Content/themes/blitzer/jquery-ui-1.8.24.custom.css" rel="stylesheet" type="text/css"><link rel="stylesheet" media="all" href="../Content/botoes.css?v=1.0">
+    <!-- botões -->
+
+    <!-- Edicao do Conteudo -->
+    <link rel="stylesheet" media="all" href="../Content/conteudo.css">
+
+    <!-- CSS3 Styles -->
+    <link rel="stylesheet" media="all" href="../Content/css3-styles.css?v=1.0">
+
+    <!--[if IE]>
+            <link rel="stylesheet" media="all" href="../Content/ie-hacks.css?v=1.0" />
+        <![endif]-->
+
+    <!--[if lt IE 9]>
+        <script src='/NFCeConsultaPublica/Scripts/html5.js'></script>
+    <![endif]-->
+
+    
+
+
+    <script type="text/javascript">
+        function IniciarDialog() {
+
+            $('#divSucessoMaster').dialog({
+                autoOpen: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Ok": function () {
+                        trigger = "SIM";
+                        $(this).dialog("close");
+                    }
+                },
+                open: function (event, ui) {
+                    $(this).parents(".ui-dialog:first").find(".ui-widget-header").removeClass("ui-widget-header").addClass("ui-widget-header-info");
+                },
+                close: function (event, ui) {
+                    $('#hdfMsgConfirmacao').val("S");
+                    __doPostBack('btnDisparaPageLoad', 'CONFIRMACAO');
+                }
+            });
+
+            $('#divAlertaMaster').dialog({
+                autoOpen: false,
+                resizable: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Ok": function () {
+                        $(this).dialog("close");
+                    }
+                },
+                open: function (event, ui) {
+                    $(this).parents(".ui-dialog:first").find(".ui-widget-header").removeClass("ui-widget-header").addClass("ui-widget-header-info");
+                },
+            });
+
+            $('#divAlertaProsseguirMaster').dialog({
+                autoOpen: false,
+                resizable: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Ok": function () {
+                        __doPostBack('btnDisparaPageLoad', 'PROSSEGUIR');
+                        $(this).dialog("close");
+                    }
+                },
+                open: function (event, ui) {
+                    $(this).parents(".ui-dialog:first").find(".ui-widget-header").removeClass("ui-widget-header").addClass("ui-widget-header-info");
+                },
+            });
+
+            $('#divErroMaster').dialog({
+                autoOpen: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Ok": function () {
+                        $(this).dialog("close");
+                    }
+                }
+            });
+
+            $('#divErroProsseguirMaster').dialog({
+                autoOpen: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Ok": function () {
+                        __doPostBack('btnDisparaPageLoad', 'PROSSEGUIR');
+                        $(this).dialog("close");
+                    }
+                }
+            });
+
+            $('#divConfirmaMaster').dialog({
+                autoOpen: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Sim": function () {
+                        trigger = "SIM";
+                        $('#hdfMsgConfirmacao').val("S");
+                        $(this).dialog("close");
+                    },
+                    "Não": function () {
+                        trigger = "NAO";
+                        $('#hdfMsgConfirmacao').val("N");
+                        $(this).dialog("close");
+                    }
+                },
+                close: function (event, ui) {
+                    if (trigger == undefined)
+                        $('#hdfMsgConfirmacao').val("N");
+                    __doPostBack('btnDisparaPageLoad', 'CONFIRMACAO');
+                }
+            });
+
+            $('#divConfirmaMasterSair').dialog({
+                autoOpen: false,
+                width: 300,
+                modal: true,
+                closeOnEscape: false,
+                buttons: {
+                    "Sim": function () {
+                        trigger = "SIM";
+                        $('#hdfMsgConfirmacaoSair').val("S");
+                        $(this).dialog("close");
+                    },
+                    "Não": function () {
+                        trigger = "NAO";
+                        $('#hdfMsgConfirmacaoSair').val("N");
+                        $(this).dialog("close");
+                    }
+                },
+                close: function (event, ui) {
+                    if (trigger == undefined)
+                        $("#hdfMsgConfirmacaoSair").val("N");
+                    __doPostBack('btnDisparaPageLoad', 'CONFIRMACAO_SAIR');
+                }
+            });
+        }
+
+        function openDialog(idDialog) {
+            IniciarDialog();
+            $('#' + idDialog).dialog('open');
+        }
+    </script>
+
+</head>
+<body>
+    <form method="post" action="./ConsultaQRCode.aspx?p=https%3A%2F%2Fwww.nfce.fazenda.sp.gov.br%2Fqrcode%3Fp%3D35251160579950000497650050000018121000018139%7C2%7C1%7C1%7C6108F143904691FD1CF7B0D99FE90A5967EE7A57" id="ctl00">
+<div class="aspNetHidden">
+<input type="hidden" name="ctl26_HiddenField" id="ctl26_HiddenField" value="">
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="">
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="">
+<input type="hidden" name="__LASTFOCUS" id="__LASTFOCUS" value="">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="GNX+wPb+qBZtw9/XEJScyKoxg1EdWLKIZiaRSbGjo6278splXEevTKLPQU5d2sZe34kvXVT259kxqCH9/Atjp4R/63648UinregErYHgRoeuNziv3WgALxrDKEVWxk7uxD3qo+hJHmT2hS2x0SWsPlc66olzACP8H4Sh/9F8B39GPWLFbHwPa2JJebqHQcqiglfw8i7I3S0Fdr/4EPyMcbG7hO5Cr3yZMCNW7Kcze0poaBoPeizYBYliKEHvg6HasADooDYEZGLM2eR2ArWb/DFbS3lMrxo7rPEoX7IwbRYMOhc8lRp0Wpegh20phlpWJbh7sQJShHrXVMlocsA2cCBm+RCdytE6ld8PYtGgZc7EV6yt02a/EjVlqYo5Wo7pUZET+gcNhJteyiB9VlLbyXjHNGW/QDEqmcoicBc5FlkWVpbqjq8AKmtMLfgKCCHtPmxHAHy+RTpjc1cPlLQjXPGuwZMEXxmoiEigAYqy8QFmGuAnT5uQDpjXgMMRsLhc8Zi4s0jcL0OeOBY2uq47ZfFyA5QvZpcw3fYyMgQZi2bxzbmKpUurKs3yT5rXUMVGYizkhwmrHVCjvng9OqN8Wg==">
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['ctl00'];
+if (!theForm) {
+    theForm = document.ctl00;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/NFCeConsultaPublica/WebResource.axd?d=pynGkmcFUV13He1Qd6_TZKaPA8rduY97EVto9uGHpzHa2VBKO5L8wtvO-f64zvy22nW69agtenlnfbza-HfpYQ2&amp;t=638628099619783110" type="text/javascript"></script>
+
+
+<script src="/NFCeConsultaPublica/ScriptResource.axd?d=x6wALODbMJK5e0eRC_p1LZkI1i-QHAd9OD0UgN4auycWCqDIU4Uweja1-veozV2DVmz3toyeZcxVEyUxw_iSyLSXTMh1svgXZv_EJSw2mv6QQhM9h1u9mRgBbET9zMg80&amp;t=610a7411" type="text/javascript"></script>
+<script src="/NFCeConsultaPublica/ScriptResource.axd?d=P5lTttoqSeZXoYRLQMIScMxZxInU3LxZsIM0jpFWKhMLbAXDIr3nAA20umBTC5zvaNBwKP_HgQv97pV2ZkG4yNNDybE9Nj8ATtSB8tKNozMCOd0iWmOh3ak0_j97HFoy0&amp;t=610a7411" type="text/javascript"></script>
+<script src="../Scripts/jquery-1.8.2.min.js" type="text/javascript"></script>
+<script src="../Scripts/jquery-ui-1.8.24.min.js" type="text/javascript"></script>
+<script src="/NFCeConsultaPublica/bundles/WebFormsJs?v=Fmpof4YW_hu5GitZg8e3W6dXIcQB4aq0W4ynnfJiZp81" type="text/javascript"></script>
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="59238BB3">
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="ZTMPwNzLH3TDj3hB+RuKaQPq9PRZ0ol40DWpv8sna4ThrVSxnjfqNJLt2PYiQLVjTkUbxx7t1A99J2KKav7rcAGtoli8pQvfZkg/kuP+6CfVAnPSnDdAid1jMGBJZXtWasfs3UAHAbHpyzlLyk6Oudu/YPtr5Ru/UvsERyIIl6EvdhOEoNSYlYxF+nxP7aP77gJRaQfy2VxjWSPWwscN0MlPKIITTTZ/8C7Rzj/jlgiFbrlssoEPckIENSYDH1P4XCxc2TLZWQJsHtXrDEMesAAETfE4l6EdHNk6VaXe0eI=">
+</div>
+        <script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('ctl00$ctl26', 'ctl00', ['tctl00$UpdatePanelMensagens','UpdatePanelMensagens'], [], [], 90, 'ctl00');
+//]]>
+</script>
+
+
+        <header id="HeaderSefaz" role="banner" class="naoImprimir">
+
+            <hgroup>
+                <h1 class="hide" title="Secretaria da Fazenda - Governo do Estado de São Paulo">Secretaria da Fazenda - Governo do Estado de São Paulo</h1>
+                <h2 class="naoImprimir" title="Nota Fiscal de Consumidor Eletrônica">Nota Fiscal de Consumidor Eletrônica</h2>
+            </hgroup>
+
+            <!-- accessibility bar -->
+            <nav role="navigation">
+                <span class="hide">Menu de Acesso</span>
+                <ul class="access naoImprimir">
+                    <li class="wheelchair"><a href="#" title="Menu de Acessibilidade" tabindex="1"><span></span>Acessibilidade</a></li>
+                    <li class="hide skip-menu"><a href="#menu" tabindex="2">Ir para Menu</a></li>
+                    <li class="skip-content"><a href="#ConteudoPrincipal" title="Ir para Conteúdo" tabindex="3"><span></span>Ir para Conteúdo</a></li>
+                    <li class="contraste"><a href="#" title="Contraste" tabindex="4"><span></span>Contraste</a></li>
+                    <li class="txt-size-menos"><a href="#" class="decreaseFont" title="Diminuir Fonte" tabindex="5"><span></span><em class="hide">Tamanho da Fonte: menor</em></a></li>
+                    <li class="txt-size-mais"><a href="#" class="increaseFont" title="Aumentar Fonte" tabindex="6"><span></span><em class="hide">Tamanho da Fonte : maior</em></a></li>
+                    
+                </ul>
+            </nav>
+            <!-- /accessibility bar -->
+
+            <!-- Menu Web Form -->
+
+            
+
+            
+            
+
+            <!-- OS ITENS DE MENU PODEM SER ENCONTRADOS NO ARQUIVO WEB.SITEMAP NO ROOT DA APLICAÇÃO -->
+            
+
+            
+
+            
+            
+            
+            <!-- /menu principal -->
+
+            <!-- breadcrumb -->
+            
+            <!-- /breadcrumb -->
+
+            <!-- Div necessária para não 'sumir' o banner do estado de SP quando não tem menu-->
+            
+
+        </header>
+        <!-- END HEADER -->
+
+        <!-- Divs de mensagens - Início -->
+        <div id="UpdatePanelMensagens">
+	
+                <script type="text/javascript">
+                    Sys.WebForms.PageRequestManager.getInstance().add_endRequest(EndRequestHandler);
+                    Sys.WebForms.PageRequestManager.getInstance().add_pageLoaded(LoadRequestHandler);
+                    function EndRequestHandler(sender, args) {
+                        IniciarDialog();
+                    }
+                    function LoadRequestHandler(sender, args) {
+                        IniciarDialog();
+                    }
+                </script>
+                <input type="hidden" name="ctl00$hdfNegacaoAtual" id="hdfNegacaoAtual">
+                <input type="hidden" name="ctl00$hdfConfirmacaoAtual" id="hdfConfirmacaoAtual">
+                <input type="hidden" name="ctl00$hdfProsseguimentoAtual" id="hdfProsseguimentoAtual" value="RedirectParaPaginaInicial">
+                <input type="hidden" name="ctl00$hdfMsgConfirmacao" id="hdfMsgConfirmacao">
+                <input type="hidden" name="ctl00$hdfMsgConfirmacaoSair" id="hdfMsgConfirmacaoSair">
+                <input type="hidden" name="ctl00$hdfMsgConfirmacaoRecusa" id="hdfMsgConfirmacaoRecusa">
+            
+</div>
+
+        <input name="ctl00$txtMotivoRecusa" type="text" onchange="javascript:setTimeout('__doPostBack(\'ctl00$txtMotivoRecusa\',\'\')', 0)" onkeypress="if (WebForm_TextBoxKeyHandler(event) == false) return false;" id="txtMotivoRecusa" style="display: none" tabindex="7">
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        
+
+        <div id="divConfirmaRecusaMaster" title="Informar o Motivo do Indeferimento" style="display: none">
+            <textarea name="ctl00$txtMotivoRecusaTemp" rows="10" cols="47" id="txtMotivoRecusaTemp" onblur="copiarValorRecusa(this.value, 10000);" onkeyup="habilitarConfirmaRecusa(this.id)" onkeypress="return imposeMaxLength(this, 10000);"></textarea>
+        </div>
+
+        <input type="submit" name="ctl00$btnDisparaPageLoad" value="" id="btnDisparaPageLoad" style="display: none" tabindex="8">
+        <!-- Divs de mensagens - fim -->
+
+        <!-- CONTAINER -->
+        <section id="ConteudoPrincipal" class="container" role="main">
+            
+    <h1></h1>
+    <div class="box-padrao" style="margin-left:360px; margin-bottom:0">
+        <h3 style="text-align: left">Consulta Pública por QR Code</h3>
+    </div>
+
+        </section>
+        <!-- END CONTAINER -->
+
+        <!-- FOOTER -->
+        <div id="footer" class="naoImprimir">
+            <div id="tf_rodape_versao" style="font-size: 10px; color: gray; float:right">
+                Versão do Site: 1.0.3.0-P33
+            </div>
+            <footer role="contentinfo" class="naoImprimir">
+                <div class="naoImprimir">
+                    <p>Secretaria da Fazenda do Estado de São Paulo</p>
+                    <address>Av. Rangel Pestana, 300 - São Paulo / SP - 01017-911 - PABX (11)3243-3400</address>
+                </div>
+                <div class="selos naoImprimir">
+                    <img src="/NFCeConsultaPublica/img/footer-selo-dasilva.png" alt="Aprovado AAA" width="80" height="40">
+                    <img src="/NFCeConsultaPublica/img/footer-selo-wcag.png" alt="Aprovado AAA" width="80" height="40">
+                </div>
+            </footer>
+        </div>
+        <!-- END FOOTER -->
+
+    
+
+<script type="text/javascript">
+//<![CDATA[
+(function() {var fn = function() {$get("ctl26_HiddenField").value = '';Sys.Application.remove_init(fn);};Sys.Application.add_init(fn);})();//]]>
+</script>
+</form>
+
+    <!-- Scripts Unificados -->
+    <script src="/NFCeConsultaPublica/Scripts/scripts.js"></script>
+    <noscript>Seu navegador não da suporte a JavaScript. Por favor atualize-o!</noscript>
+
+
+
+<div class="ui-dialog ui-widget ui-widget-content ui-corner-all ui-draggable ui-resizable" tabindex="-1" role="dialog" aria-labelledby="ui-dialog-title-divSucessoMaster" style="display: none; z-index: 1000; outline: 0px; position: absolute;"><div class="ui-dialog-titlebar ui-widget-header ui-corner-all ui-helper-clearfix"><span class="ui-dialog-title" id="ui-dialog-title-divSucessoMaster">Sucesso</span><a href="#" class="ui-dialog-titlebar-close ui-corner-all" role="button"><span class="ui-icon ui-icon-closethick">close</span></a></div><div id="divSucessoMaster" style="" class="ui-dialog-content ui-widget-content">
+            <strong><span id="spnSucessoMaster" class="corTextoMensagem"></span></strong>
+        </div><div class="ui-resizable-handle ui-resizable-n" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-e" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-s" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-w" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-se ui-icon ui-icon-gripsmall-diagonal-se ui-icon-grip-diagonal-se" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-sw" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-ne" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-nw" style="z-index: 1000;"></div><div class="ui-dialog-buttonpane ui-widget-content ui-helper-clearfix"><div class="ui-dialog-buttonset"><button type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" role="button" aria-disabled="false"><span class="ui-button-text">Ok</span></button></div></div></div><div class="ui-dialog ui-widget ui-widget-content ui-corner-all ui-draggable" tabindex="-1" role="dialog" aria-labelledby="ui-dialog-title-divAlertaMaster" style="display: none; z-index: 1000; outline: 0px;"><div class="ui-dialog-titlebar ui-widget-header ui-corner-all ui-helper-clearfix"><span class="ui-dialog-title" id="ui-dialog-title-divAlertaMaster">Alerta</span><a href="#" class="ui-dialog-titlebar-close ui-corner-all" role="button"><span class="ui-icon ui-icon-closethick">close</span></a></div><div id="divAlertaMaster" style="" class="ui-dialog-content ui-widget-content">
+            <span id="spnAlertaMaster" class="corTextoMensagem"></span>
+        </div><div class="ui-dialog-buttonpane ui-widget-content ui-helper-clearfix"><div class="ui-dialog-buttonset"><button type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" role="button" aria-disabled="false"><span class="ui-button-text">Ok</span></button></div></div></div><div class="ui-dialog ui-widget ui-widget-content ui-corner-all ui-draggable" tabindex="-1" role="dialog" aria-labelledby="ui-dialog-title-divAlertaProsseguirMaster" style="display: none; z-index: 1000; outline: 0px;"><div class="ui-dialog-titlebar ui-widget-header ui-corner-all ui-helper-clearfix"><span class="ui-dialog-title" id="ui-dialog-title-divAlertaProsseguirMaster">Alerta</span><a href="#" class="ui-dialog-titlebar-close ui-corner-all" role="button"><span class="ui-icon ui-icon-closethick">close</span></a></div><div id="divAlertaProsseguirMaster" style="" class="ui-dialog-content ui-widget-content">
+            <span id="spnAlertaProsseguirMaster" class="corTextoMensagem"></span>
+        </div><div class="ui-dialog-buttonpane ui-widget-content ui-helper-clearfix"><div class="ui-dialog-buttonset"><button type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" role="button" aria-disabled="false"><span class="ui-button-text">Ok</span></button></div></div></div><div class="ui-dialog ui-widget ui-widget-content ui-corner-all ui-draggable ui-resizable" tabindex="-1" role="dialog" aria-labelledby="ui-dialog-title-divErroMaster" style="display: none; z-index: 1000; outline: 0px; position: absolute;"><div class="ui-dialog-titlebar ui-widget-header ui-corner-all ui-helper-clearfix"><span class="ui-dialog-title" id="ui-dialog-title-divErroMaster">Erro</span><a href="#" class="ui-dialog-titlebar-close ui-corner-all" role="button"><span class="ui-icon ui-icon-closethick">close</span></a></div><div id="divErroMaster" style="" class="ui-dialog-content ui-widget-content">
+            <strong><span id="spnErroMaster" class="corTextoErro"></span></strong>
+        </div><div class="ui-resizable-handle ui-resizable-n" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-e" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-s" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-w" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-se ui-icon ui-icon-gripsmall-diagonal-se ui-icon-grip-diagonal-se" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-sw" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-ne" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-nw" style="z-index: 1000;"></div><div class="ui-dialog-buttonpane ui-widget-content ui-helper-clearfix"><div class="ui-dialog-buttonset"><button type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" role="button" aria-disabled="false"><span class="ui-button-text">Ok</span></button></div></div></div><div class="ui-dialog ui-widget ui-widget-content ui-corner-all ui-draggable ui-resizable" tabindex="-1" role="dialog" aria-labelledby="ui-dialog-title-divErroProsseguirMaster" style="display: none; z-index: 1000; outline: 0px; position: absolute;"><div class="ui-dialog-titlebar ui-widget-header ui-corner-all ui-helper-clearfix"><span class="ui-dialog-title" id="ui-dialog-title-divErroProsseguirMaster">Erro</span><a href="#" class="ui-dialog-titlebar-close ui-corner-all" role="button"><span class="ui-icon ui-icon-closethick">close</span></a></div><div id="divErroProsseguirMaster" style="" class="ui-dialog-content ui-widget-content">
+            <strong><span id="spnErroProsseguirMaster" class="corTextoErro"></span></strong>
+        </div><div class="ui-resizable-handle ui-resizable-n" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-e" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-s" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-w" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-se ui-icon ui-icon-gripsmall-diagonal-se ui-icon-grip-diagonal-se" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-sw" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-ne" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-nw" style="z-index: 1000;"></div><div class="ui-dialog-buttonpane ui-widget-content ui-helper-clearfix"><div class="ui-dialog-buttonset"><button type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" role="button" aria-disabled="false"><span class="ui-button-text">Ok</span></button></div></div></div><div class="ui-dialog ui-widget ui-widget-content ui-corner-all ui-draggable ui-resizable" tabindex="-1" role="dialog" aria-labelledby="ui-dialog-title-divConfirmaMaster" style="display: none; z-index: 1000; outline: 0px; position: absolute;"><div class="ui-dialog-titlebar ui-widget-header ui-corner-all ui-helper-clearfix"><span class="ui-dialog-title" id="ui-dialog-title-divConfirmaMaster">Confirmar</span><a href="#" class="ui-dialog-titlebar-close ui-corner-all" role="button"><span class="ui-icon ui-icon-closethick">close</span></a></div><div id="divConfirmaMaster" style="" class="ui-dialog-content ui-widget-content">
+            <strong><span id="spnConfirmar" class="corTextoMensagem"></span></strong>
+        </div><div class="ui-resizable-handle ui-resizable-n" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-e" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-s" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-w" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-se ui-icon ui-icon-gripsmall-diagonal-se ui-icon-grip-diagonal-se" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-sw" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-ne" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-nw" style="z-index: 1000;"></div><div class="ui-dialog-buttonpane ui-widget-content ui-helper-clearfix"><div class="ui-dialog-buttonset"><button type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" role="button" aria-disabled="false"><span class="ui-button-text">Sim</span></button><button type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" role="button" aria-disabled="false"><span class="ui-button-text">Não</span></button></div></div></div><div class="ui-dialog ui-widget ui-widget-content ui-corner-all ui-draggable ui-resizable" tabindex="-1" role="dialog" aria-labelledby="ui-dialog-title-divConfirmaMasterSair" style="display: none; z-index: 1000; outline: 0px; position: absolute;"><div class="ui-dialog-titlebar ui-widget-header ui-corner-all ui-helper-clearfix"><span class="ui-dialog-title" id="ui-dialog-title-divConfirmaMasterSair">Sair</span><a href="#" class="ui-dialog-titlebar-close ui-corner-all" role="button"><span class="ui-icon ui-icon-closethick">close</span></a></div><div id="divConfirmaMasterSair" style="" class="ui-dialog-content ui-widget-content">
+            <strong><span id="spnConfirmarSair"></span></strong>
+        </div><div class="ui-resizable-handle ui-resizable-n" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-e" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-s" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-w" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-se ui-icon ui-icon-gripsmall-diagonal-se ui-icon-grip-diagonal-se" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-sw" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-ne" style="z-index: 1000;"></div><div class="ui-resizable-handle ui-resizable-nw" style="z-index: 1000;"></div><div class="ui-dialog-buttonpane ui-widget-content ui-helper-clearfix"><div class="ui-dialog-buttonset"><button type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" role="button" aria-disabled="false"><span class="ui-button-text">Sim</span></button><button type="button" class="ui-button ui-widget ui-state-default ui-corner-all ui-button-text-only" role="button" aria-disabled="false"><span class="ui-button-text">Não</span></button></div></div></div></body></html>

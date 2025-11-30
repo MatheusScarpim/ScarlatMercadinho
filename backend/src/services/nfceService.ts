@@ -40,6 +40,9 @@ export interface NfceItem {
     baseCalculo: Nullable<number>;
     aliquota: Nullable<number>;
     valor: Nullable<number>;
+    icmsStRetido?: Nullable<number>;
+    fcpStRetido?: Nullable<number>;
+    icmsEfetivo?: Nullable<number>;
   };
   pis: {
     baseCalculo: Nullable<number>;
@@ -51,6 +54,7 @@ export interface NfceItem {
     aliquota: Nullable<number>;
     valor: Nullable<number>;
   };
+  valorAproxTributos?: Nullable<number>;
 }
 
 export interface NfcePagamento {
@@ -499,11 +503,19 @@ function parseNfceFull(html: string): NfceData {
     const cest = findValueByLabelIn($, detailTable, 'Código CEST');
     const cfop = findCfop($, detailTable);
     const eanComercial = findValueByLabelIn($, detailTable, 'Código EAN Comercial');
+    const valorAproxTributos = findNumberByLabelIn($, detailTable, 'Valor Aproximado dos Tributos');
 
     const icms = {
       baseCalculo: findNumberByLabelIn($, detailTable, 'Base de Cálculo do ICMS Normal'),
       aliquota: findNumberByLabelIn($, detailTable, 'Alíquota do ICMS Normal'),
       valor: findNumberByLabelIn($, detailTable, 'Valor do ICMS Normal'),
+      icmsStRetido: findNumberByLabelIn($, detailTable, 'Valor do ICMS ST retido'),
+      fcpStRetido: findNumberByLabelIn(
+        $,
+        detailTable,
+        'Valor do FCP retido anteriormente por Substituição Tributária'
+      ),
+      icmsEfetivo: findNumberByLabelIn($, detailTable, 'Valor do ICMS efetivo'),
     };
 
     const pisBox = detailTable.find('legend').filter((_j, el) => normalizeText($(el).text()).includes('PIS')).first().closest('fieldset');
@@ -534,6 +546,7 @@ function parseNfceFull(html: string): NfceData {
       icms,
       pis,
       cofins,
+      valorAproxTributos,
     });
   });
 

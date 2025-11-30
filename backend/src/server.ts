@@ -21,7 +21,11 @@ import paymentRoutes from './routes/paymentRoutes';
 import nfceRoutes from './routes/nfceRoutes';
 import cosmosRoutes from './routes/cosmosRoutes';
 import settingsRoutes from './routes/settingsRoutes';
+import batchRoutes from './routes/batchRoutes';
+import customerRoutes from './routes/customerRoutes';
 import { createAdminSeed } from './services/authService';
+import { startExpiryNotificationJob } from './jobs/expiryNotificationJob';
+import { migrateBatchesWithSalePrice } from './services/batchService';
 
 const app = express();
 app.use(cors());
@@ -46,12 +50,31 @@ app.use('/locations', locationRoutes);
 app.use('/nfce', nfceRoutes);
 app.use('/cosmos', cosmosRoutes);
 app.use('/settings', settingsRoutes);
+app.use('/batches', batchRoutes);
+app.use('/customers', customerRoutes);
 
 app.use(errorHandler);
 
 async function bootstrap() {
   await connectDatabase();
   await createAdminSeed();
+
+  // Migra lotes antigos para adicionar originalSalePrice
+  console.log('[MIGRATION] Verificando lotes antigos...');
+  try {
+    const updated = await migrateBatchesWithSalePrice();
+    if (updated > 0) {
+      console.log(`[MIGRATION] ${updated} lotes migrados com sucesso`);
+    } else {
+      console.log('[MIGRATION] Nenhum lote precisou ser migrado');
+    }
+  } catch (error) {
+    console.error('[MIGRATION] Erro ao migrar lotes:', error);
+  }
+
+  // Inicia o job de notificação de produtos próximos do vencimento
+  startExpiryNotificationJob();
+
   app.listen(env.port, () => {
     console.log(`Server running on port ${env.port}`);
   });

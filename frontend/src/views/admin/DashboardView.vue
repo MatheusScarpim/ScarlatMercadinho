@@ -209,13 +209,41 @@ function paymentLabel(pay: string) {
 
 <style scoped>
 .dashboard {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
+  height: 100%;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  padding-right: 4px;
+}
+
+/* Scrollbar personalizado */
+.dashboard::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dashboard::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+}
+
+.dashboard::-webkit-scrollbar-thumb {
+  background: rgba(91, 231, 196, 0.25);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.dashboard::-webkit-scrollbar-thumb:hover {
+  background: rgba(91, 231, 196, 0.45);
 }
 .header-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 .filters {
   display: flex;
@@ -226,36 +254,77 @@ function paymentLabel(pay: string) {
 }
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  flex-shrink: 0;
 }
 .stat {
-  padding: 12px;
+  padding: 20px;
   border-radius: 12px;
+  transition: all 0.3s ease;
+  animation: slideIn 0.3s ease;
 }
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(91, 231, 196, 0.15);
+}
+
 .stat span {
   color: var(--muted);
   font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
 }
 .stat strong {
   display: block;
-  margin-top: 6px;
-  font-size: 22px;
+  margin-top: 8px;
+  font-size: 28px;
+  color: var(--primary);
+  font-weight: 700;
 }
 .grid {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr;
-  gap: 12px;
+  gap: 16px;
+  flex-shrink: 0;
 }
 .panel {
-  padding: 12px;
+  padding: 20px;
   border-radius: 12px;
+  transition: all 0.3s ease;
+  animation: slideIn 0.3s ease;
+  flex-shrink: 0;
 }
+
+.panel:hover {
+  box-shadow: 0 8px 20px rgba(91, 231, 196, 0.1);
+}
+
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+.panel-header h4 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
 }
 .chart {
   min-height: 260px;
@@ -280,6 +349,12 @@ td {
 @media (max-width: 900px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    max-height: calc(100vh - 80px);
   }
 }
 </style>

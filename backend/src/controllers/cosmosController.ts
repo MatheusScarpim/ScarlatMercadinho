@@ -1,5 +1,16 @@
 import { Request, Response } from 'express';
 import { fetchCosmosProduct } from '../services/cosmosService';
+import { GtinLookupModel } from '../models/GtinLookup';
+
+export async function getAllGtinLookups(req: Request, res: Response) {
+  try {
+    const lookups = await GtinLookupModel.find().lean();
+    return res.json(lookups);
+  } catch (err: any) {
+    console.log('[GTIN-LOOKUPS] error', err?.message ?? err);
+    return res.status(500).json({ message: 'Erro ao buscar lookups' });
+  }
+}
 
 export async function getCosmosProduct(req: Request, res: Response) {
   const { ean } = req.params;
