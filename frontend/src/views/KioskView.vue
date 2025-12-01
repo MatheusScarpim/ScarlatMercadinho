@@ -60,7 +60,7 @@
           <span class="chip">{{ totalItems }} itens</span>
           <div class="top-actions">
             <button class="ghost sm" @click="openBarcode">Digitar código</button>
-            <button class="ghost sm" @click="openPromos">Promocoes</button>
+            <button class="ghost sm" @click="openPromos">Promoções</button>
             <button class="ghost sm" @click="showLocationModal = true">Trocar local</button>
           </div>
         </div>

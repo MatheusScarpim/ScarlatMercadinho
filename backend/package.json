@@ -22,6 +22,7 @@
     "mongoose": "^8.6.0",
     "morgan": "^1.10.0",
     "node-cron": "^4.2.1",
+    "pdfkit": "^0.15.2",
     "puppeteer": "^24.31.0",
     "zod": "^3.23.8"
   },
@@ -33,6 +34,7 @@
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.7.4",
     "@types/node-cron": "^3.0.11",
+    "@types/pdfkit": "^0.13.6",
     "@types/puppeteer": "^5.4.7",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",

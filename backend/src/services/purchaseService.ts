@@ -30,14 +30,75 @@ async function ensureProductForItem(item: {
   unitCost: number;
   marginMultiplier: number;
   salePrice?: number;
+  ncm?: string | null;
+  cest?: string | null;
+  cfop?: string | null;
+  cst?: string | null;
+  csosn?: string | null;
+  icmsRate?: number | null;
+  pisRate?: number | null;
+  cofinsRate?: number | null;
+  unit?: string | null;
 }) {
-  if (item.product) return item.product;
+  if (item.product) {
+    const found = await ProductModel.findById(item.product);
+    if (found) {
+      const needsUpdate =
+        (item.ncm && !found.ncm) ||
+        (item.cest && !found.cest) ||
+        (item.cfop && !found.cfop) ||
+        (item.cst && !found.cst) ||
+        (item.csosn && !found.csosn) ||
+        (item.icmsRate && !found.icmsRate) ||
+        (item.pisRate && !found.pisRate) ||
+        (item.cofinsRate && !found.cofinsRate) ||
+        (item.unit && !found.unit);
+      if (needsUpdate) {
+        found.ncm = item.ncm ?? found.ncm;
+        found.cest = item.cest ?? found.cest;
+        found.cfop = item.cfop ?? found.cfop;
+        found.cst = item.cst ?? found.cst;
+        found.csosn = item.csosn ?? found.csosn;
+        found.icmsRate = item.icmsRate ?? found.icmsRate;
+        found.pisRate = item.pisRate ?? found.pisRate;
+        found.cofinsRate = item.cofinsRate ?? found.cofinsRate;
+        found.unit = item.unit ?? found.unit;
+        await found.save();
+      }
+    }
+    return item.product;
+  }
   const barcode = (item.barcode || '').trim();
   const name = (item.name || '').trim() || 'Produto sem nome';
 
   if (barcode) {
     const existingByBarcode = await ProductModel.findOne({ barcode });
-    if (existingByBarcode) return existingByBarcode._id.toString();
+    if (existingByBarcode) {
+      // Atualiza campos fiscais se ainda n��o existirem
+      const needsUpdate =
+        (item.ncm && !existingByBarcode.ncm) ||
+        (item.cest && !existingByBarcode.cest) ||
+        (item.cfop && !existingByBarcode.cfop) ||
+        (item.cst && !existingByBarcode.cst) ||
+        (item.csosn && !existingByBarcode.csosn) ||
+        (item.icmsRate && !existingByBarcode.icmsRate) ||
+        (item.pisRate && !existingByBarcode.pisRate) ||
+        (item.cofinsRate && !existingByBarcode.cofinsRate) ||
+        (item.unit && !existingByBarcode.unit);
+      if (needsUpdate) {
+        existingByBarcode.ncm = item.ncm ?? existingByBarcode.ncm;
+        existingByBarcode.cest = item.cest ?? existingByBarcode.cest;
+        existingByBarcode.cfop = item.cfop ?? existingByBarcode.cfop;
+        existingByBarcode.cst = item.cst ?? existingByBarcode.cst;
+        existingByBarcode.csosn = item.csosn ?? existingByBarcode.csosn;
+        existingByBarcode.icmsRate = item.icmsRate ?? existingByBarcode.icmsRate;
+        existingByBarcode.pisRate = item.pisRate ?? existingByBarcode.pisRate;
+        existingByBarcode.cofinsRate = item.cofinsRate ?? existingByBarcode.cofinsRate;
+        existingByBarcode.unit = item.unit ?? existingByBarcode.unit;
+        await existingByBarcode.save();
+      }
+      return existingByBarcode._id.toString();
+    }
   }
 
   const categoryId = await ensureAutoCategory();
@@ -54,6 +115,15 @@ async function ensureProductForItem(item: {
         ? (item.salePrice as number)
         : (item.unitCost * item.marginMultiplier).toFixed(2)
     ),
+    ncm: item.ncm ?? null,
+    cest: item.cest ?? null,
+    cfop: item.cfop ?? null,
+    cst: item.cst ?? null,
+    csosn: item.csosn ?? null,
+    icmsRate: item.icmsRate ?? null,
+    pisRate: item.pisRate ?? null,
+    cofinsRate: item.cofinsRate ?? null,
+    unit: item.unit ?? null,
     stockQuantity: 0,
     stockByLocation: [],
     minimumStock: 0,
@@ -100,6 +170,15 @@ export async function createPurchase(data: {
     salePrice?: number;
     batchCode?: string;
     expiryDate?: Date | null;
+    ncm?: string | null;
+    cest?: string | null;
+    cfop?: string | null;
+    cst?: string | null;
+    csosn?: string | null;
+    icmsRate?: number | null;
+    pisRate?: number | null;
+    cofinsRate?: number | null;
+    unit?: string | null;
   }[];
   notes?: string;
   createdBy: string;
@@ -130,6 +209,15 @@ export async function createPurchase(data: {
       unitCost: item.unitCost,
       marginMultiplier: multiplier,
       salePrice: normalizedSale,
+      ncm: item.ncm,
+      cest: item.cest,
+      cfop: item.cfop,
+      cst: item.cst,
+      csosn: item.csosn,
+      icmsRate: item.icmsRate,
+      pisRate: item.pisRate,
+      cofinsRate: item.cofinsRate,
+      unit: item.unit,
     });
     itemsWithTotal.push({
       ...item,
@@ -147,6 +235,15 @@ export async function createPurchase(data: {
         ? (normalizedSale as number)
         : Number((item.unitCost * multiplier).toFixed(2));
       product.salePrice = saleValue;
+      if (item.ncm !== undefined) product.ncm = item.ncm;
+      if (item.cest !== undefined) product.cest = item.cest;
+      if (item.cfop !== undefined) product.cfop = item.cfop;
+      if (item.cst !== undefined) product.cst = item.cst;
+      if (item.csosn !== undefined) product.csosn = item.csosn;
+      if (item.icmsRate !== undefined) product.icmsRate = item.icmsRate;
+      if (item.pisRate !== undefined) product.pisRate = item.pisRate;
+      if (item.cofinsRate !== undefined) product.cofinsRate = item.cofinsRate;
+      if (item.unit !== undefined) product.unit = item.unit;
       await product.save();
     }
   }

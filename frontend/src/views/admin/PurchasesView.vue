@@ -560,7 +560,20 @@ async function exportPurchases() {
 
 function parseDateToInput(dateStr: string | null | undefined) {
   if (!dateStr) return '';
-  const parsed = new Date(dateStr);
+  const cleaned = dateStr.trim();
+
+  // Suporta formato brasileiro "dd/mm/yyyy hh:mm:ss"
+  const match = cleaned.match(
+    /(?<dia>\d{2})\/(?<mes>\d{2})\/(?<ano>\d{4})(?:\s+(?<hora>\d{2}):(?<min>\d{2})(?::(?<seg>\d{2}))?)?/,
+  );
+  if (match?.groups) {
+    const { dia, mes, ano } = match.groups;
+    const pad = (v: string) => v.toString().padStart(2, '0');
+    // Monta string YYYY-MM-DD para evitar deslocamentos de fuso
+    return `${ano}-${pad(mes)}-${pad(dia)}`;
+  }
+
+  const parsed = new Date(cleaned);
   return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
 }
 
@@ -745,8 +758,11 @@ async function importFromNfce() {
   nfceLoading.value = true;
   try {
     const data = await fetchNfce(nfceUrl.value);
-    form.issueDate = parseDateToInput(data.info?.emissao) || form.issueDate;
-    form.arrivalDate = form.arrivalDate || form.issueDate;
+    const parsedIssueDate = parseDateToInput(data.info?.emissao);
+    if (parsedIssueDate) {
+      form.issueDate = parsedIssueDate;
+      form.arrivalDate = parsedIssueDate;
+    }
     form.invoiceNumber = data.info?.numero || form.invoiceNumber;
     form.supplierName = data.emitente?.nome || form.supplierName;
     form.supplierCnpj = normalizeDigits(data.emitente?.cnpj || '');
@@ -765,14 +781,27 @@ async function importFromNfce() {
       data.itens.map(async (it: any, idx: number) => {
         const cosmos = cosmosResponses[idx];
         const barcode = it.eanComercial || it.codigo || '';
+        const quantity = Number(it.quantidade) || 1;
+        const unitCost =
+          it.valorUnitario ??
+          (Number.isFinite(it.valorTotal) && quantity ? Number(it.valorTotal) / quantity : 0);
         const productId = await findOrFetchProductId(barcode);
         return {
           product: productId,
           name: cosmos?.name || it.descricao || '',
           barcode,
-          quantity: it.quantidade || 1,
-          unitCost: it.valorUnitario || 0,
-          salePrice: Number(suggestedSalePrice({ unitCost: it.valorUnitario || 0 }).toFixed(2)),
+          quantity,
+          unitCost,
+          salePrice: Number(suggestedSalePrice({ unitCost }).toFixed(2)),
+          ncm: it.ncm || null,
+          cest: it.cest || null,
+          cfop: it.cfop || null,
+          cst: it.icms?.cst || null,
+          csosn: it.icms?.csosn || null,
+          icmsRate: it.icms?.aliquota ?? null,
+          pisRate: it.pis?.aliquota ?? null,
+          cofinsRate: it.cofins?.aliquota ?? null,
+          unit: it.unidade || null,
           batchCode: '',
           expiryDate: ''
         };

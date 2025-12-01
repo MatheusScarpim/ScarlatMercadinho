@@ -15,6 +15,15 @@ export interface ProductDocument extends Document {
   minimumStock: number;
   active: boolean;
   isWeighed: boolean;
+  ncm?: string | null;
+  cest?: string | null;
+  cfop?: string | null;
+  cst?: string | null;
+  csosn?: string | null;
+  icmsRate?: number | null;
+  pisRate?: number | null;
+  cofinsRate?: number | null;
+  unit?: string | null;
 }
 
 const productSchema = new Schema(
@@ -37,7 +46,16 @@ const productSchema = new Schema(
     ],
     minimumStock: { type: Number, default: 0 },
     active: { type: Boolean, default: true },
-    isWeighed: { type: Boolean, default: false }
+    isWeighed: { type: Boolean, default: false },
+    ncm: { type: String, default: null },
+    cest: { type: String, default: null },
+    cfop: { type: String, default: null },
+    cst: { type: String, default: null },
+    csosn: { type: String, default: null },
+    icmsRate: { type: Number, default: null },
+    pisRate: { type: Number, default: null },
+    cofinsRate: { type: Number, default: null },
+    unit: { type: String, default: null }
   },
   { timestamps: true }
 );

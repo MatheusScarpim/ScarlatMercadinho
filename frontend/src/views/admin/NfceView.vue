@@ -1,5 +1,5 @@
 <template>
-  <div class="nfce">
+  <div class="nfce-view">
     <header class="nfce-header">
       <div>
         <p class="eyebrow">NFC-e</p>
@@ -11,7 +11,7 @@
       </button>
     </header>
 
-    <form class="card" @submit.prevent="submit">
+    <form class="card form-card" @submit.prevent="submit">
       <label class="label">URL do QR Code</label>
       <div class="input-row">
         <input
@@ -26,9 +26,22 @@
       <p v-if="error" class="error">{{ error }}</p>
     </form>
 
-    <section v-if="loading" class="card muted">Consultando NFC-e...</section>
+    <div class="nfce-content">
+      <section v-if="loading" class="card loading-card">
+        <div class="loading-spinner"></div>
+        <p class="muted">Consultando NFC-e...</p>
+        <p class="muted tiny">Aguarde enquanto processamos a nota fiscal</p>
+      </section>
 
-    <section v-if="data && !loading" class="grid">
+      <section v-if="!loading && !data && !error" class="card empty-state-card">
+        <svg viewBox="0 0 24 24" fill="none" class="empty-icon">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"/>
+        </svg>
+        <p class="muted">Nenhuma consulta realizada</p>
+        <p class="muted tiny">Cole a URL do QR Code acima ou clique em "Usar exemplo"</p>
+      </section>
+
+      <section v-if="data && !loading" class="grid">
       <div class="card">
         <div class="section-title">Emitente</div>
         <p class="big">{{ data.emitente.nome || '-' }}</p>
@@ -88,7 +101,7 @@
         <div>
           <div class="section-title">Cenários fiscais (estimativa)</div>
           <p class="muted">
-            Usa o total da nota como base e aplica alíquotas típicas de varejo. É uma visão rápida, não substitui a apuração oficial.
+            Base calculada pela soma dos produtos da nota; aplica aliquotas tipicas de varejo. E uma visao rapida, nao substitui a apuracao oficial.
           </p>
         </div>
         <div class="pill-toggle">
@@ -148,12 +161,17 @@
       </div>
     </section>
 
-    <section v-if="data && data.itens.length && !loading" class="card">
-      <div class="section-title">Itens ({{ data.itens.length }})</div>
-      <div class="table">
+    <section v-if="data && data.itens.length && !loading" class="card items-card">
+      <div class="section-title">
+        Itens da Nota
+        <span class="items-count">{{ data.itens.length }} {{ data.itens.length === 1 ? 'item' : 'itens' }}</span>
+      </div>
+      <div class="table-container">
+        <div class="table">
+        
         <div class="thead">
-          <span>Descrição</span>
-          <span>Código</span>
+          <span>Descricao</span>
+          <span>Codigo</span>
           <span>Qtd</span>
           <span>UN</span>
           <span>Vlr Unit</span>
@@ -162,9 +180,15 @@
           <span>CEST</span>
           <span>CFOP</span>
           <span>EAN</span>
-          <span>ICMS</span>
-          <span>PIS</span>
-          <span>COFINS</span>
+          <span>ICMS CST/CSOSN</span>
+          <span>ICMS Alq</span>
+          <span>ICMS Valor</span>
+          <span>PIS CST</span>
+          <span>PIS Alq</span>
+          <span>PIS Valor</span>
+          <span>COFINS CST</span>
+          <span>COFINS Alq</span>
+          <span>COFINS Valor</span>
           <span>Cosmos</span>
         </div>
         <div v-for="(item, idx) in data.itens" :key="idx" class="trow">
@@ -178,15 +202,23 @@
           <span>{{ item.cest || '-' }}</span>
           <span>{{ item.cfop || '-' }}</span>
           <span>{{ item.eanComercial || '-' }}</span>
+          <span>{{ item.icms.csosn || item.icms.cst || '-' }}</span>
+          <span>{{ formatRate(item.icms.aliquota) }}</span>
           <span>R$ {{ formatNumber(item.icms.valor) }}</span>
+          <span>{{ item.pis.cst || '-' }}</span>
+          <span>{{ formatRate(item.pis.aliquota) }}</span>
           <span>R$ {{ formatNumber(item.pis.valor) }}</span>
+          <span>{{ item.cofins.cst || '-' }}</span>
+          <span>{{ formatRate(item.cofins.aliquota) }}</span>
           <span>R$ {{ formatNumber(item.cofins.valor) }}</span>
           <span>
             <button class="btn tiny" type="button" @click="openCosmos(item)">Ver detalhes</button>
           </span>
         </div>
+        </div>
       </div>
     </section>
+    </div>
 
     <div v-if="cosmosModalOpen" class="modal">
       <div class="modal-box glass cosmos-box">
@@ -230,7 +262,20 @@ const cosmosData = ref<CosmosProduct | null>(null);
 const cosmosEan = ref('');
 const horizon = ref<'monthly' | 'yearly'>('monthly');
 
-const baseTotal = computed(() => data.value?.totais.valorTotal ?? 0);
+const itemsBaseTotal = computed(() =>
+  (data.value?.itens || []).reduce((sum, item) => {
+    const itemTotal = Number(item.valorTotal ?? item.valorUnitario ?? 0);
+    return sum + (Number.isFinite(itemTotal) ? itemTotal : 0);
+  }, 0)
+);
+
+// Usa a soma dos produtos como base; se nao houver, cai no total informado na nota.
+const baseTotal = computed(() => {
+  const byItems = itemsBaseTotal.value;
+  if (byItems > 0) return byItems;
+  const noteTotal = Number(data.value?.totais.valorTotal ?? 0);
+  return Number.isFinite(noteTotal) ? noteTotal : 0;
+});
 const horizonMultiplier = computed(() => (horizon.value === 'yearly' ? 12 : 1));
 const horizonLabel = computed(() => (horizon.value === 'yearly' ? 'ano' : 'mês'));
 const baseIcmsNota = computed(() => (data.value?.itens || []).reduce((sum, it) => sum + (it.icms?.valor || 0), 0));
@@ -283,6 +328,11 @@ function formatNumber(value: number | null) {
   return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatRate(value: number | null | undefined) {
+  const num = Number(value);
+  return Number.isFinite(num) ? `${num.toFixed(2)}%` : '-';
+}
+
 function runDemo() {
   url.value =
     'https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?p=35251006057223031131650340000092251340165652|3|1';
@@ -321,15 +371,61 @@ function closeCosmos() {
 </script>
 
 <style scoped>
-.nfce {
+.nfce-view {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
+
 .nfce-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
+  margin-bottom: 16px;
+}
+
+.nfce-header h2 {
+  margin: 4px 0;
+}
+
+.form-card {
+  flex-shrink: 0;
+  margin-bottom: 0;
+}
+
+.nfce-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  margin-top: 16px;
+  padding-right: 4px;
+  padding-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nfce-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.nfce-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.nfce-content::-webkit-scrollbar-thumb {
+  background: rgba(91, 231, 196, 0.3);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+.nfce-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(91, 231, 196, 0.5);
 }
 .eyebrow {
   text-transform: uppercase;
@@ -342,6 +438,48 @@ function closeCosmos() {
   color: var(--muted);
   margin: 4px 0;
 }
+
+.loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(91, 231, 196, 0.2);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.empty-state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  width: 80px;
+  height: 80px;
+  color: var(--muted);
+  opacity: 0.3;
+}
 .card {
   background: #fff;
   border: 1px solid var(--border);
@@ -349,13 +487,13 @@ function closeCosmos() {
   padding: 20px;
   box-shadow: var(--shadow);
   transition: all 0.3s ease;
-  animation: slideIn 0.3s ease;
+  animation: fadeIn 0.3s ease;
 }
 
-@keyframes slideIn {
+@keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -405,6 +543,19 @@ function closeCosmos() {
 .section-title {
   font-weight: 700;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.items-count {
+  padding: 4px 10px;
+  background: rgba(91, 231, 196, 0.12);
+  border: 1px solid rgba(91, 231, 196, 0.3);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
 }
 
 .big {
@@ -428,24 +579,79 @@ function closeCosmos() {
   border: 1px solid var(--border);
 }
 
-.table {
+.items-card {
+  display: flex;
+  flex-direction: column;
+  max-height: 600px;
+}
+
+.table-container {
   overflow-x: auto;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.table-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background: rgba(91, 231, 196, 0.3);
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(91, 231, 196, 0.5);
+}
+
+.table {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 1800px;
 }
 .thead,
 .trow {
   display: grid;
-  grid-template-columns: 2fr repeat(12, 1fr);
+  grid-template-columns: 2fr repeat(18, 1fr);
   gap: 6px;
   align-items: center;
 }
+
+.thead {
+  position: sticky;
+  top: 0;
+  background: rgba(91, 231, 196, 0.1);
+  padding: 12px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  z-index: 1;
+  border: 1px solid rgba(91, 231, 196, 0.2);
+}
+
 .trow {
-  padding: 8px;
+  padding: 10px 8px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.01);
+  transition: all 0.2s ease;
+}
+
+.trow:hover {
+  background: rgba(91, 231, 196, 0.05);
+  border-color: rgba(91, 231, 196, 0.3);
+  transform: translateX(2px);
 }
 .desc {
   font-weight: 600;
@@ -494,6 +700,7 @@ function closeCosmos() {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  position: relative;
 }
 .fiscal-header {
   display: flex;

@@ -11,25 +11,38 @@ export interface NfceItem {
   cest: string | null;
   cfop: string | null;
   eanComercial: string | null;
+  eanTributavel?: string | null;
+  unidadeTributavel?: string | null;
+  quantidadeTributavel?: number | null;
   icms: {
     baseCalculo: number | null;
     aliquota: number | null;
     valor: number | null;
+    cst?: string | null;
+    csosn?: string | null;
     icmsStRetido?: number | null;
     fcpStRetido?: number | null;
     icmsEfetivo?: number | null;
+    baseStRetida?: number | null;
+    percReducaoBaseEfetiva?: number | null;
+    aliquotaEfetiva?: number | null;
   };
   pis: {
     baseCalculo: number | null;
     aliquota: number | null;
     valor: number | null;
+    cst?: string | null;
   };
   cofins: {
     baseCalculo: number | null;
     aliquota: number | null;
     valor: number | null;
+    cst?: string | null;
   };
   valorAproxTributos?: number | null;
+  valorDescontoItem?: number | null;
+  valorFreteItem?: number | null;
+  valorSeguroItem?: number | null;
 }
 
 export interface NfcePagamento {
@@ -81,4 +94,21 @@ export interface NfceData {
 export async function fetchNfce(url: string) {
   const response = await api.get<NfceData>('/nfce', { params: { url } });
   return response.data;
+}
+
+export async function fetchFiscalOverview() {
+  const response = await api.get('/nfce/fiscal');
+  return response.data as {
+    purchases: any[];
+    sales: { sale: any; items: any[] }[];
+    nfces: any[];
+  };
+}
+
+export async function exportFiscalSummary(params?: { from?: string; to?: string }) {
+  const response = await api.get('/nfce/fiscal/export', {
+    params,
+    responseType: 'blob',
+  });
+  return response.data as Blob;
 }

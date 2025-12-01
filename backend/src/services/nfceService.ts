@@ -40,6 +40,8 @@ export interface NfceItem {
     baseCalculo: Nullable<number>;
     aliquota: Nullable<number>;
     valor: Nullable<number>;
+    cst?: string | null;
+    csosn?: string | null;
     icmsStRetido?: Nullable<number>;
     fcpStRetido?: Nullable<number>;
     icmsEfetivo?: Nullable<number>;
@@ -48,11 +50,13 @@ export interface NfceItem {
     baseCalculo: Nullable<number>;
     aliquota: Nullable<number>;
     valor: Nullable<number>;
+    cst?: string | null;
   };
   cofins: {
     baseCalculo: Nullable<number>;
     aliquota: Nullable<number>;
     valor: Nullable<number>;
+    cst?: string | null;
   };
   valorAproxTributos?: Nullable<number>;
 }
@@ -106,6 +110,12 @@ export interface NfceData {
 const normalizeText = (text: string | undefined | null): string =>
   (text ?? '').replace(/\s+/g, ' ').trim();
 
+const normalizeLabel = (text: string | undefined | null): string =>
+  normalizeText(text)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
 const parseDecimal = (text: string | undefined | null): Nullable<number> => {
   if (!text) return null;
   const cleaned = text.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
@@ -150,9 +160,9 @@ function extractItens($: cheerio.CheerioAPI): NfceItem[] {
       cest: null,
       cfop: null,
       eanComercial: null,
-      icms: { baseCalculo: null, aliquota: null, valor: null },
-      pis: { baseCalculo: null, aliquota: null, valor: null },
-      cofins: { baseCalculo: null, aliquota: null, valor: null },
+      icms: { baseCalculo: null, aliquota: null, valor: null, cst: null, csosn: null },
+      pis: { baseCalculo: null, aliquota: null, valor: null, cst: null },
+      cofins: { baseCalculo: null, aliquota: null, valor: null, cst: null },
     });
   });
 
@@ -367,8 +377,8 @@ export function parseNfceMobile(html: string): NfceData {
 function findValueByLabel($: cheerio.CheerioAPI, container: cheerio.Cheerio<any>, startsWith: string) {
   let result: string | null = null;
   container.find('td').each((_i: number, td: any) => {
-    const label = normalizeText($(td).find('label').text());
-    if (!label || !label.toLowerCase().startsWith(startsWith.toLowerCase())) return;
+    const label = normalizeLabel($(td).find('label').text());
+    if (!label || !label.startsWith(normalizeLabel(startsWith))) return;
     const val = normalizeText($(td).find('span').text());
     if (val) result = val;
   });
@@ -382,8 +392,8 @@ function findValueByLabelIn(
 ): string | null {
   let result: string | null = null;
   container.find('label').each((_i: number, label: any) => {
-    const text = normalizeText($(label).text());
-    if (!text.toLowerCase().startsWith(startsWith.toLowerCase())) return;
+    const text = normalizeLabel($(label).text());
+    if (!text.startsWith(normalizeLabel(startsWith))) return;
     const span = $(label).parent().find('span').first();
     const val = normalizeText(span.text());
     if (val) result = val;
@@ -399,8 +409,8 @@ function findValueByLabelContains(
 ): string | null {
   let result: string | null = null;
   container.find('label').each((_i: number, label: any) => {
-    const text = normalizeText($(label).text()).toLowerCase();
-    if (!text.includes(needle.toLowerCase())) return;
+    const text = normalizeLabel($(label).text());
+    if (!text.includes(normalizeLabel(needle))) return;
     const span = $(label).parent().find('span').first();
     const val = normalizeText(span.text());
     if (val) result = val;
@@ -509,6 +519,11 @@ function parseNfceFull(html: string): NfceData {
       baseCalculo: findNumberByLabelIn($, detailTable, 'Base de Cálculo do ICMS Normal'),
       aliquota: findNumberByLabelIn($, detailTable, 'Alíquota do ICMS Normal'),
       valor: findNumberByLabelIn($, detailTable, 'Valor do ICMS Normal'),
+      cst: findValueByLabelContains($, detailTable, 'cst do icms')
+        || findValueByLabelContains($, detailTable, 'tributacao do icms')
+        || findValueByLabelContains($, detailTable, 'tributacao')
+        || findValueByLabelContains($, detailTable, 'cst'),
+      csosn: findValueByLabelContains($, detailTable, 'csosn'),
       icmsStRetido: findNumberByLabelIn($, detailTable, 'Valor do ICMS ST retido'),
       fcpStRetido: findNumberByLabelIn(
         $,
@@ -523,6 +538,7 @@ function parseNfceFull(html: string): NfceData {
       baseCalculo: pisBox.length ? findNumberByLabelIn($, pisBox, 'Base de Cálculo') : null,
       aliquota: pisBox.length ? findNumberByLabelIn($, pisBox, 'Alíquota') : null,
       valor: pisBox.length ? findNumberByLabelIn($, pisBox, 'Valor') : null,
+      cst: pisBox.length ? findValueByLabelContains($, pisBox, 'cst') : findValueByLabelContains($, detailTable, 'cst do pis'),
     };
 
     const cofinsBox = detailTable.find('legend').filter((_j, el) => normalizeText($(el).text()).includes('COFINS')).first().closest('fieldset');
@@ -530,6 +546,7 @@ function parseNfceFull(html: string): NfceData {
       baseCalculo: cofinsBox.length ? findNumberByLabelIn($, cofinsBox, 'Base de Cálculo') : null,
       aliquota: cofinsBox.length ? findNumberByLabelIn($, cofinsBox, 'Alíquota') : null,
       valor: cofinsBox.length ? findNumberByLabelIn($, cofinsBox, 'Valor') : null,
+      cst: cofinsBox.length ? findValueByLabelContains($, cofinsBox, 'cst') : findValueByLabelContains($, detailTable, 'cst do cofins'),
     };
 
     itens.push({
@@ -595,3 +612,4 @@ export async function scrapeNfce(url: string): Promise<NfceData> {
   logDebug('Sem itens na visão completa, tentando parser mobile');
   return parseNfceMobile(html);
 }
+
