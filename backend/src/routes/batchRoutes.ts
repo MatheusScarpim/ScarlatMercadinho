@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import * as controller from '../controllers/batchController';
-import { authMiddleware } from '../middlewares/auth';
+import { authMiddleware, requirePermission } from '../middlewares/auth';
 
 const router = Router();
 
-router.use(authMiddleware);
+router.use(authMiddleware, requirePermission('EXPIRING_PRODUCTS'));
 
 // Lista lotes próximos do vencimento
 router.get('/expiring', controller.listExpiringBatches);

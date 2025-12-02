@@ -8,7 +8,8 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET || 'changeme',
   mpAccessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN || '',
   mpPointDeviceId: process.env.MERCADO_PAGO_POINT_DEVICE_ID || '',
-  mpSandbox: process.env.MERCADO_PAGO_SANDBOX !== 'false'
+  mpSandbox: process.env.MERCADO_PAGO_SANDBOX !== 'false',
+  adminBootstrapSecret: process.env.ADMIN_BOOTSTRAP_SECRET || ''
 };
 
 if (!env.mongoUri) {

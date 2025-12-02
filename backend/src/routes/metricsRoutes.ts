@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { getOverview } from '../controllers/metricsController';
-import { authMiddleware } from '../middlewares/auth';
+import { authMiddleware, requirePermission } from '../middlewares/auth';
 
 const router = Router();
 
-router.get('/', authMiddleware, getOverview);
+router.get('/', authMiddleware, requirePermission('DASHBOARD'), getOverview);
 
 export default router;

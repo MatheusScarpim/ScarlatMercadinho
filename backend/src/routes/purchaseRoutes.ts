@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import * as controller from '../controllers/purchaseController';
-import { authMiddleware } from '../middlewares/auth';
+import { authMiddleware, requirePermission } from '../middlewares/auth';
 
 const router = Router();
 
-router.use(authMiddleware);
+router.use(authMiddleware, requirePermission('PURCHASES'));
 router.post('/', controller.create);
 router.get('/with-details', controller.listWithDetails);
 router.get('/', controller.list);

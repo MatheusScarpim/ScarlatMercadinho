@@ -11,45 +11,87 @@
         </div>
       </div>
 
-                  <nav>
-        <div class="nav-section">
+                        <nav>
+        <div class="nav-section" v-if="showOverview">
           <p class="nav-label">Visão Geral</p>
-          <RouterLink to="/admin/dashboard" class="nav-item"> <span class="icon">📊</span> <span>Dashboard</span> </RouterLink>
+          <RouterLink v-if="can('DASHBOARD')" to="/admin/dashboard" class="nav-item">
+            <span class="icon">📊</span>
+            <span>Dashboard</span>
+          </RouterLink>
         </div>
 
-        <div class="nav-section">
+        <div class="nav-section" v-if="showInventory">
           <p class="nav-label">Inventário</p>
-          <RouterLink to="/admin/products" class="nav-item"> <span class="icon">🛍️</span> <span>Produtos</span> </RouterLink>
-          <RouterLink to="/admin/expiring-products" class="nav-item expiring-link">
+          <RouterLink v-if="can('PRODUCTS')" to="/admin/products" class="nav-item">
+            <span class="icon">📦</span>
+            <span>Produtos</span>
+          </RouterLink>
+          <RouterLink
+            v-if="can('EXPIRING_PRODUCTS')"
+            to="/admin/expiring-products"
+            class="nav-item expiring-link"
+          >
             <span class="icon">⏳</span>
             <span class="link-content">
               <span>Vencimentos</span>
               <span v-if="criticalBatchCount > 0" class="critical-badge">{{ criticalBatchCount }}</span>
             </span>
           </RouterLink>
-          <RouterLink to="/admin/categories" class="nav-item"> <span class="icon">🏷️</span> <span>Categorias</span> </RouterLink>
-          <RouterLink to="/admin/stock-movements" class="nav-item"> <span class="icon">📦</span> <span>Movimentações</span> </RouterLink>
+          <RouterLink v-if="can('CATEGORIES')" to="/admin/categories" class="nav-item">
+            <span class="icon">🏷️</span>
+            <span>Categorias</span>
+          </RouterLink>
+          <RouterLink v-if="can('STOCK_MOVEMENTS')" to="/admin/stock-movements" class="nav-item">
+            <span class="icon">📦</span>
+            <span>Movimentações</span>
+          </RouterLink>
         </div>
 
-        <div class="nav-section">
+        <div class="nav-section" v-if="showOperations">
           <p class="nav-label">Operações</p>
-          <RouterLink to="/admin/purchases" class="nav-item"> <span class="icon">🛒</span> <span>Compras</span> </RouterLink>
-          <RouterLink to="/admin/sales" class="nav-item"> <span class="icon">🧾</span> <span>Vendas</span> </RouterLink>
-          <RouterLink to="/admin/nfce" class="nav-item"> <span class="icon">🧾</span> <span>NFC-e</span> </RouterLink>
-          <RouterLink to="/admin/fiscal" class="nav-item"> <span class="icon">📊</span> <span>Fiscal</span> </RouterLink>
+          <RouterLink v-if="can('PURCHASES')" to="/admin/purchases" class="nav-item">
+            <span class="icon">🧾</span>
+            <span>Compras</span>
+          </RouterLink>
+          <RouterLink v-if="can('SALES')" to="/admin/sales" class="nav-item">
+            <span class="icon">🧾</span>
+            <span>Vendas</span>
+          </RouterLink>
+          <RouterLink v-if="can('NFC_E')" to="/admin/nfce" class="nav-item">
+            <span class="icon">🧾</span>
+            <span>NFC-e</span>
+          </RouterLink>
+          <RouterLink v-if="can('FISCAL')" to="/admin/fiscal" class="nav-item">
+            <span class="icon">🧾</span>
+            <span>Fiscal</span>
+          </RouterLink>
         </div>
 
-        <div class="nav-section">
+        <div class="nav-section" v-if="showCadastros">
           <p class="nav-label">Cadastros</p>
-          <RouterLink to="/admin/suppliers" class="nav-item"> <span class="icon">🏢</span> <span>Fornecedores</span> </RouterLink>
-          <RouterLink to="/admin/locations" class="nav-item"> <span class="icon">📍</span> <span>Locais</span> </RouterLink>
+          <RouterLink v-if="can('SUPPLIERS')" to="/admin/suppliers" class="nav-item">
+            <span class="icon">🚚</span>
+            <span>Fornecedores</span>
+          </RouterLink>
+          <RouterLink v-if="can('LOCATIONS')" to="/admin/locations" class="nav-item">
+            <span class="icon">📍</span>
+            <span>Locais</span>
+          </RouterLink>
         </div>
 
-        <div class="nav-section">
+        <div class="nav-section" v-if="showSystem">
           <p class="nav-label">Sistema</p>
-          <RouterLink to="/admin/settings" class="nav-item"> <span class="icon">⚙️</span> <span>Configurações</span> </RouterLink>
+          <RouterLink v-if="can('SETTINGS')" to="/admin/settings" class="nav-item">
+            <span class="icon">⚙️</span>
+            <span>Configurações</span>
+          </RouterLink>
+          <RouterLink v-if="isAdmin" to="/admin/users" class="nav-item">
+            <span class="icon">👥</span>
+            <span>Usuários</span>
+          </RouterLink>
         </div>
       </nav>
+
 
       <button class="logout" @click="logout">
         <span class="icon">🚪</span>
@@ -128,8 +170,9 @@ import { RouterLink, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { useAuthStore } from '../../stores/auth';
 import { useNotificationStore } from '../../stores/notifications';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, computed } from 'vue';
 import api from '../../services/api';
+import { PermissionKey } from '../../constants/permissions';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -141,6 +184,18 @@ const showNotifications = ref(false);
 
 const criticalBatchCount = ref(0);
 let criticalInterval: number | null = null;
+
+const isAdmin = computed(() => auth.user?.role === 'ADMIN');
+const can = (permission: PermissionKey) => auth.hasPermission(permission);
+const showOverview = computed(() => can('DASHBOARD'));
+const showInventory = computed(
+  () => can('PRODUCTS') || can('EXPIRING_PRODUCTS') || can('CATEGORIES') || can('STOCK_MOVEMENTS')
+);
+const showOperations = computed(
+  () => can('PURCHASES') || can('SALES') || can('NFC_E') || can('FISCAL')
+);
+const showCadastros = computed(() => can('SUPPLIERS') || can('LOCATIONS'));
+const showSystem = computed(() => can('SETTINGS') || isAdmin.value);
 
 function logout() {
   auth.logout();
@@ -215,6 +270,10 @@ function clearAllNotifications() {
 
 // Busca contagem de produtos críticos
 async function fetchCriticalCount() {
+  if (!can('EXPIRING_PRODUCTS')) {
+    criticalBatchCount.value = 0;
+    return;
+  }
   try {
     const { data } = await api.get('/batches/critical-count');
     criticalBatchCount.value = data.count;
@@ -225,12 +284,13 @@ async function fetchCriticalCount() {
 
 onMounted(() => {
   notifications.fetchUnread().catch(() => { });
-  fetchCriticalCount();
-
-  // Atualiza a cada 2 minutos
-  criticalInterval = window.setInterval(() => {
+  if (can('EXPIRING_PRODUCTS')) {
     fetchCriticalCount();
-  }, 120000);
+    // Atualiza a cada 2 minutos
+    criticalInterval = window.setInterval(() => {
+      fetchCriticalCount();
+    }, 120000);
+  }
 });
 
 onUnmounted(() => {
