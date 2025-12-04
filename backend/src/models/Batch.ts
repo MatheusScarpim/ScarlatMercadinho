@@ -23,7 +23,7 @@ const batchSchema = new Schema<BatchDocument>(
     location: { type: String, required: true, default: 'default' },
     batchCode: { type: String, default: null },
     quantity: { type: Number, required: true, default: 0 },
-    expiryDate: { type: Date, required: true, index: true },
+    expiryDate: { type: Date, required: true },
     purchasePrice: { type: Number, required: true }, // Custo de compra
     originalSalePrice: { type: Number }, // Preço de venda original (opcional para retrocompatibilidade)
     currentPrice: { type: Number, required: true }, // Preço atual com desconto

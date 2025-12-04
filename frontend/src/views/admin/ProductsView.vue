@@ -430,7 +430,7 @@ async function loadStockSummary() {
 function getProductImage(product: any): string | null {
   if (!product || !product.barcode) return null;
   const gtinLookup = gtinLookups.value.find((g: any) => g.ean === product.barcode);
-  return gtinLookup.imageUrl || null;
+  return gtinLookup?.imageUrl || null;
 }
 
 const calculateMargin = computed(() => {
