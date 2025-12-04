@@ -283,10 +283,17 @@ export async function fetchNfceHtml(url: string): Promise<string> {
 }
 
 async function fetchNfceHtmlWithBrowser(url: string): Promise<string> {
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
   const browser = await puppeteer.launch({
     headless: true,
     slowMo: 150,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--start-maximized'],
+    executablePath,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--start-maximized',
+    ],
   });
   try {
     let page = await browser.newPage();
