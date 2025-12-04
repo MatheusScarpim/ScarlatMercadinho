@@ -63,3 +63,37 @@ export async function bootstrapAdmin(name: string, email: string, password: stri
   const token = signToken({ userId: user.id, role: user.role });
   return { user, token };
 }
+
+export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
+  if (!currentPassword || !newPassword) {
+    throw new ApiError(400, 'Senha atual e nova senha são obrigatórias');
+  }
+  if (newPassword.length < 6) {
+    throw new ApiError(400, 'Nova senha deve ter pelo menos 6 caracteres');
+  }
+
+  const user = await UserModel.findById(userId);
+  if (!user || !user.active) {
+    throw new ApiError(404, 'Usuário não encontrado');
+  }
+
+  const matches = await comparePassword(currentPassword, user.passwordHash);
+  if (!matches) {
+    throw new ApiError(401, 'Senha atual inválida');
+  }
+
+  const samePassword = await comparePassword(newPassword, user.passwordHash);
+  if (samePassword) {
+    throw new ApiError(400, 'Nova senha deve ser diferente da atual');
+  }
+
+  user.passwordHash = await hashPassword(newPassword);
+  user.passwordMustChange = false;
+  await user.save();
+
+  const token = signToken({ userId: user.id, role: user.role });
+  return {
+    token,
+    user
+  };
+}

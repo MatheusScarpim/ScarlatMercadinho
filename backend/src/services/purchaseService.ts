@@ -182,7 +182,7 @@ export async function createPurchase(data: {
   }[];
   notes?: string;
   createdBy: string;
-  location?: string;
+  location: string;
 }) {
   if (!data.location) {
     throw new Error('Campo location Ǹ obrigat��rio para registrar compra.');

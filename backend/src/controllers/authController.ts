@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import * as authService from '../services/authService';
 import { ALL_PERMISSIONS } from '../config/permissions';
 import { validateEmail } from '../utils/validation';
+import { AuthRequest } from '../middlewares/auth';
+import { ApiError } from '../utils/apiError';
 
 export async function login(req: Request, res: Response) {
   const { email, password } = req.body;
@@ -44,9 +46,12 @@ export async function bootstrapAdmin(req: Request, res: Response) {
   });
 }
 
-export async function changePassword(req: Request, res: Response) {
+export async function changePassword(req: AuthRequest, res: Response) {
   const { currentPassword, newPassword } = req.body;
-  const payload = await authService.changePassword(req.user!.userId, currentPassword, newPassword);
+  if (!req.user) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+  const payload = await authService.changePassword(req.user.userId, currentPassword, newPassword);
   res.json({
     token: payload.token,
     user: {

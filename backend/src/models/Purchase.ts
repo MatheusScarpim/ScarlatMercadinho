@@ -19,7 +19,7 @@ export interface PurchaseDocument extends Document {
   totalAmount: number;
   notes?: string;
   createdBy: Types.ObjectId;
-  location?: string;
+  location: string;
 }
 
 const purchaseItemSchema = new Schema(

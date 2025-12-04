@@ -14,9 +14,10 @@ export interface BatchDocument extends Document {
   purchaseId?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+  calculateDynamicDiscount(): number;
 }
 
-const batchSchema = new Schema(
+const batchSchema = new Schema<BatchDocument>(
   {
     product: { type: Schema.Types.ObjectId, ref: 'Product', required: true, index: true },
     location: { type: String, required: true, default: 'default' },
@@ -41,7 +42,7 @@ batchSchema.index({ product: 1, location: 1, batchCode: 1 });
 batchSchema.index({ expiryDate: 1 });
 
 // Método para calcular desconto baseado em dias até vencimento
-batchSchema.methods.calculateDynamicDiscount = function() {
+batchSchema.methods.calculateDynamicDiscount = function(this: BatchDocument) {
   const today = new Date();
   const daysUntilExpiry = Math.ceil((this.expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -68,7 +69,7 @@ batchSchema.methods.calculateDynamicDiscount = function() {
 };
 
 // Hook para atualizar preço antes de salvar
-batchSchema.pre('save', async function(next) {
+batchSchema.pre('save', async function(this: BatchDocument, next) {
   // Se desconto foi ajustado manualmente, não recalcula automaticamente
   if (!this.manualDiscount) {
     const discount = this.calculateDynamicDiscount();
