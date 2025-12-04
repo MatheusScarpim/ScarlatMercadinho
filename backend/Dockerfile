@@ -1,6 +1,9 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
+# Avoid downloading Chromium for puppeteer during install (saves space in CI/builders)
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 COPY package*.json tsconfig*.json ./
 COPY src ./src
 
@@ -10,6 +13,8 @@ RUN npm run build
 FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+# Keep the same flag in runtime layer to avoid attempts if scripts run
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 COPY package*.json ./
 RUN npm ci --omit=dev
