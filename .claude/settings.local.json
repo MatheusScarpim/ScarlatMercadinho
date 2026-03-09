@@ -3,7 +3,9 @@
     "allow": [
       "Bash(tree:*)",
       "Bash(dir:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(xargs grep:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

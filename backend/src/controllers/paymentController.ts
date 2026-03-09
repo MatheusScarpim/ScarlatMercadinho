@@ -1,10 +1,15 @@
 import { Request, Response } from 'express';
-import { ApiError } from '../utils/apiError';
+import {
+  PaymentMethodRequiredError,
+  UnsupportedPaymentMethodError,
+} from '../errors/paymentErrors';
 import {
   createPixPaymentIntent,
   createPointPaymentIntent,
   getPaymentStatus,
-  getPointIntentStatus
+  getPointIntentStatus,
+  configurePointDevice,
+  getPointDeviceStatus
 } from '../services/paymentGatewayService';
 
 function resolvePointType(method: string, paymentType?: string) {
@@ -21,7 +26,7 @@ export async function createPaymentIntent(req: Request, res: Response) {
   const method = (req.body.method || '').toUpperCase();
 
   if (!method) {
-    throw new ApiError(400, 'Payment method is required');
+    throw new PaymentMethodRequiredError();
   }
 
   if (method === 'PIX') {
@@ -44,13 +49,13 @@ export async function createPaymentIntent(req: Request, res: Response) {
     });
   }
 
-  throw new ApiError(400, 'Unsupported payment method');
+  throw new UnsupportedPaymentMethodError(method);
 }
 
 export async function paymentStatus(req: Request, res: Response) {
   const paymentId = req.params.paymentId;
   if (!paymentId) {
-    throw new ApiError(400, 'paymentId is required');
+    throw new PaymentMethodRequiredError();
   }
   const status = await getPaymentStatus(paymentId);
   res.json(status);
@@ -58,14 +63,23 @@ export async function paymentStatus(req: Request, res: Response) {
 
 export async function cancelPointPayment(req: Request, res: Response) {
   const intentId = req.params.intentId;
-  if (!intentId) throw new ApiError(400, 'intentId is required');
-  // Mantém stub para registro de tentativa; backend já tentou todos os caminhos de cancelamento e falhou.
+  if (!intentId) throw new PaymentMethodRequiredError();
   res.status(501).json({ message: 'Cancelamento não suportado via API. Use a maquininha para cancelar.' });
 }
 
 export async function pointIntentStatus(req: Request, res: Response) {
   const intentId = req.params.intentId;
-  if (!intentId) throw new ApiError(400, 'intentId is required');
+  if (!intentId) throw new PaymentMethodRequiredError();
   const result = await getPointIntentStatus(intentId);
+  res.json(result);
+}
+
+export async function configureDevice(_req: Request, res: Response) {
+  const result = await configurePointDevice();
+  res.json(result);
+}
+
+export async function deviceStatus(_req: Request, res: Response) {
+  const result = await getPointDeviceStatus();
   res.json(result);
 }

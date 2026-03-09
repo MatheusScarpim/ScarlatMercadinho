@@ -263,9 +263,14 @@
             <p class="muted sm" v-if="paymentMethod === 'PIX'">
               Estamos gerando e esperando o Pix. Isso leva poucos segundos.
             </p>
-            <p class="muted sm" v-else>
-              Confirme na maquininha: verde para pagar, vermelho para cancelar.
-            </p>
+            <div v-else>
+              <p class="muted sm">
+                Aperte o botão <strong style="color: var(--success, green)">verde</strong> na maquininha para pagar.
+              </p>
+              <p class="muted sm">
+                Para cancelar, aperte o botão <strong style="color: var(--danger, red)">vermelho</strong>.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -286,24 +291,6 @@
         </div>
         <p class="muted">Pressione o botão verde na maquininha para pagar.</p>
         <p class="muted">Para cancelar, pressione o botão vermelho.</p>
-        <div class="actions modal-actions">
-          <button class="ghost" @click="closeTerminalHint">Voltar</button>
-          <button class="primary" @click="confirmTerminalHint">Já apertei o verde</button>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="showTerminalHint" class="modal">
-      <div class="modal-box glass">
-        <div class="modal-header">
-          <h3>Confirme na maquininha</h3>
-          <button class="ghost" @click="closeTerminalHint">Fechar</button>
-        </div>
-        <p class="muted emphasis">
-          {{ terminalHintMode === 'pay'
-            ? 'Pressione o botão verde na maquininha para pagar.'
-            : 'Para cancelar, pressione o botão vermelho na maquininha.' }}
-        </p>
         <div class="actions modal-actions">
           <button class="primary" @click="closeTerminalHint">Ok, entendi</button>
         </div>
@@ -610,17 +597,12 @@ function closePayment() {
 
 async function confirmPayment() {
   showTerminalHint.value = false;
-  if (paymentMethod.value === 'CREDIT_CARD' || paymentMethod.value === 'DEBIT_CARD') {
-    terminalHintMode.value = 'pay';
-    showTerminalHint.value = true; // mostra instrução do botão verde enquanto envia
-  }
   paymentError.value = '';
   paymentProcessing.value = true;
-  const isMachine = paymentMethod.value === 'CREDIT_CARD' || paymentMethod.value === 'DEBIT_CARD';
-  paymentStatusText.value = isMachine ? 'Aguardando confirmacao na maquininha...' : 'Gerando pagamento...';
 
-  try {
-    if (paymentMethod.value === 'PIX') {
+  if (paymentMethod.value === 'PIX') {
+    paymentStatusText.value = 'Gerando pagamento...';
+    try {
       const result: any = await store.startPayment('PIX', apartmentNote.value);
       const provider = result?.provider || {};
       pixData.value = {
@@ -630,30 +612,39 @@ async function confirmPayment() {
       };
       paymentStatusText.value = 'Aguardando pagamento PIX...';
       await pollPixStatus(provider.paymentId);
-    } else {
-      const result: any = await store.startPayment(paymentMethod.value, apartmentNote.value);
-      const provider = result?.provider || {};
-      const state =
-        provider?.payment?.state ||
-        provider?.payment?.status ||
-        provider?.state ||
-        provider?.status ||
-        provider?.status_detail ||
-        '';
-      const approvedStates = ['APPROVED', 'approved', 'FINISHED', 'finished', 'success', 'closed'];
-      if (approvedStates.includes(state)) {
-        paymentOpen.value = false;
-        paymentTotal.value = subtotal.value || paymentTotal.value;
-        paymentSuccess.value = true;
-      } else if (provider?.intentId || provider?.payment?.id) {
-        await pollPointStatus(provider.intentId || provider.payment?.id);
-      } else {
-        throw new Error('Estado do pagamento desconhecido');
-      }
+    } catch (err: any) {
+      const data = err?.response?.data;
+      paymentError.value = data?.message || err?.message || 'Erro ao processar pagamento';
+    } finally {
+      paymentProcessing.value = false;
     }
+    return;
+  }
+
+  // ─── Cartão: cria intent uma vez, faz polling ─────────────────────
+  paymentStatusText.value = 'Enviando para a maquininha...';
+
+  try {
+    const result: any = await store.startPayment(paymentMethod.value, apartmentNote.value);
+    const provider = result?.provider || {};
+    const intentId = provider?.intentId || provider?.payment?.id;
+
+    if (!intentId) {
+      throw new Error('Maquininha não retornou ID do pagamento. Verifique a conexão.');
+    }
+
+    paymentStatusText.value = 'Aguardando confirmacao na maquininha...';
+    const pollResult = await pollPointStatus(intentId);
+
+    if (pollResult === 'approved' || pollResult === 'cancelled_by_user') {
+      return;
+    }
+
+    // pollResult === 'error' → mostra erro, usuário pode tentar de novo
+    paymentProcessing.value = false;
   } catch (err: any) {
-    paymentError.value = err?.response?.data?.message || err?.message || 'Erro ao processar pagamento';
-  } finally {
+    const data = err?.response?.data;
+    paymentError.value = data?.message || err?.message || 'Erro ao processar pagamento';
     paymentProcessing.value = false;
   }
 }
@@ -662,9 +653,26 @@ async function pollPixStatus(paymentId?: string) {
   if (!paymentId) throw new Error('ID do pagamento PIX nao retornado');
   pixStatus.value = 'pending';
   let attempts = 0;
-  while (true) {
+  const MAX_PIX_ATTEMPTS = 150; // ~5 minutos
+  while (attempts < MAX_PIX_ATTEMPTS) {
     if (!paymentOpen.value) return; // cancelado pelo usuario
-    const { data } = await api.get(`/payments/status/${paymentId}`);
+    let data: any;
+    try {
+      const res = await api.get(`/payments/status/${paymentId}`);
+      data = res.data;
+    } catch (pollErr: any) {
+      const errData = pollErr?.response?.data;
+      // Se for erro de rede/timeout, continua tentando
+      if (errData?.retryable || !pollErr?.response) {
+        console.warn('[PIX-POLL] Erro retentável:', errData?.code || pollErr?.message);
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        attempts++;
+        continue;
+      }
+      // Erro não retentável
+      pixStatus.value = 'error';
+      throw new Error(errData?.message || pollErr?.message || 'Erro ao verificar PIX');
+    }
     const status = (data?.status || data?.status_detail || '').toLowerCase();
     if (['approved', 'accredited', 'completed'].includes(status)) {
       pixStatus.value = 'approved';
@@ -674,46 +682,104 @@ async function pollPixStatus(paymentId?: string) {
       paymentSuccess.value = true;
       return;
     }
-    if (['rejected', 'cancelled', 'canceled', 'expired'].includes(status)) {
+    if (['rejected', 'cancelled', 'canceled'].includes(status)) {
       pixStatus.value = 'rejected';
-      throw new Error(`Pagamento PIX ${status}`);
+      const msg = data?.error_message || `Pagamento PIX ${status}`;
+      throw new Error(msg);
+    }
+    if (status === 'expired') {
+      pixStatus.value = 'expired';
+      throw new Error(data?.error_message || 'QR Code PIX expirou. Gere um novo pagamento.');
+    }
+    if (['refunded', 'charged_back'].includes(status)) {
+      pixStatus.value = 'error';
+      throw new Error(data?.error_message || `Pagamento PIX ${status}`);
+    }
+    if (status === 'in_mediation') {
+      pixStatus.value = 'error';
+      throw new Error(data?.error_message || 'Pagamento PIX está em disputa.');
     }
     await new Promise((resolve) => setTimeout(resolve, 2000 + attempts * 300));
     attempts++;
   }
+  throw new Error('Tempo limite aguardando pagamento PIX. Gere um novo pagamento.');
 }
 
-async function pollPointStatus(intentId: string) {
-  if (paymentMethod.value !== 'CREDIT_CARD' && paymentMethod.value !== 'DEBIT_CARD') {
-    return;
-  }
+async function pollPointStatus(intentId: string): Promise<'approved' | 'error' | 'cancelled_by_user'> {
   paymentStatusText.value = 'Aguardando confirmacao na maquininha...';
   let attempts = 0;
-  while (true) {
-    if (!paymentOpen.value) return;
-    const { data } = await api.get(`/payments/point/${intentId}`);
+  const MAX_POINT_ATTEMPTS = 90; // ~3 minutos
+
+  while (attempts < MAX_POINT_ATTEMPTS) {
+    if (!paymentOpen.value) return 'cancelled_by_user';
+
+    let data: any;
+    try {
+      const res = await api.get(`/payments/point/${intentId}`);
+      data = res.data;
+    } catch (pollErr: any) {
+      const errData = pollErr?.response?.data;
+      if (errData?.retryable || !pollErr?.response) {
+        console.warn('[POINT-POLL] Erro retentável:', errData?.code || pollErr?.message);
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        attempts++;
+        continue;
+      }
+      // Erro não retentável no polling
+      paymentError.value = errData?.message || pollErr?.message || 'Erro ao verificar maquininha';
+      return 'error';
+    }
+
     const state = (data?.state || data?.status || '').toLowerCase();
-    if (['approved', 'finished', 'closed', 'approved'].includes(state)) {
+    console.log('[POINT-POLL] Resposta MP:', JSON.stringify(data));
+
+    // Extrai o resultado REAL do pagamento (pode estar em vários campos)
+    const paymentResult = (
+      data?.payment?.state ||
+      data?.payment?.status ||
+      data?.payment_status ||
+      data?.transactions?.[0]?.state ||
+      data?.transactions?.[0]?.status ||
+      ''
+    ).toLowerCase();
+
+    console.log('[POINT-POLL] state:', state, '| paymentResult:', paymentResult);
+
+    // APPROVED direto ou FINISHED com pagamento confirmado
+    const isApproved =
+      state === 'approved' ||
+      (state === 'finished' && ['approved', 'success', 'accredited'].includes(paymentResult));
+
+    if (isApproved) {
       const totalPaid = subtotal.value || paymentTotal.value;
       await store.finalizeSale(paymentMethod.value, apartmentNote.value);
       paymentOpen.value = false;
       paymentTotal.value = totalPaid;
       paymentSuccess.value = true;
-      return;
-    }
-    if (['rejected', 'cancelled', 'canceled', 'expired'].includes(state)) {
-      // Se o terminal foi cancelado/rejeitado, só avisa sem erro (apenas para cartão)
-      if (paymentMethod.value === 'PIX') {
-        return;
-      }
-      terminalHintMode.value = 'cancel';
-      showTerminalHint.value = true;
       paymentProcessing.value = false;
-      return;
+      return 'approved';
     }
-    await new Promise((resolve) => setTimeout(resolve, 2000 + attempts * 300));
+
+    // FINISHED sem resultado de pagamento claro = NÃO aprovar → retry
+    if (state === 'finished') {
+      console.warn('[POINT-POLL] FINISHED mas payment result:', paymentResult, '- reenviando');
+      paymentError.value = data?.error_message || 'Pagamento não confirmado. Reenviando...';
+      return 'error';
+    }
+
+    // Estados terminais de erro → retry
+    if (['rejected', 'cancelled', 'canceled', 'expired', 'error', 'abandoned'].includes(state)) {
+      console.warn('[POINT-POLL] Estado terminal:', state, '- reenviando');
+      paymentError.value = data?.error_message || `Pagamento ${state}. Reenviando...`;
+      return 'error';
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 2000 + Math.min(attempts, 10) * 300));
     attempts++;
   }
+
+  paymentError.value = 'Tempo limite aguardando maquininha. Reenviando...';
+  return 'error';
 }
 
 function focusBarcode() {

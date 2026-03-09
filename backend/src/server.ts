@@ -26,6 +26,7 @@ import customerRoutes from './routes/customerRoutes';
 import { createAdminSeed } from './services/authService';
 import { startExpiryNotificationJob } from './jobs/expiryNotificationJob';
 import { migrateBatchesWithSalePrice } from './services/batchService';
+import { configurePointDevice } from './services/paymentGatewayService';
 
 const app = express();
 app.use(cors());
@@ -71,6 +72,15 @@ async function bootstrap() {
   } catch (error) {
     console.error('[MIGRATION] Erro ao migrar lotes:', error);
   }
+
+  // Configura maquininha no modo PDV (auto-exibe pagamento)
+  configurePointDevice().then((result) => {
+    if (result.success) {
+      console.log('[POINT] Maquininha configurada no modo PDV');
+    } else {
+      console.warn('[POINT] Não foi possível configurar modo PDV:', result.error);
+    }
+  });
 
   // Inicia o job de notificação de produtos próximos do vencimento
   startExpiryNotificationJob();

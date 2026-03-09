@@ -148,21 +148,10 @@ export const useKioskStore = defineStore('kiosk', {
           return { completed: false, provider };
         }
 
-        const paymentState =
-          provider?.payment?.state ||
-          provider?.payment?.status ||
-          provider?.status ||
-          provider?.status_detail;
-
-        const approvedStates = ['APPROVED', 'approved', 'FINISHED', 'finished', 'success', 'closed'];
-
-        if (!approvedStates.includes(paymentState)) {
-          return { completed: false, provider };
-        }
-
-        await api.post(`/sales/${this.saleId}/complete`, { paymentMethod, apartmentNote });
-        this.resetCart();
-        return { completed: true, provider };
+        // Para cartão, o createPointPaymentIntent retorna state: "OPEN"
+        // NUNCA deve completar a venda aqui - sempre deve ir pro polling
+        // O state "FINISHED" do Point API NÃO significa aprovado, apenas que processou
+        return { completed: false, provider };
       }
 
       await api.post(`/sales/${this.saleId}/complete`, { paymentMethod, apartmentNote });
