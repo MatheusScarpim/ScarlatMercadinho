@@ -241,6 +241,11 @@
             <strong>Na maquininha:</strong> aperte o botão <span class="highlight success">verde</span> para pagar ou o
             <span class="highlight danger">vermelho</span> para cancelar.
           </div>
+          <div v-if="paymentMethod === 'PIX' && pixNeedsCpf && !pixData.paymentId" class="field pix-cpf-fallback">
+            <label>CPF do pagador (obrigatório para Pix)</label>
+            <input v-model="pixCpf" placeholder="000.000.000-00" maxlength="14"
+              @input="formatPixCpf" inputmode="numeric" />
+          </div>
         </div>
 
         <div v-if="paymentMethod === 'PIX' && pixData.paymentId" class="pix-block glass">
@@ -340,6 +345,10 @@ const pixData = ref<{ qrCode: string | null; qrCodeBase64: string | null; paymen
   paymentId: null
 });
 const pixStatus = ref('');
+const pixCpf = ref('');
+const pixNeedsCpf = ref(false);
+const paymentIdleTimer = ref<number | null>(null);
+const PAYMENT_IDLE_TIMEOUT = 180000; // 3 minutos
 const paymentOptions = [
   { value: 'CREDIT_CARD', label: 'Credito' },
   { value: 'DEBIT_CARD', label: 'Debito' },
@@ -579,31 +588,72 @@ function closeTerminalHint() {
   showTerminalHint.value = false;
 }
 
+function startPaymentIdleTimer() {
+  clearPaymentIdleTimer();
+  paymentIdleTimer.value = window.setTimeout(() => {
+    closePayment();
+    store.resetCart();
+    enterScreensaver();
+  }, PAYMENT_IDLE_TIMEOUT);
+}
+
+function clearPaymentIdleTimer() {
+  if (paymentIdleTimer.value) {
+    clearTimeout(paymentIdleTimer.value);
+    paymentIdleTimer.value = null;
+  }
+}
+
 function openPayment() {
   if (!cart.value.length) return;
   paymentError.value = '';
   paymentTotal.value = subtotal.value;
   showTerminalHint.value = false;
   terminalHintMode.value = 'pay';
+  pixNeedsCpf.value = false;
+  pixCpf.value = '';
   paymentOpen.value = true;
+  startPaymentIdleTimer();
 }
 
 function closePayment() {
+  clearPaymentIdleTimer();
   paymentOpen.value = false;
   pixData.value = { qrCode: null, qrCodeBase64: null, paymentId: null };
   pixStatus.value = '';
+  pixNeedsCpf.value = false;
+  pixCpf.value = '';
   showTerminalHint.value = false;
 }
 
 async function confirmPayment() {
   showTerminalHint.value = false;
   paymentError.value = '';
+  startPaymentIdleTimer();
   paymentProcessing.value = true;
 
   if (paymentMethod.value === 'PIX') {
+    // Se o campo de CPF fallback está visível, salvar o CPF na venda antes
+    if (pixNeedsCpf.value) {
+      const cpfDigits = pixCpf.value.replace(/\D/g, '');
+      if (cpfDigits.length !== 11) {
+        paymentError.value = 'Informe um CPF válido com 11 dígitos.';
+        paymentProcessing.value = false;
+        return;
+      }
+      try {
+        await api.put(`/sales/${store.saleId}/customer`, { cpf: cpfDigits });
+      } catch {
+        paymentError.value = 'Erro ao salvar CPF. Tente novamente.';
+        paymentProcessing.value = false;
+        return;
+      }
+    }
+
     paymentStatusText.value = 'Gerando pagamento...';
     try {
-      const result: any = await store.startPayment('PIX', apartmentNote.value);
+      const cpfForPix = pixNeedsCpf.value ? pixCpf.value.replace(/\D/g, '') : undefined;
+      const result: any = await store.startPayment('PIX', apartmentNote.value, cpfForPix);
       const provider = result?.provider || {};
       pixData.value = {
         qrCode: provider.qrCode || null,
@@ -611,9 +661,18 @@ async function confirmPayment() {
         paymentId: provider.paymentId || null
       };
       paymentStatusText.value = 'Aguardando pagamento PIX...';
+      clearPaymentIdleTimer(); // PIX gerado, não expira por idle
       await pollPixStatus(provider.paymentId);
     } catch (err: any) {
       const data = err?.response?.data;
+      const code = data?.code || '';
+      // Se o erro é falta de CPF, mostrar campo fallback
+      if (code === 'PIX_CPF_REQUIRED' || (data?.detail || '').includes('13253')) {
+        pixNeedsCpf.value = true;
+        paymentError.value = 'Informe seu CPF para pagar com Pix.';
+        paymentProcessing.value = false;
+        return;
+      }
       paymentError.value = data?.message || err?.message || 'Erro ao processar pagamento';
     } finally {
       paymentProcessing.value = false;
@@ -735,9 +794,12 @@ async function pollPointStatus(intentId: string): Promise<'approved' | 'error' |
 
     // Extrai o resultado REAL do pagamento (pode estar em vários campos)
     const paymentResult = (
+      data?.payment?.result ||
       data?.payment?.state ||
       data?.payment?.status ||
       data?.payment_status ||
+      data?.payment_result ||
+      data?.transactions?.[0]?.result ||
       data?.transactions?.[0]?.state ||
       data?.transactions?.[0]?.status ||
       ''
@@ -745,10 +807,12 @@ async function pollPointStatus(intentId: string): Promise<'approved' | 'error' |
 
     console.log('[POINT-POLL] state:', state, '| paymentResult:', paymentResult);
 
-    // APPROVED direto ou FINISHED com pagamento confirmado
+    // APPROVED direto ou FINISHED com payment.id = pagamento aprovado
+    // A API Point do MP não retorna payment.result — FINISHED + payment.id já é aprovação
+    const hasPaymentId = !!(data?.payment?.id || data?.payment_id);
     const isApproved =
       state === 'approved' ||
-      (state === 'finished' && ['approved', 'success', 'accredited'].includes(paymentResult));
+      (state === 'finished' && (hasPaymentId || ['approved', 'success', 'accredited'].includes(paymentResult)));
 
     if (isApproved) {
       const totalPaid = subtotal.value || paymentTotal.value;
@@ -760,10 +824,10 @@ async function pollPointStatus(intentId: string): Promise<'approved' | 'error' |
       return 'approved';
     }
 
-    // FINISHED sem resultado de pagamento claro = NÃO aprovar → retry
+    // FINISHED sem payment.id e sem resultado claro = erro real
     if (state === 'finished') {
-      console.warn('[POINT-POLL] FINISHED mas payment result:', paymentResult, '- reenviando');
-      paymentError.value = data?.error_message || 'Pagamento não confirmado. Reenviando...';
+      console.warn('[POINT-POLL] FINISHED sem payment.id, paymentResult:', paymentResult);
+      paymentError.value = data?.error_message || 'Pagamento não confirmado pela maquininha.';
       return 'error';
     }
 
@@ -798,6 +862,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearInactivityTimer();
+  clearPaymentIdleTimer();
   stopCarousel();
 });
 
@@ -824,6 +889,14 @@ async function confirmManualBarcode() {
   await handleBarcode();
   manualBarcode.value = '';
   closeBarcode();
+}
+
+function formatPixCpf() {
+  let digits = pixCpf.value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length > 9) digits = digits.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4');
+  else if (digits.length > 6) digits = digits.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+  else if (digits.length > 3) digits = digits.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+  pixCpf.value = digits;
 }
 
 function setPayment(opt: string) {
@@ -1637,40 +1710,140 @@ button.link:hover {
 }
 
 @media (max-width: 980px) {
+  .kiosk {
+    padding: 0;
+    margin: 0;
+    max-width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   .workspace {
     flex-direction: column;
     display: flex;
-    padding: 0 8px;
+    flex: 1;
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  .right {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
   }
 
   .cart {
+    flex: 1;
     max-height: none;
     min-height: 0;
-  }
-
-  .cart-item {
-    grid-template-columns: 60px 1fr;
-    gap: 10px;
-  }
-
-  .item-image {
-    width: 60px;
-    height: 60px;
-  }
-
-  .count {
-    grid-column: 1 / -1;
-    justify-content: center;
-  }
-
-  .item-total {
-    grid-column: 1 / -1;
-    text-align: center;
+    overflow-y: auto;
+    padding: 10px;
+    margin-top: 8px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .cart-top {
     position: static;
     background: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 0 10px;
+    flex-shrink: 0;
+  }
+
+  .cart-top h3 {
+    font-size: 20px;
+  }
+
+  .top-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .top-actions button {
+    flex: 1;
+    padding: 12px 8px;
+    font-size: 13px;
+  }
+
+  .cart-item {
+    grid-template-columns: 56px 1fr auto;
+    gap: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+
+  .item-image {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+  }
+
+  .item-info strong {
+    font-size: 14px;
+  }
+
+  .count {
+    grid-column: 1 / -1;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .count button {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+  }
+
+  .count input {
+    width: 60px;
+    padding: 10px 6px;
+    font-size: 16px;
+  }
+
+  .item-total {
+    grid-column: 1 / -1;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .item-total button.link {
+    font-size: 20px;
+    padding: 8px 12px;
+  }
+
+  .summary {
+    padding: 12px;
+    margin-top: 0;
+    flex-shrink: 0;
+    border-radius: 0;
+  }
+
+  .summary-row strong {
+    font-size: 24px;
+  }
+
+  .summary .actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .summary .actions button {
+    width: 100%;
+    padding: 16px;
+    font-size: 16px;
   }
 
   .hero {
@@ -1681,6 +1854,14 @@ button.link:hover {
 
   .total {
     text-align: center;
+  }
+
+  .empty-cart {
+    padding: 40px 16px;
+  }
+
+  .empty-icon {
+    font-size: 56px;
   }
 }
 </style>
@@ -2123,6 +2304,144 @@ button.link:hover {
   .tap-icon {
     width: 24px;
     height: 24px;
+  }
+}
+
+/* ─── Tablet portrait (600-980px) ─── */
+@media (max-width: 980px) {
+  .modal {
+    padding: 12px;
+  }
+
+  .modal-box {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .modal-box.payment {
+    width: 100%;
+    max-height: 95vh;
+  }
+
+  .modal-header h3 {
+    font-size: 20px;
+  }
+
+  .payment-total strong {
+    font-size: 26px;
+  }
+
+  .payment-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .pay-chip {
+    padding: 16px 10px;
+    text-align: center;
+    font-size: 15px;
+  }
+
+  .field input,
+  .field select {
+    padding: 14px;
+    font-size: 16px;
+  }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  .modal-actions button {
+    width: 100%;
+    padding: 16px;
+    font-size: 16px;
+  }
+
+  .pix-qr {
+    max-width: 240px;
+  }
+
+  .pix-qr img {
+    max-width: 200px;
+  }
+
+  .payment-wait {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .customer-step .field input {
+    padding: 16px;
+    font-size: 18px;
+  }
+}
+
+/* ─── Small tablet / phone portrait ─── */
+@media (max-width: 600px) {
+  .kiosk {
+    padding: 8px 6px 16px;
+  }
+
+  .cart {
+    max-height: 45vh;
+    padding: 8px;
+  }
+
+  .cart-item {
+    grid-template-columns: 48px 1fr;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .item-image {
+    width: 48px;
+    height: 48px;
+  }
+
+  .cart-top h3 {
+    font-size: 18px;
+  }
+
+  .top-actions {
+    flex-wrap: wrap;
+  }
+
+  .top-actions button {
+    font-size: 12px;
+    padding: 10px 6px;
+  }
+
+  .payment-options {
+    grid-template-columns: 1fr;
+  }
+
+  .screensaver-content {
+    padding: 16px;
+  }
+
+  .carousel-track {
+    min-height: 250px;
+  }
+
+  .promo-card {
+    padding: 14px;
+    min-height: 300px;
+  }
+
+  .promo-image {
+    height: 160px;
+  }
+
+  .promo-title {
+    font-size: 18px;
+  }
+
+  .price-current {
+    font-size: 24px;
   }
 }
 </style>

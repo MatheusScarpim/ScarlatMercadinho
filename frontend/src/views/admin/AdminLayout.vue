@@ -6,8 +6,8 @@
           <div class="dot"></div>
         </div>
         <div class="brand-text">
-          <h1>Scarlat</h1>
-          <p>Mercadinho</p>
+          <h1>Asyncx</h1>
+          <p>Market</p>
         </div>
       </div>
 

@@ -43,14 +43,14 @@ function inferCategoryName(nameHint: string | null | undefined) {
   const rules: Array<{ test: RegExp; name: string }> = [
     { test: /(coca|cola|refrigerante|guarana|soda|refri)/, name: 'Refrigerantes' },
     { test: /(cerveja|brew|lager|pilsen)/, name: 'Cervejas' },
-    { test: /(agua|mineral)/, name: '�?gua' },
+    { test: /(agua|mineral)/, name: 'Água' },
     { test: /(suco|nectar)/, name: 'Sucos' },
     { test: /(vinho)/, name: 'Vinhos' },
     { test: /(carne|bovino|frango|suino)/, name: 'Carnes' },
     { test: /(arroz)/, name: 'Arroz' },
-    { test: /(feijao|feijão)/, name: 'Feij�o' },
+    { test: /(feijao|feijão)/, name: 'Feijão' },
     { test: /(pao|pão|panetone|pao de forma)/, name: 'Padaria' },
-    { test: /(leite|lactic)/, name: 'Latic�nios' },
+    { test: /(leite|lactic)/, name: 'Laticínios' },
     { test: /(iogurte)/, name: 'Iogurtes' },
     { test: /(queijo)/, name: 'Queijos' },
     { test: /(sabao|detergente|limpeza)/, name: 'Limpeza' },
@@ -239,29 +239,39 @@ async function ensureProductFromAi(params: {
 }
 
 async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookupDocument> {
-  const aiResult = await fetchProductFromOpenAi(ean, nameHint);
+  let aiResult: AiProductGuess | null = null;
 
-  const globalProductCategory = aiResult.categoryName ?? aiResult.categoryCode ?? null;
-  const ensuredCategory = await ensureCategory(globalProductCategory);
-  const productId = await ensureProductFromAi({
-    ean: aiResult.ean,
-    name: aiResult.name,
-    description: aiResult.description,
+  try {
+    aiResult = await fetchProductFromOpenAi(ean, nameHint);
+  } catch {
+    // OpenAI indisponivel – cria produto com dados da NFC-e
+  }
+
+  const name = aiResult?.name ?? nameHint ?? null;
+  const description = aiResult?.description ?? nameHint ?? null;
+  const categoryNameRaw = aiResult?.categoryName ?? aiResult?.categoryCode ?? inferCategoryName(nameHint) ?? null;
+  const averagePrice = aiResult?.averagePrice ?? null;
+
+  const ensuredCategory = await ensureCategory(categoryNameRaw);
+  await ensureProductFromAi({
+    ean: aiResult?.ean ?? ean,
+    name,
+    description,
     categoryId: ensuredCategory.id,
-    averagePrice: aiResult.averagePrice,
-    imageUrl: aiResult.averagePrice ? `https://cdn-cosmos.bluesoft.com.br/products/${aiResult.ean}` : null,
+    averagePrice,
+    imageUrl: `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
   });
 
   const created = await GtinLookupModel.create({
-    ean: aiResult.ean,
-    name: aiResult.name,
-    description: aiResult.description ?? aiResult.name,
-    globalProductCategory: ensuredCategory.name ?? globalProductCategory,
+    ean: aiResult?.ean ?? ean,
+    name,
+    description: description ?? name,
+    globalProductCategory: ensuredCategory.name ?? categoryNameRaw,
     categoryId: ensuredCategory.id ?? null,
-    categoryName: ensuredCategory.name ?? globalProductCategory,
-    imageUrl: `https://cdn-cosmos.bluesoft.com.br/products/${aiResult.ean}`,
-    averagePrice: aiResult.averagePrice,
-    sourceUrl: 'openai',
+    categoryName: ensuredCategory.name ?? categoryNameRaw,
+    imageUrl: `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
+    averagePrice,
+    sourceUrl: aiResult ? 'openai' : 'nfce-fallback',
   });
 
   return created;

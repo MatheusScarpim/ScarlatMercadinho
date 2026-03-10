@@ -30,7 +30,8 @@ export async function createPaymentIntent(req: Request, res: Response) {
   }
 
   if (method === 'PIX') {
-    const providerResponse = await createPixPaymentIntent(saleId);
+    const cpf = req.body.cpf || undefined;
+    const providerResponse = await createPixPaymentIntent(saleId, cpf);
     return res.json({
       saleId,
       method,

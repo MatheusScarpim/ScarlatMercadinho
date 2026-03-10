@@ -1,6 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import puppeteer from 'puppeteer';
+import puppeteer, { Browser, ConsoleMessage, HTTPRequest } from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
 
@@ -239,6 +239,20 @@ function extractConsumidor($: cheerio.CheerioAPI): NfceConsumidor {
   };
 }
 
+
+function resolveExecutablePath(): string | undefined {
+  const candidates = [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/usr/lib/chromium/chrome',
+  ].filter(Boolean) as string[];
+  const found = candidates.find((p) => fs.existsSync(p));
+  if (found) logDebug('Usando Chromium em', found);
+  else logDebug('Chromium nao encontrado nos caminhos conhecidos');
+  return found;
+}
+
 function buildFullUrl(url: string): string {
   const pMatch = url.match(/p=([^&]+)/);
   if (!pMatch) throw new Error('URL da NFC-e sem parâmetro p');
@@ -259,7 +273,7 @@ export async function fetchNfceHtml(url: string): Promise<string> {
 
   const response = await axios.get<string>(noCacheUrl, {
     headers: {
-      'User-Agent': 'ScarlatBot/1.0',
+      'User-Agent': 'AsyncxBot/1.0',
       'Cache-Control': 'no-cache',
       Pragma: 'no-cache',
       'If-Modified-Since': 'Sat, 1 Jan 2000 00:00:00 GMT',
@@ -283,23 +297,35 @@ export async function fetchNfceHtml(url: string): Promise<string> {
 }
 
 async function fetchNfceHtmlWithBrowser(url: string): Promise<string> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    slowMo: 150,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--start-maximized'],
-  });
+  const executablePath = resolveExecutablePath();
+  let browser: Browser | null = null;
   try {
+    browser = await puppeteer.launch({
+      headless: true,
+      slowMo: 150,
+      executablePath,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-zygote',
+        '--single-process',
+        '--start-maximized',
+      ],
+    });
+
     let page = await browser.newPage();
     if (nfceDebug) {
-      page.on('console', (msg) => logDebug('PAGE LOG', msg.type(), msg.text()));
-      page.on('pageerror', (err: any) => logDebug('PAGE ERROR', err?.message ?? err));
-      page.on('requestfailed', (req) =>
+      page.on('console', (msg: ConsoleMessage) => logDebug('PAGE LOG', msg.type(), msg.text()));
+      page.on('pageerror', (err: unknown) => logDebug('PAGE ERROR', err instanceof Error ? err.message : err));
+      page.on('requestfailed', (req: HTTPRequest) =>
         logDebug('REQUEST FAIL', req.url(), req.failure()?.errorText ?? ''),
       );
     }
-await sleep(5000)
+    await sleep(5000);
     const decodedUrl = decodeURIComponent(url);
-    await page.goto(decodedUrl, {waitUntil: 'networkidle2' ,   timeout: 20000 });
+    await page.goto(decodedUrl, { waitUntil: 'networkidle2', timeout: 20000 });
     await sleep(1500);
     logDebug('Page loaded, clicking Visualizar em Abas');
 
@@ -308,13 +334,13 @@ await sleep(5000)
       const listener = async (target: import('puppeteer').Target) => {
         if (target.opener() === page.target()) {
           const p = await target.page();
-          browser.off('targetcreated', listener);
+          browser!.off('targetcreated', listener);
           resolve(p ?? null);
         }
       };
-      browser.on('targetcreated', listener);
+      browser!.on('targetcreated', listener);
       setTimeout(() => {
-        browser.off('targetcreated', listener);
+        browser!.off('targetcreated', listener);
         resolve(null);
       }, 10000);
     });
@@ -353,8 +379,11 @@ await sleep(5000)
       saveDebugHtml('puppeteer', html);
     }
     return html;
+  } catch (err) {
+    logDebug('Erro ao rodar Puppeteer', err instanceof Error ? err.message : err);
+    throw err;
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
   }
 }
 
@@ -601,8 +630,8 @@ export async function scrapeNfce(url: string): Promise<NfceData> {
   try {
     logDebug('Tentando via Puppeteer');
     html = await fetchNfceHtmlWithBrowser(url);
-  } catch {
-    logDebug('Puppeteer falhou, usando fetch simples');
+  } catch (err) {
+    logDebug('Puppeteer falhou, usando fetch simples', err instanceof Error ? err.message : err);
     html = await fetchNfceHtml(url);
   }
 

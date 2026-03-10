@@ -3,6 +3,7 @@ import { SaleItemModel } from '../models/SaleItem';
 import { SaleModel, SaleStatus } from '../models/Sale';
 import { ProductModel } from '../models/Product';
 import { registerMovement } from './stockService';
+import { consumeBatch } from './batchService';
 import { notifySaleCompleted } from './notificationService';
 import { ApiError } from '../utils/apiError';
 
@@ -128,22 +129,37 @@ export async function completeSale(saleId: string, data: { paymentMethod: string
   const sale = await SaleModel.findById(saleId);
   if (!sale || sale.status !== 'OPEN') throw new ApiError(400, 'Sale not open');
   const items = await SaleItemModel.find({ sale: saleId });
-  for (const item of items) {
-    await registerMovement({
-      productId: item.product,
-      type: 'EXIT',
-      quantity: item.quantity,
-      reason: 'VENDA AUTOATENDIMENTO',
-      relatedSale: sale._id,
-      location: sale.location || 'default'
-    });
-  }
+  const location = sale.location || 'default';
+
+  // Primeiro garante que a venda é salva — estoque é secundário
   sale.status = 'COMPLETED';
   sale.paymentMethod = data.paymentMethod;
   sale.apartmentNote = data.apartmentNote;
   sale.notes = data.notes;
   sale.completedAt = new Date();
   await sale.save();
+
+  // Deduz estoque e lotes em segundo plano (não pode bloquear a venda)
+  for (const item of items) {
+    try {
+      await registerMovement({
+        productId: item.product,
+        type: 'EXIT',
+        quantity: item.quantity,
+        reason: 'VENDA AUTOATENDIMENTO',
+        relatedSale: sale._id,
+        location
+      });
+    } catch (err) {
+      console.error(`[SALE] Erro ao registrar movimento de estoque para produto ${item.product}:`, err);
+    }
+
+    try {
+      await consumeBatch(item.product, location, item.quantity);
+    } catch (err) {
+      console.warn(`[SALE] Erro ao consumir lote para produto ${item.product}:`, err);
+    }
+  }
 
   // Criar notificação para o admin (não deve quebrar o fluxo se falhar)
   try {

@@ -13,7 +13,6 @@
         <button type="submit">Entrar</button>
         <p v-if="error" class="error">{{ error }}</p>
       </form>
-      <div class="hint">Use o admin padrão: admin@example.com / admin123</div>
     </div>
   </div>
 </template>
@@ -96,11 +95,5 @@ button {
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   backdrop-filter: blur(4px);
-}
-.hint {
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--muted);
-  text-align: center;
 }
 </style>

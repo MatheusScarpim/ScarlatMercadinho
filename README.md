@@ -1,4 +1,4 @@
-# Mercadinho do Condomínio – Autoatendimento e Painel Admin
+# Asyncx Market – Autoatendimento e Painel Admin
 
 Sistema completo de autoatendimento (quiosque) e painel administrativo para gestão de estoque, compras, produtos e vendas.
 
