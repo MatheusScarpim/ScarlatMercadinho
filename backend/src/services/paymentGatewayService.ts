@@ -157,19 +157,14 @@ export async function createPixPaymentIntent(saleId: string) {
   const totalAmount = safeTotalAmount(items, saleId, totals);
   const description = buildDescription(items);
 
-  // MP exige identificação do pagador para PIX (CPF ou CNPJ)
-  const customerCpf = sale.customer?.cpf?.replace(/\D/g, '') || '';
+  // MP exige identificação do pagador para PIX — usa CPF da venda
+  const cpf = (sale.customer?.cpf || '').replace(/\D/g, '');
   const payer: any = {
     email: 'pagamentos@asyncx.com',
     first_name: 'Cliente',
-    last_name: 'Asyncx'
+    last_name: 'Asyncx',
+    identification: { type: 'CPF', number: cpf }
   };
-  if (customerCpf.length === 11) {
-    payer.identification = { type: 'CPF', number: customerCpf };
-  } else {
-    // Fallback: CPF genérico para venda anônima (MP exige identificação para PIX)
-    payer.identification = { type: 'CPF', number: '12345678909' };
-  }
 
   const payment = new MercadoPagoPayment(getMpClient());
   const body = {
