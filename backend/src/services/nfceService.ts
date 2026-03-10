@@ -318,7 +318,7 @@ async function fetchNfceHtmlWithBrowser(url: string): Promise<string> {
     let page = await browser.newPage();
     if (nfceDebug) {
       page.on('console', (msg: ConsoleMessage) => logDebug('PAGE LOG', msg.type(), msg.text()));
-      page.on('pageerror', (err: Error) => logDebug('PAGE ERROR', err?.message ?? err));
+      page.on('pageerror', (err: unknown) => logDebug('PAGE ERROR', err instanceof Error ? err.message : err));
       page.on('requestfailed', (req: HTTPRequest) =>
         logDebug('REQUEST FAIL', req.url(), req.failure()?.errorText ?? ''),
       );
