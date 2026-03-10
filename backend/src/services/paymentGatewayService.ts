@@ -159,6 +159,16 @@ export async function createPixPaymentIntent(saleId: string) {
 
   // MP exige identificação do pagador para PIX — usa CPF da venda
   const cpf = (sale.customer?.cpf || '').replace(/\D/g, '');
+  console.log(`[PIX] Sale ${saleId} customer:`, JSON.stringify(sale.customer), `CPF limpo: "${cpf}"`);
+
+  if (cpf.length !== 11) {
+    throw new PaymentError(
+      'CPF do pagador é obrigatório para pagamento via Pix. Informe o CPF antes de pagar.',
+      'PIX_CPF_REQUIRED',
+      false
+    );
+  }
+
   const payer: any = {
     email: 'pagamentos@asyncx.com',
     first_name: 'Cliente',
