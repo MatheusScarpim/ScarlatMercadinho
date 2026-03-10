@@ -151,20 +151,32 @@ function calcTotal(items: any[]) {
 // ─── PIX ────────────────────────────────────────────────────────────────────
 
 export async function createPixPaymentIntent(saleId: string) {
-  await ensureSaleOpen(saleId);
+  const sale = await ensureSaleOpen(saleId);
   const { totals } = await sanitizeSaleItems(saleId);
   const items = await getSaleItemsWithProducts(saleId);
   const totalAmount = safeTotalAmount(items, saleId, totals);
   const description = buildDescription(items);
+
+  // MP exige identificação do pagador para PIX (CPF ou CNPJ)
+  const customerCpf = sale.customer?.cpf?.replace(/\D/g, '') || '';
+  const payer: any = {
+    email: 'pagamentos@asyncx.com',
+    first_name: 'Cliente',
+    last_name: 'Asyncx'
+  };
+  if (customerCpf.length === 11) {
+    payer.identification = { type: 'CPF', number: customerCpf };
+  } else {
+    // Fallback: CNPJ da empresa para não falhar sem identificação
+    payer.identification = { type: 'CNPJ', number: '60064629000146' };
+  }
 
   const payment = new MercadoPagoPayment(getMpClient());
   const body = {
     transaction_amount: totalAmount,
     description: description || 'Pagamento Asyncx',
     payment_method_id: 'pix',
-    payer: {
-      email: 'pagamentos@asyncx.com'
-    },
+    payer,
     metadata: {
       saleId
     }
