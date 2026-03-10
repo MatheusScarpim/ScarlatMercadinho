@@ -1,6 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import puppeteer from 'puppeteer';
+import puppeteer, { Browser, ConsoleMessage, HTTPRequest } from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
 
@@ -298,7 +298,7 @@ export async function fetchNfceHtml(url: string): Promise<string> {
 
 async function fetchNfceHtmlWithBrowser(url: string): Promise<string> {
   const executablePath = resolveExecutablePath();
-  let browser: puppeteer.Browser | null = null;
+  let browser: Browser | null = null;
   try {
     browser = await puppeteer.launch({
       headless: true,
@@ -317,9 +317,9 @@ async function fetchNfceHtmlWithBrowser(url: string): Promise<string> {
 
     let page = await browser.newPage();
     if (nfceDebug) {
-      page.on('console', (msg) => logDebug('PAGE LOG', msg.type(), msg.text()));
-      page.on('pageerror', (err: any) => logDebug('PAGE ERROR', err?.message ?? err));
-      page.on('requestfailed', (req) =>
+      page.on('console', (msg: ConsoleMessage) => logDebug('PAGE LOG', msg.type(), msg.text()));
+      page.on('pageerror', (err: Error) => logDebug('PAGE ERROR', err?.message ?? err));
+      page.on('requestfailed', (req: HTTPRequest) =>
         logDebug('REQUEST FAIL', req.url(), req.failure()?.errorText ?? ''),
       );
     }
@@ -334,13 +334,13 @@ async function fetchNfceHtmlWithBrowser(url: string): Promise<string> {
       const listener = async (target: import('puppeteer').Target) => {
         if (target.opener() === page.target()) {
           const p = await target.page();
-          browser.off('targetcreated', listener);
+          browser!.off('targetcreated', listener);
           resolve(p ?? null);
         }
       };
-      browser.on('targetcreated', listener);
+      browser!.on('targetcreated', listener);
       setTimeout(() => {
-        browser.off('targetcreated', listener);
+        browser!.off('targetcreated', listener);
         resolve(null);
       }, 10000);
     });
