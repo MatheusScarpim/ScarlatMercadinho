@@ -748,10 +748,12 @@ async function pollPointStatus(intentId: string): Promise<'approved' | 'error' |
 
     console.log('[POINT-POLL] state:', state, '| paymentResult:', paymentResult);
 
-    // APPROVED direto ou FINISHED com pagamento confirmado
+    // APPROVED direto ou FINISHED com payment.id = pagamento aprovado
+    // A API Point do MP não retorna payment.result — FINISHED + payment.id já é aprovação
+    const hasPaymentId = !!(data?.payment?.id || data?.payment_id);
     const isApproved =
       state === 'approved' ||
-      (state === 'finished' && ['approved', 'success', 'accredited'].includes(paymentResult));
+      (state === 'finished' && (hasPaymentId || ['approved', 'success', 'accredited'].includes(paymentResult)));
 
     if (isApproved) {
       const totalPaid = subtotal.value || paymentTotal.value;
@@ -763,10 +765,10 @@ async function pollPointStatus(intentId: string): Promise<'approved' | 'error' |
       return 'approved';
     }
 
-    // FINISHED sem resultado de pagamento claro = NÃO aprovar → retry
+    // FINISHED sem payment.id e sem resultado claro = erro real
     if (state === 'finished') {
-      console.warn('[POINT-POLL] FINISHED mas payment result:', paymentResult, '- reenviando');
-      paymentError.value = data?.error_message || 'Pagamento não confirmado. Reenviando...';
+      console.warn('[POINT-POLL] FINISHED sem payment.id, paymentResult:', paymentResult);
+      paymentError.value = data?.error_message || 'Pagamento não confirmado pela maquininha.';
       return 'error';
     }
 
