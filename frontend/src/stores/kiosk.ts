@@ -123,12 +123,24 @@ export const useKioskStore = defineStore('kiosk', {
       }
     },
     async changeQuantity(item: CartItem, quantity: number) {
-      item.quantity = quantity;
-      await api.put(`/sales/${this.saleId}/items/${item.saleItemId}`, { quantity });
+      const prevQuantity = item.quantity;
+      try {
+        item.quantity = quantity;
+        await api.put(`/sales/${this.saleId}/items/${item.saleItemId}`, { quantity });
+      } catch (err: any) {
+        item.quantity = prevQuantity;
+        this.message = err?.response?.data?.message || 'Erro ao atualizar quantidade';
+      }
     },
     async remove(item: CartItem) {
-      this.cart = this.cart.filter((c) => c.saleItemId !== item.saleItemId);
-      await api.delete(`/sales/${this.saleId}/items/${item.saleItemId}`);
+      const prevCart = [...this.cart];
+      try {
+        this.cart = this.cart.filter((c) => c.saleItemId !== item.saleItemId);
+        await api.delete(`/sales/${this.saleId}/items/${item.saleItemId}`);
+      } catch (err: any) {
+        this.cart = prevCart;
+        this.message = err?.response?.data?.message || 'Erro ao remover item';
+      }
     },
     resetCart() {
       this.saleId = '';
@@ -160,8 +172,13 @@ export const useKioskStore = defineStore('kiosk', {
     },
     async finalizeSale(paymentMethod: string, apartmentNote?: string) {
       if (!this.saleId) return;
-      await api.post(`/sales/${this.saleId}/complete`, { paymentMethod, apartmentNote });
-      this.resetCart();
+      try {
+        await api.post(`/sales/${this.saleId}/complete`, { paymentMethod, apartmentNote });
+        this.resetCart();
+      } catch (err: any) {
+        this.message = err?.response?.data?.message || 'Erro ao finalizar venda';
+        throw err;
+      }
     },
     async setCustomer(
       customer: { cpf?: string; phone?: string; email?: string },
