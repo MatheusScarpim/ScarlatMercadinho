@@ -167,8 +167,8 @@ export async function createPixPaymentIntent(saleId: string) {
   if (customerCpf.length === 11) {
     payer.identification = { type: 'CPF', number: customerCpf };
   } else {
-    // Fallback: CNPJ da empresa para não falhar sem identificação
-    payer.identification = { type: 'CNPJ', number: '60064629000146' };
+    // Fallback: CPF genérico para venda anônima (MP exige identificação para PIX)
+    payer.identification = { type: 'CPF', number: '12345678909' };
   }
 
   const payment = new MercadoPagoPayment(getMpClient());
