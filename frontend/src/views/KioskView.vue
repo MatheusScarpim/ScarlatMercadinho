@@ -735,9 +735,12 @@ async function pollPointStatus(intentId: string): Promise<'approved' | 'error' |
 
     // Extrai o resultado REAL do pagamento (pode estar em vários campos)
     const paymentResult = (
+      data?.payment?.result ||
       data?.payment?.state ||
       data?.payment?.status ||
       data?.payment_status ||
+      data?.payment_result ||
+      data?.transactions?.[0]?.result ||
       data?.transactions?.[0]?.state ||
       data?.transactions?.[0]?.status ||
       ''
