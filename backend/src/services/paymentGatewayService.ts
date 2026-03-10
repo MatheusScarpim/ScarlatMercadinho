@@ -163,8 +163,10 @@ export async function createPixPaymentIntent(saleId: string) {
 
   if (cpf.length !== 11) {
     throw new PaymentError(
-      'CPF do pagador é obrigatório para pagamento via Pix. Informe o CPF antes de pagar.',
+      400,
       'PIX_CPF_REQUIRED',
+      'CPF do pagador é obrigatório para pagamento via Pix.',
+      'Informe seu CPF para pagar com Pix.',
       false
     );
   }
