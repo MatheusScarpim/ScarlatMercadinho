@@ -184,9 +184,9 @@ export async function createPixPaymentIntent(saleId: string, cpfOverride?: strin
   }
 
   const payer: any = {
-    email: 'pagamentos@asyncx.com',
-    first_name: 'Cliente',
-    last_name: 'Asyncx',
+    email: `cliente.${cpf}@pagamentos.asyncx.com`,
+    first_name: sale.customer?.name || 'Cliente',
+    last_name: 'Scarlate',
     identification: { type: 'CPF', number: cpf }
   };
 
