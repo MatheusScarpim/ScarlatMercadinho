@@ -1,6 +1,6 @@
 server {
     listen 80;
-    server_name market.scarlate.com.br;
+    server_name market.asyncx.com.br;
 
     location / {
         proxy_pass http://localhost:5173;

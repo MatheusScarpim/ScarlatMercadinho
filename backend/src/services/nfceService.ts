@@ -273,7 +273,7 @@ export async function fetchNfceHtml(url: string): Promise<string> {
 
   const response = await axios.get<string>(noCacheUrl, {
     headers: {
-      'User-Agent': 'ScarlatBot/1.0',
+      'User-Agent': 'AsyncxBot/1.0',
       'Cache-Control': 'no-cache',
       Pragma: 'no-cache',
       'If-Modified-Since': 'Sat, 1 Jan 2000 00:00:00 GMT',

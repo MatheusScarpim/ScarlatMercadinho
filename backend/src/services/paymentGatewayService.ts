@@ -160,10 +160,10 @@ export async function createPixPaymentIntent(saleId: string) {
   const payment = new MercadoPagoPayment(getMpClient());
   const body = {
     transaction_amount: totalAmount,
-    description: description || 'Pagamento Mercadinho',
+    description: description || 'Pagamento Asyncx',
     payment_method_id: 'pix',
     payer: {
-      email: 'pagamentos@scarlat.com'
+      email: 'pagamentos@asyncx.com'
     },
     metadata: {
       saleId
@@ -324,7 +324,7 @@ export async function createPointPaymentIntent(
   const amountInCents = Math.round(totalAmount * 100);
   const requestData: any = {
     amount: amountInCents,
-    description: description || 'Pagamento Mercadinho',
+    description: description || 'Pagamento Asyncx',
     payment: {
       type: paymentType === 'credit' ? 'credit_card' : 'debit_card',
       ...(paymentType === 'credit' && { installments: 1, installments_cost: 'seller' })
