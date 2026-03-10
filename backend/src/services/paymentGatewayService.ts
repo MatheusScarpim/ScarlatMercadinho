@@ -168,10 +168,10 @@ export async function createPixPaymentIntent(saleId: string, cpfOverride?: strin
   const totalAmount = safeTotalAmount(items, saleId, totals);
   const description = buildDescription(items);
 
-  // CPF pode vir do body da request (cpfOverride) ou do customer da venda
-  const rawCpf = cpfOverride || sale.customer?.cpf || '';
+  // CPF do cliente (informado ao entrar) tem prioridade, fallback pro body da request
+  const rawCpf = sale.customer?.cpf || cpfOverride || '';
   const cpf = rawCpf.replace(/\D/g, '');
-  console.log(`[PIX] Sale ${saleId} customer:`, JSON.stringify(sale.customer), `CPF override: "${cpfOverride || ''}"`, `CPF limpo: "${cpf}"`);
+  console.log(`[PIX] Sale ${saleId} customer:`, JSON.stringify(sale.customer), `CPF fallback: "${cpfOverride || ''}"`, `CPF limpo: "${cpf}"`);
 
   if (!isValidCpf(cpf)) {
     throw new PaymentError(

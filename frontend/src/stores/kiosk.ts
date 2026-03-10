@@ -147,13 +147,13 @@ export const useKioskStore = defineStore('kiosk', {
       this.cart = [];
       this.message = '';
     },
-    async startPayment(paymentMethod: string, apartmentNote?: string) {
+    async startPayment(paymentMethod: string, apartmentNote?: string, cpf?: string) {
       if (!this.saleId) return { completed: false };
 
       if (paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD' || paymentMethod === 'PIX') {
-        const { data } = await api.post(`/payments/sales/${this.saleId}`, {
-          method: paymentMethod
-        });
+        const body: Record<string, string> = { method: paymentMethod };
+        if (cpf) body.cpf = cpf;
+        const { data } = await api.post(`/payments/sales/${this.saleId}`, body);
 
         const provider = data?.providerResponse || {};
         if (paymentMethod === 'PIX') {

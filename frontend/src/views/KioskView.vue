@@ -652,7 +652,8 @@ async function confirmPayment() {
 
     paymentStatusText.value = 'Gerando pagamento...';
     try {
-      const result: any = await store.startPayment('PIX', apartmentNote.value);
+      const cpfForPix = pixNeedsCpf.value ? pixCpf.value.replace(/\D/g, '') : undefined;
+      const result: any = await store.startPayment('PIX', apartmentNote.value, cpfForPix);
       const provider = result?.provider || {};
       pixData.value = {
         qrCode: provider.qrCode || null,
