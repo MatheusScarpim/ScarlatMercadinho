@@ -14,7 +14,8 @@ import { Types } from 'mongoose';
 export async function listExpiringBatches(req: AuthRequest, res: Response) {
   try {
     const daysThreshold = req.query.days ? parseInt(req.query.days as string) : 30;
-    const batches = await getExpiringBatches(daysThreshold);
+    const location = req.query.location as string | undefined;
+    const batches = await getExpiringBatches(daysThreshold, location);
     res.json(batches);
   } catch (error: any) {
     res.status(500).json({ message: error?.message || 'Erro ao buscar lotes' });

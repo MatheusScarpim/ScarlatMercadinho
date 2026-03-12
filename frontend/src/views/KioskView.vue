@@ -5,6 +5,11 @@
     <div v-if="showScreensaver" class="screensaver" @click="exitScreensaver">
       <div class="screensaver-content">
         <div class="promo-carousel">
+          <button v-if="promos.length > 1" class="carousel-arrow carousel-arrow-left" @click.stop="prevPromo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
           <transition-group name="slide-fade" tag="div" class="carousel-track">
             <div v-for="(promo, index) in visiblePromos" :key="promo._id" class="promo-slide"
               :class="{ active: index === 0 }">
@@ -35,6 +40,14 @@
               </div>
             </div>
           </transition-group>
+          <button v-if="promos.length > 1" class="carousel-arrow carousel-arrow-right" @click.stop="nextPromo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+          <div v-if="promos.length > 1" class="carousel-dots">
+            <span v-for="(_, i) in promos" :key="i" class="carousel-dot" :class="{ active: i === currentPromoIndex % promos.length }" @click.stop="goToPromo(i)" />
+          </div>
         </div>
         <div class="screensaver-footer">
           <div class="tap-message">
@@ -392,7 +405,7 @@ const visiblePromos = computed(() => {
 async function loadPromos() {
   try {
     const { data } = await api.get('/batches/expiring', {
-      params: { days: 30 }
+      params: { days: 30, location: store.selectedLocation }
     });
     promos.value = data.filter((batch: any) => batch.discountPercent > 0 && batch.product);
   } catch (error) {
@@ -493,10 +506,34 @@ function backToBanner() {
   enterScreensaver();
 }
 
+function prevPromo() {
+  const total = promos.value.length;
+  if (!total) return;
+  currentPromoIndex.value = (currentPromoIndex.value - 1 + total) % total;
+  restartCarousel();
+}
+
+function nextPromo() {
+  const total = promos.value.length;
+  if (!total) return;
+  currentPromoIndex.value = (currentPromoIndex.value + 1) % total;
+  restartCarousel();
+}
+
+function goToPromo(index: number) {
+  currentPromoIndex.value = index;
+  restartCarousel();
+}
+
+function restartCarousel() {
+  stopCarousel();
+  startCarousel();
+}
+
 function startCarousel() {
   stopCarousel();
   carouselTimer.value = window.setInterval(() => {
-    currentPromoIndex.value += 1;
+    currentPromoIndex.value = (currentPromoIndex.value + 1) % (promos.value.length || 1);
   }, CAROUSEL_INTERVAL);
 }
 
@@ -1987,6 +2024,61 @@ button.link:hover {
   width: 100%;
   max-width: 1600px;
   position: relative;
+}
+
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  background: none;
+  border: none;
+  color: white;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 0.25s ease;
+  opacity: 0.7;
+}
+
+.carousel-arrow:hover {
+  opacity: 1;
+}
+
+.carousel-arrow svg {
+  width: 48px;
+  height: 48px;
+}
+
+.carousel-arrow-left {
+  left: 16px;
+}
+
+.carousel-arrow-right {
+  right: 16px;
+}
+
+.carousel-dots {
+  position: absolute;
+  bottom: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+}
+
+.carousel-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.carousel-dot.active {
+  background: #5be7c4;
+  transform: scale(1.3);
+  box-shadow: 0 0 12px rgba(91, 231, 196, 0.5);
 }
 
 .carousel-track {

@@ -106,14 +106,17 @@ export async function consumeBatch(
 /**
  * Busca lotes próximos do vencimento
  */
-export async function getExpiringBatches(daysThreshold: number = 30) {
+export async function getExpiringBatches(daysThreshold: number = 30, location?: string) {
   const thresholdDate = new Date();
   thresholdDate.setDate(thresholdDate.getDate() + daysThreshold);
 
-  const batches = await BatchModel.find({
+  const filter: any = {
     expiryDate: { $lte: thresholdDate },
     quantity: { $gt: 0 }
-  })
+  };
+  if (location) filter.location = location;
+
+  const batches = await BatchModel.find(filter)
     .populate('product')
     .sort({ expiryDate: 1 })
     .lean();

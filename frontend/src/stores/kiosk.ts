@@ -59,16 +59,6 @@ export const useKioskStore = defineStore('kiosk', {
             location
           });
 
-          // Usa o preço original do batch (se houver desconto)
-          const originalPrice = product.hasBatch && product.batchDiscount > 0
-            ? product.batchOriginalPrice
-            : undefined;
-
-          // Calcula a porcentagem real de desconto baseado nos preços (não na margem)
-          const realDiscountPercent = originalPrice && product.salePrice < originalPrice
-            ? Math.round(((originalPrice - product.salePrice) / originalPrice) * 100)
-            : 0;
-
           this.cart.push({
             saleItemId: data.item._id,
             productId: product._id,
@@ -77,8 +67,8 @@ export const useKioskStore = defineStore('kiosk', {
             quantity: 1,
             isWeighed: product.isWeighed,
             imageUrl: product.imageUrl || null,
-            originalPrice,
-            discountPercent: realDiscountPercent,
+            originalPrice: product.hasBatch && product.batchDiscount > 0 ? product.batchOriginalPrice : undefined,
+            discountPercent: product.hasBatch ? product.batchDiscount : 0,
             expiryDate: product.batchExpiryDate || null
           });
         }
@@ -98,16 +88,6 @@ export const useKioskStore = defineStore('kiosk', {
       } else {
         const { data } = await api.post(`/sales/${this.saleId}/items`, { productId: product._id, quantity: 1, location });
 
-        // Usa o preço original do batch (se houver desconto)
-        const originalPrice = product.hasBatch && product.batchDiscount > 0
-          ? product.batchOriginalPrice
-          : undefined;
-
-        // Calcula a porcentagem real de desconto baseado nos preços (não na margem)
-        const realDiscountPercent = originalPrice && product.salePrice < originalPrice
-          ? Math.round(((originalPrice - product.salePrice) / originalPrice) * 100)
-          : 0;
-
         this.cart.push({
           saleItemId: data.item._id,
           productId: product._id,
@@ -116,8 +96,8 @@ export const useKioskStore = defineStore('kiosk', {
           quantity: 1,
           isWeighed: product.isWeighed,
           imageUrl: product.imageUrl || null,
-          originalPrice,
-          discountPercent: realDiscountPercent,
+          originalPrice: product.hasBatch && product.batchDiscount > 0 ? product.batchOriginalPrice : undefined,
+          discountPercent: product.hasBatch ? product.batchDiscount : 0,
           expiryDate: product.batchExpiryDate || null
         });
       }
