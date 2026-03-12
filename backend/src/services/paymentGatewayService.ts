@@ -184,16 +184,16 @@ export async function createPixPaymentIntent(saleId: string, cpfOverride?: strin
   }
 
   const payer: any = {
-    email: `cliente.${cpf}@pagamentos.asyncx.com`,
+    email: `cliente.${cpf}@pagamentos.${env.brandDomain}`,
     first_name: 'Cliente',
-    last_name: 'Scarlate',
+    last_name: env.payerLastName,
     identification: { type: 'CPF', number: cpf }
   };
 
   const payment = new MercadoPagoPayment(getMpClient());
   const body = {
     transaction_amount: totalAmount,
-    description: description || 'Pagamento Asyncx',
+    description: description || env.paymentDescription,
     payment_method_id: 'pix',
     payer,
     metadata: {
@@ -367,7 +367,7 @@ export async function createPointPaymentIntent(
   const amountInCents = Math.round(totalAmount * 100);
   const requestData: any = {
     amount: amountInCents,
-    description: description || 'Pagamento Asyncx',
+    description: description || env.paymentDescription,
     payment: {
       type: paymentType === 'credit' ? 'credit_card' : 'debit_card',
       ...(paymentType === 'credit' && { installments: 1, installments_cost: 'seller' })

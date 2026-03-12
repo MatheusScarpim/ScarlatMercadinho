@@ -2,7 +2,8 @@
   <div class="login">
     <div class="card glass">
       <div class="card-header">
-        <p class="eyebrow">painel</p>
+        <img v-if="wl.logoUrl" :src="resolveAssetUrl(wl.logoUrl)" :alt="wl.brandName" class="login-logo" />
+        <p class="eyebrow">{{ wl.labels.loginEyebrow }}</p>
         <h2>Entrar</h2>
       </div>
       <form @submit.prevent="submit">
@@ -21,6 +22,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import wl, { resolveAssetUrl } from '../config/whitelabel';
 
 const email = ref('');
 const password = ref('');
@@ -82,6 +84,12 @@ button {
 }
 .error {
   color: #c62828;
+}
+.login-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  margin-bottom: 8px;
 }
 .eyebrow {
   text-transform: uppercase;

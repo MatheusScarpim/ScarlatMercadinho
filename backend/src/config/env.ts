@@ -9,7 +9,14 @@ export const env = {
   mpAccessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN || '',
   mpPointDeviceId: process.env.MERCADO_PAGO_POINT_DEVICE_ID || '',
   mpSandbox: process.env.MERCADO_PAGO_SANDBOX !== 'false',
-  adminBootstrapSecret: process.env.ADMIN_BOOTSTRAP_SECRET || ''
+  adminBootstrapSecret: process.env.ADMIN_BOOTSTRAP_SECRET || '',
+
+  // White-label
+  brandName: process.env.BRAND_NAME || 'Asyncx',
+  brandDomain: process.env.BRAND_DOMAIN || 'asyncx.com',
+  paymentDescription: process.env.PAYMENT_DESCRIPTION || 'Pagamento',
+  payerLastName: process.env.PAYER_LAST_NAME || 'Cliente',
+  botUserAgent: process.env.BOT_USER_AGENT || 'AsyncxBot/1.0',
 };
 
 if (!env.mongoUri) {

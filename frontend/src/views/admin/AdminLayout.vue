@@ -2,12 +2,15 @@
   <div class="layout">
     <aside class="glass">
       <div class="brand">
-        <div class="brand-icon">
+        <div v-if="wl.logoUrl" class="brand-logo">
+          <img :src="resolveAssetUrl(wl.logoUrl)" :alt="wl.brandName" />
+        </div>
+        <div v-else class="brand-icon">
           <div class="dot"></div>
         </div>
         <div class="brand-text">
-          <h1>Asyncx</h1>
-          <p>Market</p>
+          <h1>{{ wl.brandName }}</h1>
+          <p>{{ wl.brandSubtitle }}</p>
         </div>
       </div>
 
@@ -101,8 +104,8 @@
     <main>
       <header>
         <div>
-          <p class="eyebrow">admin</p>
-          <h2>Backoffice</h2>
+          <p class="eyebrow">{{ wl.labels.adminEyebrow }}</p>
+          <h2>{{ wl.labels.adminTitle }}</h2>
         </div>
         <div class="header-actions">
           <button class="btn btn-ghost notify" @click="toggleNotifications">
@@ -173,6 +176,7 @@ import { useNotificationStore } from '../../stores/notifications';
 import { onMounted, onUnmounted, ref, computed } from 'vue';
 import api from '../../services/api';
 import { PermissionKey } from '../../constants/permissions';
+import wl, { resolveAssetUrl } from '../../config/whitelabel';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -376,6 +380,20 @@ aside::-webkit-scrollbar-thumb:hover {
     border-radius: 50%;
     background: #0c1829;
     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+  }
+
+  .brand-logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .brand-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
   
   .brand-text h1 {

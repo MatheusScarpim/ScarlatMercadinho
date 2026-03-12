@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio';
 import puppeteer, { Browser, ConsoleMessage, HTTPRequest } from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
+import { env } from '../config/env';
 
 type Nullable<T> = T | null;
 
@@ -273,7 +274,7 @@ export async function fetchNfceHtml(url: string): Promise<string> {
 
   const response = await axios.get<string>(noCacheUrl, {
     headers: {
-      'User-Agent': 'AsyncxBot/1.0',
+      'User-Agent': env.botUserAgent,
       'Cache-Control': 'no-cache',
       Pragma: 'no-cache',
       'If-Modified-Since': 'Sat, 1 Jan 2000 00:00:00 GMT',
