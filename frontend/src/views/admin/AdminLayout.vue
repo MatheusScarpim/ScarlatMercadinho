@@ -93,6 +93,14 @@
             <span>Usuários</span>
           </RouterLink>
         </div>
+
+        <div class="nav-section">
+          <p class="nav-label">Atendimento</p>
+          <RouterLink to="/admin/chat" class="nav-item">
+            <span class="icon">💬</span>
+            <span>Chat</span>
+          </RouterLink>
+        </div>
       </nav>
 
 

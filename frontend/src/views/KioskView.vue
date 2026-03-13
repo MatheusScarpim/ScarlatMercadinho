@@ -329,6 +329,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Chat de ajuda -->
+    <HelpChat />
   </div>
 </template>
 
@@ -336,6 +339,7 @@
 import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue';
 import { useKioskStore } from '../stores/kiosk';
 import api from '../services/api';
+import HelpChat from '../components/HelpChat.vue';
 
 const store = useKioskStore();
 const barcode = ref('');

@@ -16,6 +16,7 @@ import SettingsView from '../views/admin/SettingsView.vue';
 import ExpiringProductsView from '../views/admin/ExpiringProductsView.vue';
 import FiscalView from '../views/admin/FiscalView.vue';
 import UsersView from '../views/admin/UsersView.vue';
+import ChatView from '../views/admin/ChatView.vue';
 import { useAuthStore } from '../stores/auth';
 import { PermissionKey } from '../constants/permissions';
 
@@ -33,7 +34,8 @@ const adminChildren: RouteRecordRaw[] = [
   { path: 'nfce', component: NfceView, meta: { permission: 'NFC_E' as PermissionKey } },
   { path: 'expiring-products', component: ExpiringProductsView, meta: { permission: 'EXPIRING_PRODUCTS' as PermissionKey } },
   { path: 'fiscal', component: FiscalView, meta: { permission: 'FISCAL' as PermissionKey } },
-  { path: 'users', component: UsersView, meta: { requiresAdmin: true } }
+  { path: 'users', component: UsersView, meta: { requiresAdmin: true } },
+  { path: 'chat', component: ChatView, meta: { requiresAuth: true } }
 ];
 
 const router = createRouter({
