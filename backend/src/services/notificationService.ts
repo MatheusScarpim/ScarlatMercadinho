@@ -213,6 +213,25 @@ export const notifyExpiringProduct = async (
 /**
  * Cria notificação para produto vencido
  */
+/**
+ * Cria notificação para produto auto-cadastrado via código de barras
+ */
+export const notifyProductAutoCreated = async (
+  productId: Types.ObjectId | string,
+  productName: string,
+  barcode: string,
+  salePrice: number,
+  averagePrice: number,
+  marginPercent: number
+) => {
+  return createNotification({
+    type: 'PRODUCT_AUTO_CREATED',
+    title: '🆕 Produto Cadastrado Automaticamente',
+    message: `O produto "${productName}" (EAN: ${barcode}) foi cadastrado automaticamente pelo kiosk. Preço médio encontrado: R$ ${averagePrice.toFixed(2)} + margem ${marginPercent}% = R$ ${salePrice.toFixed(2)}. Revise o cadastro e ajuste o preço se necessário.`,
+    relatedProduct: productId,
+  });
+};
+
 export const notifyExpiredProduct = async (
   productId: Types.ObjectId | string,
   productName: string,
