@@ -2,6 +2,7 @@ import axios from 'axios';
 import { GtinLookupModel, type GtinLookupDocument } from '../models/GtinLookup';
 import { CategoryModel } from '../models/Category';
 import { ProductModel } from '../models/Product';
+import { scrapeProductByEan } from './productSearchService';
 
 export interface CosmosProduct {
   ean: string;
@@ -197,13 +198,13 @@ async function validateImageWithAi(imageUrl: string, productName: string): Promi
         messages: [
           {
             role: 'system',
-            content: 'Voce valida imagens de produtos. Responda APENAS com JSON: {"match": true} se a imagem corresponde ao produto informado, ou {"match": false} se nao corresponde. Seja rigoroso: o produto na imagem deve ser o mesmo tipo de produto informado.',
+            content: 'Voce valida imagens de produtos de supermercado. Responda APENAS com JSON: {"match": true} ou {"match": false}. Regras RIGOROSAS: a imagem deve mostrar EXATAMENTE o mesmo produto (mesma marca e mesmo tipo). Exemplos de NAO match: imagem de Pepsi quando o produto e Skol, imagem de Coca-Cola quando o produto e Leite Condensado, imagem de cerveja quando o produto e refrigerante. A marca na imagem TEM que ser a mesma marca do nome do produto.',
           },
           {
             role: 'user',
             content: [
               { type: 'text', text: `O produto e: "${productName}". A imagem corresponde a esse produto?` },
-              { type: 'image_url', image_url: { url: imageUrl, detail: 'low' } },
+              { type: 'image_url', image_url: { url: imageUrl, detail: 'auto' } },
             ],
           },
         ],
@@ -311,10 +312,24 @@ async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookup
 
   const ensuredCategory = await ensureCategory(categoryNameRaw);
 
-  // Valida se a imagem do Cosmos corresponde ao produto
-  const cosmosImageUrl = `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
-  const imageIsValid = name ? await validateImageWithAi(cosmosImageUrl, name) : false;
-  const finalImageUrl = imageIsValid ? cosmosImageUrl : null;
+  // Busca imagem via scrape do product-search.net (fonte confiável)
+  let finalImageUrl: string | null = null;
+  try {
+    const scraped = await scrapeProductByEan(ean);
+    if (scraped?.imageUrl) {
+      finalImageUrl = scraped.imageUrl;
+      console.log('[COSMOS] Imagem obtida via product-search.net:', finalImageUrl);
+    }
+  } catch (err: any) {
+    console.warn('[COSMOS] Falha ao buscar imagem via scrape:', err?.message);
+  }
+
+  // Fallback: tenta Cosmos CDN + validação via IA
+  if (!finalImageUrl && name) {
+    const cosmosImageUrl = `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
+    const imageIsValid = await validateImageWithAi(cosmosImageUrl, name);
+    finalImageUrl = imageIsValid ? cosmosImageUrl : null;
+  }
 
   await ensureProductFromAi({
     ean: aiResult?.ean ?? ean,
@@ -343,6 +358,35 @@ async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookup
 export async function fetchCosmosProduct(ean: string, nameHint?: string): Promise<CosmosProduct> {
   const existing = await GtinLookupModel.findOne({ ean }).lean<GtinLookupDocument | null>();
   if (existing) {
+    // Se não tem imagem ou é do Cosmos (pode estar errada), busca via scrape
+    let cachedImage = existing.imageUrl ?? null;
+    if (!cachedImage || (cachedImage.includes('cdn-cosmos.bluesoft.com.br'))) {
+      try {
+        const scraped = await scrapeProductByEan(ean);
+        if (scraped?.imageUrl) {
+          cachedImage = scraped.imageUrl;
+          await GtinLookupModel.updateOne({ ean }, { $set: { imageUrl: cachedImage } });
+          console.log('[COSMOS] Imagem atualizada via product-search.net para cache:', cachedImage);
+        } else if (cachedImage && existing.name) {
+          // Fallback: valida imagem do Cosmos via IA
+          const imageOk = await validateImageWithAi(cachedImage, existing.name);
+          if (!imageOk) {
+            cachedImage = null;
+            await GtinLookupModel.updateOne({ ean }, { $set: { imageUrl: null } });
+          }
+        }
+      } catch {
+        // Se scrape falhar e tem Cosmos, valida via IA
+        if (cachedImage && existing.name) {
+          const imageOk = await validateImageWithAi(cachedImage, existing.name);
+          if (!imageOk) {
+            cachedImage = null;
+            await GtinLookupModel.updateOne({ ean }, { $set: { imageUrl: null } });
+          }
+        }
+      }
+    }
+
     const ensuredCategory = await ensureCategory(existing.globalProductCategory ?? null);
     await ensureProductFromAi({
       ean,
@@ -350,7 +394,7 @@ export async function fetchCosmosProduct(ean: string, nameHint?: string): Promis
       description: existing.description,
       categoryId: ensuredCategory.id,
       averagePrice: existing.averagePrice,
-      imageUrl: existing.imageUrl || `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
+      imageUrl: cachedImage,
     });
 
     return {
@@ -358,7 +402,7 @@ export async function fetchCosmosProduct(ean: string, nameHint?: string): Promis
       name: existing.name ?? null,
       description: existing.description ?? existing.name ?? null,
       averagePrice: existing.averagePrice ?? null,
-      imageUrl: existing.imageUrl ?? `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
+      imageUrl: cachedImage,
       globalProductCategory: existing.globalProductCategory ?? existing.categoryName ?? null,
       categoryCode: null,
       categoryName: existing.categoryName ?? existing.globalProductCategory ?? null,
