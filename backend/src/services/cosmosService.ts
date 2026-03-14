@@ -18,7 +18,7 @@ export interface CosmosProduct {
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
-const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS ?? 8000);
+const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS ?? 15000);
 const COSMOS_DEBUG = process.env.COSMOS_DEBUG;
 
 type AiProductGuess = {
@@ -241,14 +241,21 @@ async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookup
 
   try {
     aiResult = await fetchProductFromOpenAi(ean, nameHint);
-  } catch {
-    // OpenAI indisponivel – cria produto com dados da NFC-e
+  } catch (err: any) {
+    console.error('[COSMOS] OpenAI indisponivel:', err?.message);
+    throw new Error('Não foi possível obter dados do produto via IA');
   }
 
   const name = aiResult?.name ?? nameHint ?? null;
   const description = aiResult?.description ?? nameHint ?? null;
   const categoryNameRaw = aiResult?.categoryName ?? aiResult?.categoryCode ?? inferCategoryName(nameHint) ?? null;
   const averagePrice = aiResult?.averagePrice ?? null;
+
+  // Não auto-criar produto sem preço
+  if (!averagePrice || Number(averagePrice) <= 0) {
+    console.warn('[COSMOS] IA retornou sem preço para EAN:', ean, '– produto não será auto-criado');
+    throw new Error('Preço não disponível para auto-cadastro');
+  }
 
   const ensuredCategory = await ensureCategory(categoryNameRaw);
   await ensureProductFromAi({
