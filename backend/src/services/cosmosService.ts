@@ -185,6 +185,60 @@ async function fetchProductFromOpenAi(ean: string, nameHint?: string): Promise<A
 }
 
 
+async function validateImageWithAi(imageUrl: string, productName: string): Promise<boolean> {
+  if (!OPENAI_API_KEY) return true; // sem chave, aceita a imagem
+
+  try {
+    const url = `${OPENAI_BASE_URL}/chat/completions`;
+    const { data } = await axios.post(
+      url,
+      {
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'Voce valida imagens de produtos. Responda APENAS com JSON: {"match": true} se a imagem corresponde ao produto informado, ou {"match": false} se nao corresponde. Seja rigoroso: o produto na imagem deve ser o mesmo tipo de produto informado.',
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: `O produto e: "${productName}". A imagem corresponde a esse produto?` },
+              { type: 'image_url', image_url: { url: imageUrl, detail: 'low' } },
+            ],
+          },
+        ],
+        temperature: 0,
+        max_tokens: 20,
+        response_format: { type: 'json_object' },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000,
+      },
+    );
+
+    const content = data?.choices?.[0]?.message?.content;
+    const parsed = JSON.parse(content || '{}');
+    const isMatch = parsed.match === true;
+
+    if (COSMOS_DEBUG) {
+      console.log('[COSMOS][IMAGE-VALIDATION]', { imageUrl, productName, isMatch });
+    }
+
+    if (!isMatch) {
+      console.warn('[COSMOS] Imagem do Cosmos NAO corresponde ao produto:', productName, '| URL:', imageUrl);
+    }
+
+    return isMatch;
+  } catch (err: any) {
+    console.error('[COSMOS] Erro ao validar imagem:', err?.message);
+    return true; // em caso de erro, aceita a imagem para não bloquear
+  }
+}
+
 async function ensureCategory(name: string | null) {
   const normalized = (name || 'OUTROS').toUpperCase();
 
@@ -206,9 +260,8 @@ async function ensureProductFromAi(params: {
   const { ean, name, description, categoryId, averagePrice, imageUrl } = params;
   const existing = await ProductModel.findOne({ barcode: ean });
   if (existing) {
-    const safeImage = imageUrl || existing.imageUrl || `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
-    if (safeImage && existing.imageUrl !== safeImage) {
-      existing.imageUrl = safeImage;
+    if (imageUrl && existing.imageUrl !== imageUrl) {
+      existing.imageUrl = imageUrl;
       await existing.save();
     }
     return existing._id.toString();
@@ -216,14 +269,13 @@ async function ensureProductFromAi(params: {
 
   const sale = Number(averagePrice ?? '');
   const salePrice = Number.isFinite(sale) && sale > 0 ? sale : 0;
-  const safeImage = imageUrl || `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
 
   const created = await ProductModel.create({
     name: name || description || 'Produto sem nome',
     description: description || name,
     barcode: ean,
     category: categoryId,
-    imageUrl: safeImage,
+    imageUrl: imageUrl || null,
     costPrice: 0,
     salePrice,
     stockQuantity: 0,
@@ -258,13 +310,19 @@ async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookup
   }
 
   const ensuredCategory = await ensureCategory(categoryNameRaw);
+
+  // Valida se a imagem do Cosmos corresponde ao produto
+  const cosmosImageUrl = `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
+  const imageIsValid = name ? await validateImageWithAi(cosmosImageUrl, name) : false;
+  const finalImageUrl = imageIsValid ? cosmosImageUrl : null;
+
   await ensureProductFromAi({
     ean: aiResult?.ean ?? ean,
     name,
     description,
     categoryId: ensuredCategory.id,
     averagePrice,
-    imageUrl: `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
+    imageUrl: finalImageUrl,
   });
 
   const created = await GtinLookupModel.create({
@@ -274,7 +332,7 @@ async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookup
     globalProductCategory: ensuredCategory.name ?? categoryNameRaw,
     categoryId: ensuredCategory.id ?? null,
     categoryName: ensuredCategory.name ?? categoryNameRaw,
-    imageUrl: `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
+    imageUrl: finalImageUrl,
     averagePrice,
     sourceUrl: aiResult ? 'openai' : 'nfce-fallback',
   });
