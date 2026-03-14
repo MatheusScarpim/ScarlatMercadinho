@@ -27,7 +27,7 @@ export async function scrapeProductName(ean: string): Promise<string | null> {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
     );
 
-    // Bloqueia CSS/fontes/imagens pra carregar mais rápido (só precisa do HTML)
+    // Bloqueia CSS/fontes/imagens pra carregar mais rápido
     await page.setRequestInterception(true);
     page.on('request', (req) => {
       const type = req.resourceType();
@@ -43,10 +43,11 @@ export async function scrapeProductName(ean: string): Promise<string | null> {
       timeout: SCRAPE_TIMEOUT_MS,
     });
 
-    // Nome vem do título: "EAN 7898422746759 Sabonete Dove Cremoso 90g"
-    const title = await page.title();
-    const match = title.match(/^EAN\s+\d+\s+(.+)$/);
-    const name = match ? match[1].trim() : null;
+    // Nome está em: h1 > a (ex: <h1><a href="/ext/...">Sabonete Dove Cremoso 90g</a> (*)</h1>)
+    const name = await page.evaluate(() => {
+      const link = document.querySelector('h1 a');
+      return link?.textContent?.trim() || null;
+    });
 
     console.log('[PRODUCT-SEARCH] EAN:', ean, '| Nome:', name);
     return name;
