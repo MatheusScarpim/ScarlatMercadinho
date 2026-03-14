@@ -190,6 +190,15 @@ async function validateImageWithAi(imageUrl: string, productName: string): Promi
   if (!OPENAI_API_KEY) return true; // sem chave, aceita a imagem
 
   try {
+    // Primeiro verifica se a imagem existe (HEAD request)
+    try {
+      const head = await axios.head(imageUrl, { timeout: 5000 });
+      if (head.status !== 200) return false;
+    } catch {
+      console.warn('[COSMOS] Imagem inacessível:', imageUrl);
+      return false;
+    }
+
     const url = `${OPENAI_BASE_URL}/chat/completions`;
     const { data } = await axios.post(
       url,
@@ -236,7 +245,7 @@ async function validateImageWithAi(imageUrl: string, productName: string): Promi
     return isMatch;
   } catch (err: any) {
     console.error('[COSMOS] Erro ao validar imagem:', err?.message);
-    return true; // em caso de erro, aceita a imagem para não bloquear
+    return false; // em caso de erro, rejeita a imagem
   }
 }
 
