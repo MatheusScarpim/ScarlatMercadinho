@@ -18,10 +18,6 @@ const FAQ_ITEMS = [
   { q: 'Posso sugerir novos produtos?', a: 'Claro! Envie sua sugestão pelo chat durante o horário comercial e nossa equipe vai avaliar.' },
 ];
 
-export function getFaqItems() {
-  return FAQ_ITEMS;
-}
-
 /**
  * Verifica se está dentro do horário comercial (8:30 - 18:00)
  */

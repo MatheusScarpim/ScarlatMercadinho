@@ -23,20 +23,38 @@
 
         <!-- Tab bar -->
         <div class="chat-tabs">
-          <button :class="['tab', activeTab === 'faq' ? 'active' : '']" @click="activeTab = 'faq'">FAQ</button>
+          <button :class="['tab', activeTab === 'contato' ? 'active' : '']" @click="activeTab = 'contato'">Contato</button>
           <button :class="['tab', activeTab === 'chat' ? 'active' : '']" @click="activeTab = 'chat'">Chat</button>
         </div>
 
-        <!-- FAQ -->
-        <div v-if="activeTab === 'faq'" class="chat-body faq-body">
-          <div v-for="(item, i) in faqItems" :key="i" class="faq-item" @click="toggleFaq(i)">
-            <div class="faq-question">
-              <span>{{ item.q }}</span>
-              <span class="faq-arrow" :class="{ open: openFaq === i }">▸</span>
+        <!-- Contato -->
+        <div v-if="activeTab === 'contato'" class="chat-body contact-body">
+          <div class="contact-card">
+            <p class="contact-title">Entre em contato conosco</p>
+
+            <a v-if="contactInfo.phone" :href="'tel:' + contactInfo.phone" class="contact-item">
+              <span class="contact-icon">📞</span>
+              <div>
+                <span class="contact-label">Telefone</span>
+                <span class="contact-value">{{ contactInfo.phone }}</span>
+              </div>
+            </a>
+
+            <a v-if="contactInfo.email" :href="'mailto:' + contactInfo.email" class="contact-item">
+              <span class="contact-icon">✉️</span>
+              <div>
+                <span class="contact-label">E-mail</span>
+                <span class="contact-value">{{ contactInfo.email }}</span>
+              </div>
+            </a>
+
+            <div class="contact-hours">
+              <span class="contact-icon">🕐</span>
+              <div>
+                <span class="contact-label">Atendimento humano</span>
+                <span class="contact-value">Seg a Sáb, 8:30 - 18:00</span>
+              </div>
             </div>
-            <transition name="faq-expand">
-              <div v-if="openFaq === i" class="faq-answer">{{ item.a }}</div>
-            </transition>
           </div>
         </div>
 
@@ -85,21 +103,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue';
+import { ref, onMounted, nextTick, watch, computed } from 'vue';
 import axios from 'axios';
+import wl from '../config/whitelabel';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 const isOpen = ref(false);
-const activeTab = ref<'faq' | 'chat'>('faq');
-const openFaq = ref<number | null>(null);
+const activeTab = ref<'contato' | 'chat'>('contato');
 const inputMsg = ref('');
 const loading = ref(false);
 const messages = ref<any[]>([]);
 const messagesRef = ref<HTMLElement | null>(null);
 const isBusinessHoursLocal = ref(false);
 
-const faqItems = ref<{ q: string; a: string }[]>([]);
+const contactInfo = computed(() => ({
+  phone: wl.contactPhone,
+  email: wl.contactEmail,
+}));
 
 // Gera um sessionId único por sessão do browser
 const sessionId = ref(
@@ -130,15 +151,6 @@ async function fetchStatus() {
   updateMode();
 }
 
-async function fetchFaq() {
-  try {
-    const { data } = await axios.get(`${apiBase}/chat/faq`);
-    faqItems.value = data.faq;
-  } catch {
-    // usa defaults
-  }
-}
-
 async function fetchMessages() {
   try {
     const { data } = await axios.get(`${apiBase}/chat/messages/${sessionId.value}`);
@@ -156,10 +168,6 @@ function toggleChat() {
     fetchStatus();
     if (messages.value.length === 0) fetchMessages();
   }
-}
-
-function toggleFaq(i: number) {
-  openFaq.value = openFaq.value === i ? null : i;
 }
 
 function msgClass(msg: any) {
@@ -237,7 +245,6 @@ watch(isOpen, (open) => {
 });
 
 onMounted(() => {
-  fetchFaq();
   fetchStatus();
   // Atualiza status a cada 5 minutos
   setInterval(fetchStatus, 300000);
@@ -408,60 +415,63 @@ onMounted(() => {
   border-radius: 3px;
 }
 
-/* FAQ */
-.faq-body {
-  padding: 8px;
+/* Contato */
+.contact-body {
+  padding: 16px;
 }
 
-.faq-item {
-  border: 1px solid var(--border, #d9e2ec);
-  border-radius: 10px;
-  margin-bottom: 6px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.faq-item:hover {
-  border-color: var(--primary, #10b49d);
-}
-
-.faq-question {
+.contact-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 14px;
-  font-size: 13px;
-  font-weight: 500;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contact-title {
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text, #1f2937);
+  margin: 0 0 4px;
+  text-align: center;
 }
 
-.faq-arrow {
-  transition: transform 0.2s;
+.contact-item,
+.contact-hours {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border, #d9e2ec);
+  border-radius: 12px;
+  transition: border-color 0.2s, background 0.2s;
+  text-decoration: none;
+  color: inherit;
+}
+
+.contact-item:hover {
+  border-color: var(--primary, #10b49d);
+  background: rgba(16, 180, 157, 0.05);
+}
+
+.contact-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.contact-label {
+  display: block;
+  font-size: 11px;
   color: var(--muted, #5b6577);
-  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
-.faq-arrow.open {
-  transform: rotate(90deg);
-}
-
-.faq-answer {
-  padding: 0 14px 12px;
-  font-size: 13px;
-  color: var(--muted, #5b6577);
-  line-height: 1.5;
-}
-
-.faq-expand-enter-active,
-.faq-expand-leave-active {
-  transition: all 0.2s ease;
-}
-
-.faq-expand-enter-from,
-.faq-expand-leave-to {
-  opacity: 0;
-  max-height: 0;
+.contact-value {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text, #1f2937);
+  margin-top: 2px;
 }
 
 /* Messages */

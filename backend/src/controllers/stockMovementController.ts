@@ -47,6 +47,7 @@ export async function createAdjustment(req: AuthRequest, res: Response) {
     type: req.body.type,
     quantity: req.body.quantity,
     reason: req.body.reason || 'AJUSTE INVENTÁRIO',
+    location: req.body.location,
     userId: req.user?.userId
   });
   res.status(201).json(movement);

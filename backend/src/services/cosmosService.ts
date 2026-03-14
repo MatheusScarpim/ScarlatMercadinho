@@ -186,9 +186,7 @@ async function fetchProductFromOpenAi(ean: string, nameHint?: string): Promise<A
 
 
 async function ensureCategory(name: string | null) {
-  if (!name) return { name: null, id: null };
-
-  const normalized = name.toUpperCase();
+  const normalized = (name || 'OUTROS').toUpperCase();
 
   const existing = await CategoryModel.findOne({ name: normalized }).lean();
   if (existing) return { name: existing.name, id: existing._id?.toString?.() ?? null };

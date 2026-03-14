@@ -1,6 +1,9 @@
 <template>
   <div class="movements-view">
-    <h3>Movimentações de estoque</h3>
+    <div class="movements-header">
+      <h3>Movimentações de estoque</h3>
+      <button class="btn btn-danger" @click="showExitModal = true">Nova saída de estoque</button>
+    </div>
     <div class="filters glass">
       <select v-model="type" @change="filterAndLoad">
         <option value="">Todos</option>
@@ -73,13 +76,64 @@
       <span class="page-info">Página {{ page }} de {{ pages }}</span>
       <button class="btn btn-ghost" :disabled="page === pages" @click="nextPage">Próxima →</button>
     </div>
+    <BaseModal :open="showExitModal" title="Nova saída de estoque" :onClose="closeExitModal">
+      <form @submit.prevent="submitExit" class="exit-form">
+        <div class="exit-field">
+          <label>Produto (buscar por nome ou código)</label>
+          <input v-model="exitSearch" placeholder="Digite nome ou código de barras" @input="searchProducts" />
+          <div v-if="exitProductResults.length" class="exit-product-list">
+            <div
+              v-for="p in exitProductResults" :key="p._id"
+              class="exit-product-item"
+              :class="{ selected: exitForm.productId === p._id }"
+              @click="selectExitProduct(p)"
+            >
+              <strong>{{ p.name }}</strong>
+              <span class="exit-product-barcode">{{ p.barcode }}</span>
+            </div>
+          </div>
+          <p v-if="exitForm.productName" class="exit-selected">Selecionado: <strong>{{ exitForm.productName }}</strong></p>
+        </div>
+        <div class="exit-field">
+          <label>Local</label>
+          <select v-model="exitForm.location" required>
+            <option value="" disabled>Selecione o local</option>
+            <option v-for="loc in locations" :key="loc._id" :value="loc.code">{{ loc.name }} ({{ loc.code }})</option>
+          </select>
+        </div>
+        <div class="exit-field">
+          <label>Quantidade</label>
+          <input type="number" min="1" v-model.number="exitForm.quantity" required placeholder="Quantidade" />
+        </div>
+        <div class="exit-field">
+          <label>Motivo</label>
+          <select v-model="exitForm.reason" required>
+            <option value="" disabled>Selecione o motivo</option>
+            <option value="PERDA / AVARIA">Perda / Avaria</option>
+            <option value="VENCIMENTO">Vencimento</option>
+            <option value="QUEBRA">Quebra</option>
+            <option value="FURTO">Furto</option>
+            <option value="CONSUMO INTERNO">Consumo interno</option>
+            <option value="DOAÇÃO">Doação</option>
+            <option value="OUTRO">Outro</option>
+          </select>
+        </div>
+        <div class="exit-actions">
+          <button class="btn btn-ghost" type="button" @click="closeExitModal">Cancelar</button>
+          <button class="btn btn-danger" type="submit" :disabled="!exitForm.productId || !exitForm.location || !exitForm.quantity || !exitForm.reason">
+            Registrar saída
+          </button>
+        </div>
+      </form>
+    </BaseModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
 import api from '../../services/api';
 import { exportToCsv } from '../../utils/export';
+import BaseModal from '../../components/BaseModal.vue';
 
 const movements = ref<any[]>([]);
 const type = ref('');
@@ -89,6 +143,12 @@ const location = ref('');
 const page = ref(1);
 const pages = ref(1);
 const total = ref(0);
+
+const showExitModal = ref(false);
+const exitSearch = ref('');
+const exitProductResults = ref<any[]>([]);
+const exitForm = reactive({ productId: '', productName: '', location: '', quantity: 0, reason: '' });
+let searchTimeout: any = null;
 
 async function load() {
   const res = await api.get('/stock-movements', {
@@ -134,6 +194,57 @@ onMounted(() => {
   loadRefs();
   load();
 });
+
+function searchProducts() {
+  clearTimeout(searchTimeout);
+  if (!exitSearch.value || exitSearch.value.length < 2) {
+    exitProductResults.value = [];
+    return;
+  }
+  searchTimeout = setTimeout(async () => {
+    try {
+      const { data } = await api.get('/products', { params: { search: exitSearch.value, limit: 8 } });
+      exitProductResults.value = data.data || data;
+    } catch {
+      exitProductResults.value = [];
+    }
+  }, 300);
+}
+
+function selectExitProduct(p: any) {
+  exitForm.productId = p._id;
+  exitForm.productName = p.name;
+  exitProductResults.value = [];
+  exitSearch.value = '';
+}
+
+function closeExitModal() {
+  showExitModal.value = false;
+  exitForm.productId = '';
+  exitForm.productName = '';
+  exitForm.location = '';
+  exitForm.quantity = 0;
+  exitForm.reason = '';
+  exitSearch.value = '';
+  exitProductResults.value = [];
+}
+
+async function submitExit() {
+  try {
+    await api.post('/stock-movements', {
+      productId: exitForm.productId,
+      type: 'EXIT',
+      quantity: exitForm.quantity,
+      reason: exitForm.reason,
+      location: exitForm.location
+    });
+    alert(`Saída de ${exitForm.quantity} unidade(s) registrada com sucesso.`);
+    closeExitModal();
+    await load();
+  } catch (err: any) {
+    alert(err?.response?.data?.message || 'Erro ao registrar saída de estoque');
+  }
+}
 
 async function exportMovements() {
   const { data } = await api.get('/stock-movements', {
@@ -451,5 +562,121 @@ td {
   .product-col {
     max-width: 200px;
   }
+}
+
+/* Header */
+.movements-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+/* Exit modal */
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  transform: translateY(-1px);
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.exit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.exit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exit-field label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+
+.exit-field input,
+.exit-field select {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.exit-field input:focus,
+.exit-field select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.exit-product-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.exit-product-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.exit-product-item:last-child {
+  border-bottom: none;
+}
+
+.exit-product-item:hover,
+.exit-product-item.selected {
+  background: rgba(91, 231, 196, 0.1);
+}
+
+.exit-product-barcode {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: 'Courier New', monospace;
+}
+
+.exit-selected {
+  font-size: 13px;
+  color: var(--primary);
+  margin: 0;
+}
+
+.exit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
 }
 </style>

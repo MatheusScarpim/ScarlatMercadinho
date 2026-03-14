@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import { BatchModel } from '../models/Batch';
 import { Notification } from '../models/Notification';
 import { notifyExpiringProduct, notifyExpiredProduct } from '../services/notificationService';
-import { writeOffExpiredBatches } from '../services/batchService';
+
 
 /**
  * Verifica se já existe notificação recente para este produto/local
@@ -123,16 +123,6 @@ export async function checkExpiringBatchesAndNotify() {
     }
 
     console.log(`[EXPIRY-JOB] Verificação concluída. ${notificationsCreated} notificações criadas.`);
-
-    // Dá baixa automática nos lotes vencidos
-    try {
-      const removed = await writeOffExpiredBatches();
-      if (removed.length > 0) {
-        console.log(`[EXPIRY-JOB] ${removed.length} lote(s) vencido(s) removido(s) do estoque automaticamente.`);
-      }
-    } catch (writeOffError: any) {
-      console.error('[EXPIRY-JOB] Erro ao dar baixa em lotes vencidos:', writeOffError.message);
-    }
   } catch (error: any) {
     console.error('[EXPIRY-JOB] Erro ao verificar produtos próximos do vencimento:', error.message);
   }

@@ -5,7 +5,6 @@ import * as chat from '../controllers/chatController';
 const router = Router();
 
 // ── Endpoints públicos (kiosk) ──
-router.get('/faq', chat.faq);
 router.get('/status', chat.status);
 router.post('/send', chat.send);
 router.get('/messages/:sessionId', chat.messages);

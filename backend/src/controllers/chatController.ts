@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import {
-  getFaqItems,
   isBusinessHours,
   sendAiMessage,
   sendCustomerMessage,
@@ -9,11 +8,6 @@ import {
   getSessionMessages,
   closeSession,
 } from '../services/chatService';
-
-/** GET /chat/faq — retorna itens de FAQ */
-export async function faq(_req: Request, res: Response) {
-  res.json({ faq: getFaqItems() });
-}
 
 /** GET /chat/status — retorna se é horário comercial */
 export async function status(_req: Request, res: Response) {
