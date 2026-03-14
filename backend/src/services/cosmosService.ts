@@ -68,7 +68,7 @@ function inferCategoryName(nameHint: string | null | undefined) {
 
 function buildMessages(ean: string, nameHint?: string) {
   const system =
-    'Voce e um catalogador de produtos brasileiro. Recebe apenas um codigo EAN/GTIN-13 e deve responder estritamente um JSON compacto com os campos: ean, name (nome curto comercial), category_name (apenas nome da categoria, sem codigo), category_code (sempre null) e average_price_brl (preco medio de venda no Brasil em reais). Use null quando nao tiver certeza. Nao inclua texto explicativo. Prefira categorias GENERICAS do varejo brasileiro (refrigerantes, cervejas, sucos, agua, laticinios, carnes, hortifruti, limpeza, higiene pessoal, bazar, pet, etc.). Para produtos de agua (H2O), use o valor mais caro que ja observou como preco medio.';
+    'Voce e um catalogador de produtos brasileiro. Recebe apenas um codigo EAN/GTIN-13 e deve responder estritamente um JSON compacto com os campos: ean, name (nome curto comercial), category_name (apenas nome da categoria, sem codigo), category_code (sempre null) e average_price_brl (preco de venda mais alto que voce ja observou no varejo brasileiro em reais). IMPORTANTE: o preco NUNCA pode ser null ou zero — sempre retorne o valor mais alto que conhecer para esse produto. Se nao souber o preco exato, estime com base em produtos similares usando o valor mais alto da faixa. Nao inclua texto explicativo. Prefira categorias GENERICAS do varejo brasileiro (refrigerantes, cervejas, sucos, agua, laticinios, carnes, hortifruti, limpeza, higiene pessoal, bazar, pet, etc.).';
   const userLines = [`EAN: ${ean}`];
   if (nameHint) {
     userLines.push(`Nome NFCe: ${nameHint}`);
