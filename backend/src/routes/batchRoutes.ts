@@ -13,6 +13,7 @@ router.get('/product/:productId', controller.listProductBatches);
 router.get('/critical-count', authMiddleware, requirePermission('EXPIRING_PRODUCTS'), controller.getCriticalCount);
 router.post('/update-prices', authMiddleware, requirePermission('EXPIRING_PRODUCTS'), controller.updateBatchPrices);
 router.post('/migrate', authMiddleware, requirePermission('EXPIRING_PRODUCTS'), controller.migrateBatches);
+router.post('/write-off-expired', authMiddleware, requirePermission('EXPIRING_PRODUCTS'), controller.writeOffExpired);
 router.patch('/:id/discount', authMiddleware, requirePermission('EXPIRING_PRODUCTS'), controller.updateBatchDiscount);
 
 export default router;

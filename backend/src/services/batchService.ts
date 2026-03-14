@@ -1,6 +1,7 @@
 import { BatchModel } from '../models/Batch';
 import { ProductModel } from '../models/Product';
 import { Types } from 'mongoose';
+import { registerMovement } from './stockService';
 
 /**
  * Cria ou atualiza um lote para um produto
@@ -209,6 +210,62 @@ export async function getCriticalBatchesCount() {
   });
 
   return count;
+}
+
+/**
+ * Dá baixa em todos os lotes vencidos:
+ * - Cria movimentação de saída (EXIT) para cada lote
+ * - Remove o lote do banco
+ * Retorna resumo dos lotes removidos
+ */
+export async function writeOffExpiredBatches(location?: string) {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const filter: any = {
+    expiryDate: { $lt: now },
+    quantity: { $gt: 0 }
+  };
+  if (location) filter.location = location;
+
+  const expiredBatches = await BatchModel.find(filter).populate('product');
+
+  const results: Array<{
+    productId: string;
+    productName: string;
+    batchId: string;
+    location: string;
+    quantity: number;
+    expiryDate: Date;
+  }> = [];
+
+  for (const batch of expiredBatches) {
+    const product = batch.product as any;
+    if (!product) continue;
+
+    // Registra saída de estoque com motivo de vencimento
+    await registerMovement({
+      productId: product._id,
+      type: 'EXIT',
+      quantity: batch.quantity,
+      reason: `BAIXA POR VENCIMENTO - Lote ${batch.batchCode || 'S/N'} vencido em ${batch.expiryDate.toLocaleDateString('pt-BR')}`,
+      location: batch.location
+    });
+
+    results.push({
+      productId: product._id.toString(),
+      productName: product.name,
+      batchId: batch._id.toString(),
+      location: batch.location,
+      quantity: batch.quantity,
+      expiryDate: batch.expiryDate
+    });
+
+    // Remove o lote
+    await BatchModel.deleteOne({ _id: batch._id });
+  }
+
+  return results;
 }
 
 /**
