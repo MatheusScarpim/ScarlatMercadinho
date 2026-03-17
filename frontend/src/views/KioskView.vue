@@ -79,6 +79,15 @@
     <input class="scan-input" ref="barcodeInput" v-model="barcode" @keyup.enter="handleBarcode"
       aria-label="Leitor oculto" />
 
+    <!-- Alerta de produto auto-cadastrado -->
+    <transition name="slide-down">
+      <div v-if="store.autoCreatedAlert" class="auto-created-alert">
+        <span class="auto-created-icon">&#x26A0;</span>
+        <span>{{ store.autoCreatedAlert }}</span>
+        <button class="auto-created-close" @click="store.autoCreatedAlert = ''">&#x2715;</button>
+      </div>
+    </transition>
+
     <section class="workspace">
       <div class="right glass">
         <div class="cart-top">
@@ -342,6 +351,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Chat de ajuda -->
+    <HelpChat />
   </div>
 </template>
 
@@ -350,6 +362,7 @@ import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue';
 import { useKioskStore } from '../stores/kiosk';
 import api from '../services/api';
 import wl from '../config/whitelabel';
+import HelpChat from '../components/HelpChat.vue';
 
 const store = useKioskStore();
 
@@ -1972,6 +1985,51 @@ button.link:hover {
   .empty-icon {
     font-size: 56px;
   }
+}
+
+.auto-created-alert {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffc107;
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  max-width: 90vw;
+}
+
+.auto-created-icon {
+  font-size: 20px;
+}
+
+.auto-created-close {
+  background: none;
+  border: none;
+  color: #856404;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
 }
 </style>
 

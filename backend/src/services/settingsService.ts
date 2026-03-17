@@ -39,6 +39,8 @@ export interface WhiteLabelSettings {
     adminTitle: string;
     paymentDescription: string;
   };
+  contactPhone: string;
+  contactEmail: string;
 }
 
 const DEFAULT_WHITELABEL: WhiteLabelSettings = {
@@ -65,6 +67,8 @@ const DEFAULT_WHITELABEL: WhiteLabelSettings = {
     adminTitle: 'Backoffice',
     paymentDescription: 'Pagamento',
   },
+  contactPhone: '',
+  contactEmail: '',
 };
 
 export async function getWhiteLabelSettings(): Promise<WhiteLabelSettings> {

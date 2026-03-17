@@ -2,6 +2,9 @@ import { FilterQuery } from 'mongoose';
 import { ProductModel } from '../models/Product';
 import { getBestPriceForProduct } from './batchService';
 import { StockMovementModel } from '../models/StockMovement';
+import { fetchCosmosProduct } from './cosmosService';
+import { getMarginPercent } from './settingsService';
+import { notifyProductAutoCreated } from './notificationService';
 
 function buildFilter(params: { search?: string; category?: string; active?: string }) {
   const filter: FilterQuery<any> = {};
@@ -75,7 +78,48 @@ export async function searchProducts(
 }
 
 export async function findByBarcode(barcode: string, location?: string) {
-  const doc = await ProductModel.findOne({ barcode, active: true }).populate('category');
+  let doc = await ProductModel.findOne({ barcode, active: true }).populate('category');
+  let autoCreated = false;
+
+  if (!doc) {
+    // Produto não existe – busca via Cosmos (OpenAI) e cria automaticamente
+    try {
+      console.log('[PRODUCT-SERVICE] Produto não encontrado, buscando via Cosmos:', barcode);
+      const cosmosResult = await fetchCosmosProduct(barcode);
+
+      // Aplica margem (taxa) ao preço médio encontrado
+      const marginPercent = await getMarginPercent();
+      const averagePrice = Number(cosmosResult.averagePrice ?? 0);
+      const marginMultiplier = 1 + marginPercent / 100;
+      const salePriceWithMargin = averagePrice > 0 ? Math.round(averagePrice * marginMultiplier * 100) / 100 : 0;
+
+      // Atualiza o preço do produto recém-criado com a margem aplicada
+      const created = await ProductModel.findOne({ barcode }).populate('category');
+      if (created) {
+        if (salePriceWithMargin > 0) {
+          created.salePrice = salePriceWithMargin;
+          await created.save();
+        }
+
+        // Dispara notificação para o admin
+        await notifyProductAutoCreated(
+          created._id,
+          created.name,
+          barcode,
+          salePriceWithMargin > 0 ? salePriceWithMargin : averagePrice,
+          averagePrice,
+          marginPercent
+        );
+
+        doc = await ProductModel.findById(created._id).populate('category');
+        autoCreated = true;
+        console.log('[PRODUCT-SERVICE] Produto auto-criado:', created.name, '| Preço:', salePriceWithMargin);
+      }
+    } catch (err: any) {
+      console.error('[PRODUCT-SERVICE] Erro ao auto-criar produto via Cosmos:', err?.message);
+    }
+  }
+
   if (!doc) return null;
 
   // Aplica quantidade de estoque por localização
@@ -96,20 +140,20 @@ export async function findByBarcode(barcode: string, location?: string) {
       return {
         ...productWithLocation,
         batchPrice: batchPriceInfo.price,
-        batchOriginalPrice: batchPriceInfo.originalPrice, // Preço original do produto (para mostrar ao cliente)
+        batchOriginalPrice: batchPriceInfo.originalPrice,
         batchDiscount: batchPriceInfo.discountPercent,
         batchExpiryDate: batchPriceInfo.expiryDate,
         hasBatch: batchPriceInfo.hasBatch,
-        // Se há lote com desconto, sobrescreve o preço de venda
-        salePrice: batchPriceInfo.hasBatch ? batchPriceInfo.price : productWithLocation.salePrice
+        salePrice: batchPriceInfo.hasBatch ? batchPriceInfo.price : productWithLocation.salePrice,
+        autoCreated,
       };
     } catch (error) {
       console.error('[PRODUCT-SERVICE] Erro ao buscar preço de lote:', error);
-      return productWithLocation;
+      return { ...productWithLocation, autoCreated };
     }
   }
 
-  return productWithLocation;
+  return { ...productWithLocation, autoCreated };
 }
 
 export async function countProducts(params: { search?: string; category?: string; active?: string }) {

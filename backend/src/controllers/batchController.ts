@@ -7,7 +7,8 @@ import {
   getProductBatches,
   getCriticalBatchesCount,
   migrateBatchesWithSalePrice,
-  updateBatchDiscountById
+  updateBatchDiscountById,
+  writeOffExpiredBatches
 } from '../services/batchService';
 import { Types } from 'mongoose';
 
@@ -70,6 +71,20 @@ export async function migrateBatches(req: AuthRequest, res: Response) {
     res.json({ message: `${updated} lotes atualizados com sucesso`, updated });
   } catch (error: any) {
     res.status(500).json({ message: error?.message || 'Erro ao migrar lotes' });
+  }
+}
+
+export async function writeOffExpired(req: AuthRequest, res: Response) {
+  try {
+    const location = req.query.location as string | undefined;
+    const results = await writeOffExpiredBatches(location);
+    res.json({
+      message: `${results.length} lote(s) vencido(s) removido(s) do estoque`,
+      count: results.length,
+      details: results
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error?.message || 'Erro ao dar baixa em lotes vencidos' });
   }
 }
 

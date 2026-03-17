@@ -19,6 +19,7 @@ export const useKioskStore = defineStore('kiosk', {
     saleId: '',
     cart: [] as CartItem[],
     message: '',
+    autoCreatedAlert: '',
     selectedLocation: (localStorage.getItem('kioskLocation') as string) || import.meta.env.VITE_KIOSK_LOCATION || 'central'
   }),
   getters: {
@@ -42,6 +43,13 @@ export const useKioskStore = defineStore('kiosk', {
       try {
         const location = this.selectedLocation || import.meta.env.VITE_KIOSK_LOCATION || 'central';
         const { data: product } = await api.get(`/products/barcode/${barcode}`, { params: { location } });
+
+        // Alerta se o produto foi auto-cadastrado
+        if (product.autoCreated) {
+          this.autoCreatedAlert = `Produto "${product.name}" cadastrado automaticamente com preço estimado de R$ ${Number(product.salePrice).toFixed(2)}. O admin foi notificado para revisão.`;
+          setTimeout(() => { this.autoCreatedAlert = ''; }, 8000);
+        }
+
         await this.ensureSale();
         const existing = this.cart.find((c) => c.productId === product._id);
         if (existing) {
@@ -126,6 +134,7 @@ export const useKioskStore = defineStore('kiosk', {
       this.saleId = '';
       this.cart = [];
       this.message = '';
+      this.autoCreatedAlert = '';
     },
     async startPayment(paymentMethod: string, apartmentNote?: string, cpf?: string) {
       if (!this.saleId) return { completed: false };

@@ -2,6 +2,7 @@ import axios from 'axios';
 import { GtinLookupModel, type GtinLookupDocument } from '../models/GtinLookup';
 import { CategoryModel } from '../models/Category';
 import { ProductModel } from '../models/Product';
+import { scrapeProductName } from './productSearchService';
 
 export interface CosmosProduct {
   ean: string;
@@ -18,7 +19,7 @@ export interface CosmosProduct {
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
-const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS ?? 8000);
+const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS ?? 15000);
 const COSMOS_DEBUG = process.env.COSMOS_DEBUG;
 
 type AiProductGuess = {
@@ -68,7 +69,7 @@ function inferCategoryName(nameHint: string | null | undefined) {
 
 function buildMessages(ean: string, nameHint?: string) {
   const system =
-    'Voce e um catalogador de produtos brasileiro. Recebe apenas um codigo EAN/GTIN-13 e deve responder estritamente um JSON compacto com os campos: ean, name (nome curto comercial), category_name (apenas nome da categoria, sem codigo), category_code (sempre null) e average_price_brl (preco medio de venda no Brasil em reais). Use null quando nao tiver certeza. Nao inclua texto explicativo. Prefira categorias GENERICAS do varejo brasileiro (refrigerantes, cervejas, sucos, agua, laticinios, carnes, hortifruti, limpeza, higiene pessoal, bazar, pet, etc.). Para produtos de agua (H2O), use o valor mais caro que ja observou como preco medio.';
+    'Voce e um catalogador de produtos brasileiro. Recebe apenas um codigo EAN/GTIN-13 e deve responder estritamente um JSON compacto com os campos: ean, name (nome curto comercial), category_name (apenas nome da categoria, sem codigo), category_code (sempre null) e average_price_brl (preco de venda mais alto que voce ja observou no varejo brasileiro em reais). IMPORTANTE: o preco NUNCA pode ser null ou zero — sempre retorne o valor mais alto que conhecer para esse produto. Se nao souber o preco exato, estime com base em produtos similares usando o valor mais alto da faixa. Nao inclua texto explicativo. Prefira categorias GENERICAS do varejo brasileiro (refrigerantes, cervejas, sucos, agua, laticinios, carnes, hortifruti, limpeza, higiene pessoal, bazar, pet, etc.).';
   const userLines = [`EAN: ${ean}`];
   if (nameHint) {
     userLines.push(`Nome NFCe: ${nameHint}`);
@@ -185,10 +186,71 @@ async function fetchProductFromOpenAi(ean: string, nameHint?: string): Promise<A
 }
 
 
-async function ensureCategory(name: string | null) {
-  if (!name) return { name: null, id: null };
+async function validateImageWithAi(imageUrl: string, productName: string): Promise<boolean> {
+  if (!OPENAI_API_KEY) return true; // sem chave, aceita a imagem
 
-  const normalized = name.toUpperCase();
+  try {
+    // Primeiro verifica se a imagem existe (HEAD request)
+    try {
+      const head = await axios.head(imageUrl, { timeout: 5000 });
+      if (head.status !== 200) return false;
+    } catch {
+      console.warn('[COSMOS] Imagem inacessível:', imageUrl);
+      return false;
+    }
+
+    const url = `${OPENAI_BASE_URL}/chat/completions`;
+    const { data } = await axios.post(
+      url,
+      {
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'Voce valida imagens de produtos de supermercado. Responda APENAS com JSON: {"match": true} ou {"match": false}. Regras RIGOROSAS: a imagem deve mostrar EXATAMENTE o mesmo produto (mesma marca e mesmo tipo). Exemplos de NAO match: imagem de Pepsi quando o produto e Skol, imagem de Coca-Cola quando o produto e Leite Condensado, imagem de cerveja quando o produto e refrigerante. A marca na imagem TEM que ser a mesma marca do nome do produto.',
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: `O produto e: "${productName}". A imagem corresponde a esse produto?` },
+              { type: 'image_url', image_url: { url: imageUrl, detail: 'auto' } },
+            ],
+          },
+        ],
+        temperature: 0,
+        max_tokens: 20,
+        response_format: { type: 'json_object' },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000,
+      },
+    );
+
+    const content = data?.choices?.[0]?.message?.content;
+    const parsed = JSON.parse(content || '{}');
+    const isMatch = parsed.match === true;
+
+    if (COSMOS_DEBUG) {
+      console.log('[COSMOS][IMAGE-VALIDATION]', { imageUrl, productName, isMatch });
+    }
+
+    if (!isMatch) {
+      console.warn('[COSMOS] Imagem do Cosmos NAO corresponde ao produto:', productName, '| URL:', imageUrl);
+    }
+
+    return isMatch;
+  } catch (err: any) {
+    console.error('[COSMOS] Erro ao validar imagem:', err?.message);
+    return false; // em caso de erro, rejeita a imagem
+  }
+}
+
+async function ensureCategory(name: string | null) {
+  const normalized = (name || 'OUTROS').toUpperCase();
 
   const existing = await CategoryModel.findOne({ name: normalized }).lean();
   if (existing) return { name: existing.name, id: existing._id?.toString?.() ?? null };
@@ -208,9 +270,8 @@ async function ensureProductFromAi(params: {
   const { ean, name, description, categoryId, averagePrice, imageUrl } = params;
   const existing = await ProductModel.findOne({ barcode: ean });
   if (existing) {
-    const safeImage = imageUrl || existing.imageUrl || `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
-    if (safeImage && existing.imageUrl !== safeImage) {
-      existing.imageUrl = safeImage;
+    if (imageUrl && existing.imageUrl !== imageUrl) {
+      existing.imageUrl = imageUrl;
       await existing.save();
     }
     return existing._id.toString();
@@ -218,14 +279,13 @@ async function ensureProductFromAi(params: {
 
   const sale = Number(averagePrice ?? '');
   const salePrice = Number.isFinite(sale) && sale > 0 ? sale : 0;
-  const safeImage = imageUrl || `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
 
   const created = await ProductModel.create({
     name: name || description || 'Produto sem nome',
     description: description || name,
     barcode: ean,
     category: categoryId,
-    imageUrl: safeImage,
+    imageUrl: imageUrl || null,
     costPrice: 0,
     salePrice,
     stockQuantity: 0,
@@ -239,27 +299,55 @@ async function ensureProductFromAi(params: {
 }
 
 async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookupDocument> {
-  let aiResult: AiProductGuess | null = null;
-
+  // 1. Busca nome real via product-search.net (Puppeteer)
+  let scrapedName: string | null = null;
   try {
-    aiResult = await fetchProductFromOpenAi(ean, nameHint);
-  } catch {
-    // OpenAI indisponivel – cria produto com dados da NFC-e
+    scrapedName = await scrapeProductName(ean);
+  } catch (err: any) {
+    console.warn('[COSMOS] Falha ao buscar nome via scrape:', err?.message);
   }
 
-  const name = aiResult?.name ?? nameHint ?? null;
+  // Usa o nome do scrape como hint pro GPT (mais preciso)
+  const effectiveHint = scrapedName || nameHint;
+
+  // 2. Busca preço e categoria via GPT
+  let aiResult: AiProductGuess | null = null;
+  try {
+    aiResult = await fetchProductFromOpenAi(ean, effectiveHint);
+  } catch (err: any) {
+    console.error('[COSMOS] OpenAI indisponivel:', err?.message);
+    throw new Error('Não foi possível obter dados do produto via IA');
+  }
+
+  // Nome: prioridade scrape > IA > hint
+  const name = scrapedName || aiResult?.name || nameHint || null;
   const description = aiResult?.description ?? nameHint ?? null;
-  const categoryNameRaw = aiResult?.categoryName ?? aiResult?.categoryCode ?? inferCategoryName(nameHint) ?? null;
+  const categoryNameRaw = aiResult?.categoryName ?? aiResult?.categoryCode ?? inferCategoryName(effectiveHint) ?? null;
   const averagePrice = aiResult?.averagePrice ?? null;
 
+  // Não auto-criar produto sem preço
+  if (!averagePrice || Number(averagePrice) <= 0) {
+    console.warn('[COSMOS] IA retornou sem preço para EAN:', ean, '– produto não será auto-criado');
+    throw new Error('Preço não disponível para auto-cadastro');
+  }
+
   const ensuredCategory = await ensureCategory(categoryNameRaw);
+
+  // 3. Imagem: Cosmos CDN + validação via IA
+  let finalImageUrl: string | null = null;
+  if (name) {
+    const cosmosImageUrl = `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
+    const imageIsValid = await validateImageWithAi(cosmosImageUrl, name);
+    finalImageUrl = imageIsValid ? cosmosImageUrl : null;
+  }
+
   await ensureProductFromAi({
     ean: aiResult?.ean ?? ean,
     name,
     description,
     categoryId: ensuredCategory.id,
     averagePrice,
-    imageUrl: `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
+    imageUrl: finalImageUrl,
   });
 
   const created = await GtinLookupModel.create({
@@ -269,7 +357,7 @@ async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookup
     globalProductCategory: ensuredCategory.name ?? categoryNameRaw,
     categoryId: ensuredCategory.id ?? null,
     categoryName: ensuredCategory.name ?? categoryNameRaw,
-    imageUrl: `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
+    imageUrl: finalImageUrl,
     averagePrice,
     sourceUrl: aiResult ? 'openai' : 'nfce-fallback',
   });
@@ -280,6 +368,16 @@ async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookup
 export async function fetchCosmosProduct(ean: string, nameHint?: string): Promise<CosmosProduct> {
   const existing = await GtinLookupModel.findOne({ ean }).lean<GtinLookupDocument | null>();
   if (existing) {
+    // Valida imagem do Cosmos via IA (se tiver)
+    let cachedImage = existing.imageUrl ?? null;
+    if (cachedImage && cachedImage.includes('cdn-cosmos.bluesoft.com.br') && existing.name) {
+      const imageOk = await validateImageWithAi(cachedImage, existing.name);
+      if (!imageOk) {
+        cachedImage = null;
+        await GtinLookupModel.updateOne({ ean }, { $set: { imageUrl: null } });
+      }
+    }
+
     const ensuredCategory = await ensureCategory(existing.globalProductCategory ?? null);
     await ensureProductFromAi({
       ean,
@@ -287,7 +385,7 @@ export async function fetchCosmosProduct(ean: string, nameHint?: string): Promis
       description: existing.description,
       categoryId: ensuredCategory.id,
       averagePrice: existing.averagePrice,
-      imageUrl: existing.imageUrl || `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
+      imageUrl: cachedImage,
     });
 
     return {
@@ -295,7 +393,7 @@ export async function fetchCosmosProduct(ean: string, nameHint?: string): Promis
       name: existing.name ?? null,
       description: existing.description ?? existing.name ?? null,
       averagePrice: existing.averagePrice ?? null,
-      imageUrl: existing.imageUrl ?? `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
+      imageUrl: cachedImage,
       globalProductCategory: existing.globalProductCategory ?? existing.categoryName ?? null,
       categoryCode: null,
       categoryName: existing.categoryName ?? existing.globalProductCategory ?? null,
@@ -310,7 +408,7 @@ export async function fetchCosmosProduct(ean: string, nameHint?: string): Promis
     name: created.name ?? null,
     description: created.description ?? created.name ?? null,
     averagePrice: created.averagePrice ?? null,
-    imageUrl: created.imageUrl ?? `https://cdn-cosmos.bluesoft.com.br/products/${ean}`,
+    imageUrl: created.imageUrl ?? null,
     globalProductCategory: created.globalProductCategory ?? created.categoryName ?? null,
     categoryCode: null,
     categoryName: created.categoryName ?? created.globalProductCategory ?? null,

@@ -2,9 +2,14 @@
   <div class="view-container">
     <div class="header">
       <h3>Produtos Próximos do Vencimento</h3>
-      <button class="btn btn-primary" @click="updatePrices" :disabled="updating">
-        {{ updating ? 'Atualizando...' : 'Atualizar Preços' }}
-      </button>
+      <div class="header-actions">
+        <button class="btn btn-danger" @click="writeOffAllExpired" :disabled="writingOff">
+          {{ writingOff ? 'Removendo...' : 'Dar baixa em todos vencidos' }}
+        </button>
+        <button class="btn btn-primary" @click="updatePrices" :disabled="updating">
+          {{ updating ? 'Atualizando...' : 'Atualizar Preços' }}
+        </button>
+      </div>
     </div>
 
     <div class="filters glass">
@@ -108,6 +113,7 @@ import api from '../../services/api';
 const batches = ref<any[]>([]);
 const daysFilter = ref('30');
 const updating = ref(false);
+const writingOff = ref(false);
 
 async function load() {
   try {
@@ -117,6 +123,23 @@ async function load() {
     batches.value = data;
   } catch (error) {
     console.error('Failed to load expiring batches:', error);
+  }
+}
+
+async function writeOffAllExpired() {
+  if (!confirm('Tem certeza que deseja dar baixa em TODOS os lotes vencidos? Isso removerá os produtos vencidos do estoque.')) {
+    return;
+  }
+  try {
+    writingOff.value = true;
+    const { data } = await api.post('/batches/write-off-expired');
+    alert(`${data.count} lote(s) vencido(s) removido(s) do estoque.`);
+    await load();
+  } catch (error: any) {
+    console.error('Failed to write off expired batches:', error);
+    alert('Erro ao dar baixa nos lotes vencidos');
+  } finally {
+    writingOff.value = false;
   }
 }
 
@@ -216,6 +239,35 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 16px;
   flex-shrink: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  transform: translateY(-1px);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .filters {

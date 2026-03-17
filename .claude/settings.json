@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"ChatView\\\\|HelpChat\" c:Usersmatheus.cuanDocumentsGithubScarlatMercadinhofrontendsrc --include=*.ts --include=*.vue -n)",
+      "Bash(grep -r import.*[Cc]hat c:Usersmatheus.cuanDocumentsGithubScarlatMercadinhofrontendsrc --include=*.ts --include=*.vue)",
+      "WebFetch(domain:pt.product-search.net)"
+    ]
+  }
+}

@@ -313,6 +313,99 @@
             {{ transferSuccess }}
           </div>
         </div>
+
+        <div class="transfer-block exit-block">
+          <div class="transfer-header">
+            <svg viewBox="0 0 24 24" fill="none" class="transfer-icon exit-icon">
+              <path d="M12 19V5m0 0l-7 7m7-7l7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div>
+              <h5>Saída de estoque</h5>
+              <p class="transfer-subtitle">Retire produtos do estoque (perda, vencimento, quebra, etc.)</p>
+            </div>
+          </div>
+
+          <div class="transfer-steps">
+            <div class="transfer-step">
+              <div class="step-number exit-step">1</div>
+              <label class="step-label">
+                <span class="label-text">
+                  <svg viewBox="0 0 20 20" fill="currentColor" class="label-icon">
+                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+                  </svg>
+                  Local
+                </span>
+                <select v-model="exitForm.location" :class="{ filled: exitForm.location }">
+                  <option value="" disabled>Selecione o local</option>
+                  <option v-for="loc in locations" :key="loc.code" :value="loc.code">{{ loc.name }} ({{ loc.code }})</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="transfer-step">
+              <div class="step-number exit-step">2</div>
+              <label class="step-label">
+                <span class="label-text">
+                  <svg viewBox="0 0 20 20" fill="currentColor" class="label-icon">
+                    <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+                  </svg>
+                  Quantidade
+                </span>
+                <input type="number" min="1" v-model.number="exitForm.quantity" placeholder="Digite a quantidade" :class="{ filled: exitForm.quantity > 0 }" />
+              </label>
+            </div>
+
+            <div class="transfer-step">
+              <div class="step-number exit-step">3</div>
+              <label class="step-label">
+                <span class="label-text">
+                  <svg viewBox="0 0 20 20" fill="currentColor" class="label-icon">
+                    <path fill-rule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6z" clip-rule="evenodd"/>
+                  </svg>
+                  Motivo
+                </span>
+                <select v-model="exitForm.reason" :class="{ filled: exitForm.reason }">
+                  <option value="" disabled>Selecione o motivo</option>
+                  <option value="PERDA / AVARIA">Perda / Avaria</option>
+                  <option value="VENCIMENTO">Vencimento</option>
+                  <option value="QUEBRA">Quebra</option>
+                  <option value="FURTO">Furto</option>
+                  <option value="CONSUMO INTERNO">Consumo interno</option>
+                  <option value="DOAÇÃO">Doação</option>
+                  <option value="OUTRO">Outro</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="transfer-actions">
+            <button class="btn btn-ghost btn-reset" @click="resetExit" type="button">
+              <svg viewBox="0 0 20 20" fill="currentColor" class="btn-icon-small">
+                <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+              </svg>
+              Limpar
+            </button>
+            <button class="btn btn-danger btn-exit" @click="submitExit" type="button" :disabled="!canExit">
+              <svg viewBox="0 0 20 20" fill="currentColor" class="btn-icon-small">
+                <path d="M12 19V5m0 0l-7 7m7-7l7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Registrar saída
+            </button>
+          </div>
+
+          <div v-if="exitError" class="transfer-alert alert-error">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="alert-icon">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+            </svg>
+            {{ exitError }}
+          </div>
+          <div v-if="exitSuccess" class="transfer-alert alert-success">
+            <svg viewBox="0 0 20 20" fill="currentColor" class="alert-icon">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            {{ exitSuccess }}
+          </div>
+        </div>
       </div>
     </BaseModal>
   </div>
@@ -355,6 +448,9 @@ const selectedProduct = ref<any | null>(null);
 const transferForm = reactive({ from: '', to: '', quantity: 0 });
 const transferError = ref('');
 const transferSuccess = ref('');
+const exitForm = reactive({ location: '', quantity: 0, reason: '' });
+const exitError = ref('');
+const exitSuccess = ref('');
 const form = reactive<any>({
   name: '',
   barcode: '',
@@ -587,6 +683,45 @@ async function submitTransfer() {
     resetTransfer();
   } catch (err: any) {
     transferError.value = err?.response?.data?.message || err?.message || 'Erro ao transferir estoque';
+  }
+}
+
+const canExit = computed(() => {
+  return (
+    !!selectedProduct.value &&
+    exitForm.location &&
+    exitForm.quantity > 0 &&
+    exitForm.reason
+  );
+});
+
+function resetExit() {
+  exitForm.location = '';
+  exitForm.quantity = 0;
+  exitForm.reason = '';
+  exitError.value = '';
+  exitSuccess.value = '';
+}
+
+async function submitExit() {
+  if (!selectedProduct.value) return;
+  exitError.value = '';
+  exitSuccess.value = '';
+  try {
+    await api.post('/stock-movements', {
+      productId: selectedProduct.value._id,
+      type: 'EXIT',
+      quantity: exitForm.quantity,
+      reason: exitForm.reason,
+      location: exitForm.location
+    });
+    exitSuccess.value = `Saída de ${exitForm.quantity} unidade(s) registrada com sucesso.`;
+    await load();
+    const refreshed = products.value.find((p) => p._id === selectedProduct.value._id);
+    if (refreshed) selectedProduct.value = refreshed;
+    resetExit();
+  } catch (err: any) {
+    exitError.value = err?.response?.data?.message || err?.message || 'Erro ao registrar saída';
   }
 }
 
@@ -1527,5 +1662,48 @@ function prevPage() {
   .form-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* Exit block */
+.exit-block {
+  border-color: rgba(239, 68, 68, 0.2) !important;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.03), rgba(239, 68, 68, 0.01)) !important;
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.08) !important;
+}
+
+.exit-icon {
+  color: #ef4444 !important;
+}
+
+.exit-step {
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 </style>

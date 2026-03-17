@@ -42,6 +42,17 @@
           </div>
         </div>
 
+        <div class="wl-grid" style="margin-top: 12px;">
+          <div class="field">
+            <label>Telefone de contato</label>
+            <input v-model="wlForm.contactPhone" type="text" placeholder="Ex: (11) 99999-9999" />
+          </div>
+          <div class="field">
+            <label>E-mail de contato</label>
+            <input v-model="wlForm.contactEmail" type="email" placeholder="Ex: contato@loja.com" />
+          </div>
+        </div>
+
         <!-- Upload Logo -->
         <div class="upload-section">
           <div class="upload-box">
@@ -231,6 +242,8 @@ function copyToForm(cfg: WhiteLabelConfig) {
   wlForm.logoUrl = cfg.logoUrl;
   wlForm.faviconUrl = cfg.faviconUrl;
   wlForm.launchDate = cfg.launchDate || '';
+  wlForm.contactPhone = cfg.contactPhone;
+  wlForm.contactEmail = cfg.contactEmail;
   Object.assign(wlForm.theme, cfg.theme);
   Object.assign(wlForm.labels, cfg.labels);
 }

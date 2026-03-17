@@ -93,6 +93,14 @@
             <span>Usuários</span>
           </RouterLink>
         </div>
+
+        <div class="nav-section">
+          <p class="nav-label">Atendimento</p>
+          <RouterLink to="/admin/chat" class="nav-item">
+            <span class="icon">💬</span>
+            <span>Chat</span>
+          </RouterLink>
+        </div>
       </nav>
 
 
@@ -224,7 +232,8 @@ function getNotificationIcon(type: string): string {
     'PURCHASE_REGISTERED': '🛒',
     'SYSTEM_ALERT': '🔔',
     'EXPIRING_PRODUCT': '⏰',
-    'EXPIRED_PRODUCT': '⚠️'
+    'EXPIRED_PRODUCT': '⚠️',
+    'PRODUCT_AUTO_CREATED': '🆕'
   };
   return icons[type] || '📢';
 }
@@ -859,7 +868,11 @@ main {
   .notif-SYSTEM_ALERT .notif-icon-wrapper {
     background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(147, 51, 234, 0.1));
   }
-  
+
+  .notif-PRODUCT_AUTO_CREATED .notif-icon-wrapper {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(37, 99, 235, 0.1));
+  }
+
   .notif-content {
     flex: 1;
     min-width: 0;
