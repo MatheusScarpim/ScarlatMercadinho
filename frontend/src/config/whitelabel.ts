@@ -10,6 +10,7 @@ export interface WhiteLabelConfig {
   pageTitle: string
   logoUrl: string
   faviconUrl: string
+  launchDate: string
   theme: {
     primary: string
     primaryStrong: string
@@ -35,6 +36,7 @@ export const defaults: WhiteLabelConfig = {
   pageTitle: 'Asyncx Market',
   logoUrl: '',
   faviconUrl: '',
+  launchDate: '',
   theme: {
     primary: '#10b49d',
     primaryStrong: '#0e9c87',
@@ -76,6 +78,7 @@ export function updateConfig(cfg: Partial<WhiteLabelConfig>): void {
   if (cfg.pageTitle !== undefined) wl.pageTitle = cfg.pageTitle
   if (cfg.logoUrl !== undefined) wl.logoUrl = cfg.logoUrl
   if (cfg.faviconUrl !== undefined) wl.faviconUrl = cfg.faviconUrl
+  if (cfg.launchDate !== undefined) wl.launchDate = cfg.launchDate
   if (cfg.theme) Object.assign(wl.theme, cfg.theme)
   if (cfg.labels) Object.assign(wl.labels, cfg.labels)
   applyTheme(wl)

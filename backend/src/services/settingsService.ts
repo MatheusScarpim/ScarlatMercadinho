@@ -21,6 +21,7 @@ export interface WhiteLabelSettings {
   pageTitle: string;
   logoUrl: string;
   faviconUrl: string;
+  launchDate: string;
   theme: {
     primary: string;
     primaryStrong: string;
@@ -46,6 +47,7 @@ const DEFAULT_WHITELABEL: WhiteLabelSettings = {
   pageTitle: 'Asyncx Market',
   logoUrl: '',
   faviconUrl: '',
+  launchDate: '',
   theme: {
     primary: '#10b49d',
     primaryStrong: '#0e9c87',

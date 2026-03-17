@@ -1,6 +1,19 @@
 <template>
   <div class="kiosk" @click="resetInactivity" @mousemove="resetInactivity" @keypress="resetInactivity"
     @touchstart="resetInactivity">
+    <!-- Not Launched -->
+    <div v-if="notLaunched" class="not-launched-overlay">
+      <div class="not-launched-content">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="not-launched-icon">
+          <path d="M12 8v4l3 3" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="12" cy="12" r="10"/>
+        </svg>
+        <h1 class="not-launched-title">Em breve</h1>
+        <p class="not-launched-subtitle">{{ wl.brandName }} {{ wl.brandSubtitle }} ainda não foi lançado.</p>
+        <p class="not-launched-date">Lançamento previsto: <strong>{{ launchDateFormatted }}</strong></p>
+      </div>
+    </div>
+
     <!-- Screensaver -->
     <div v-if="showScreensaver" class="screensaver" @click="exitScreensaver">
       <div class="screensaver-content">
@@ -336,8 +349,22 @@
 import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue';
 import { useKioskStore } from '../stores/kiosk';
 import api from '../services/api';
+import wl from '../config/whitelabel';
 
 const store = useKioskStore();
+
+const notLaunched = computed(() => {
+  if (!wl.launchDate) return false;
+  const launch = new Date(wl.launchDate + 'T00:00:00');
+  return new Date() < launch;
+});
+
+const launchDateFormatted = computed(() => {
+  if (!wl.launchDate) return '';
+  const d = new Date(wl.launchDate + 'T00:00:00');
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+});
+
 const barcode = ref('');
 const barcodeInput = ref<HTMLInputElement | null>(null);
 const manualBarcodeOpen = ref(false);
@@ -950,6 +977,51 @@ function closeSuccess() {
 </script>
 
 <style scoped>
+.not-launched-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: var(--bg, #f6f8fb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.not-launched-content {
+  text-align: center;
+  padding: 40px;
+}
+
+.not-launched-icon {
+  width: 80px;
+  height: 80px;
+  color: var(--primary, #10b49d);
+  margin-bottom: 24px;
+}
+
+.not-launched-title {
+  font-size: 48px;
+  font-weight: 700;
+  color: var(--text, #1f2937);
+  margin: 0 0 12px;
+}
+
+.not-launched-subtitle {
+  font-size: 20px;
+  color: var(--muted, #5b6577);
+  margin: 0 0 8px;
+}
+
+.not-launched-date {
+  font-size: 18px;
+  color: var(--muted, #5b6577);
+  margin: 0;
+}
+
+.not-launched-date strong {
+  color: var(--primary, #10b49d);
+}
+
 .kiosk {
   padding: 16px 18px 24px;
   max-width: 1440px;

@@ -86,6 +86,25 @@
       </div>
 
       <div class="wl-section">
+        <h5 class="section-title">Lançamento do Quiosque</h5>
+        <p class="muted small">Quando ativado, o quiosque mostrará uma tela de "em breve" até a data configurada.</p>
+        <div class="launch-row">
+          <button
+            type="button"
+            class="btn toggle-btn"
+            :class="{ active: !!wlForm.launchDate }"
+            @click="toggleLaunch"
+          >
+            {{ wlForm.launchDate ? 'Ativado' : 'Desativado' }}
+          </button>
+          <div v-if="wlForm.launchDate" class="field">
+            <label>Data de lançamento</label>
+            <input v-model="wlForm.launchDate" type="date" />
+          </div>
+        </div>
+      </div>
+
+      <div class="wl-section">
         <h5 class="section-title">Cores do Tema</h5>
         <div class="wl-grid colors">
           <div class="field color-field">
@@ -211,6 +230,7 @@ function copyToForm(cfg: WhiteLabelConfig) {
   wlForm.pageTitle = cfg.pageTitle;
   wlForm.logoUrl = cfg.logoUrl;
   wlForm.faviconUrl = cfg.faviconUrl;
+  wlForm.launchDate = cfg.launchDate || '';
   Object.assign(wlForm.theme, cfg.theme);
   Object.assign(wlForm.labels, cfg.labels);
 }
@@ -292,6 +312,16 @@ async function saveWl() {
     wlError.value = err?.response?.data?.message || 'Erro ao salvar personalização';
   } finally {
     loading.value = false;
+  }
+}
+
+function toggleLaunch() {
+  if (wlForm.launchDate) {
+    wlForm.launchDate = '';
+  } else {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 7);
+    wlForm.launchDate = tomorrow.toISOString().slice(0, 10);
   }
 }
 
@@ -538,6 +568,26 @@ input {
 
 .color-input input[type="text"] {
   flex: 1;
+}
+
+/* Launch toggle */
+.launch-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.toggle-btn {
+  min-width: 120px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
 }
 
 /* Form actions */
