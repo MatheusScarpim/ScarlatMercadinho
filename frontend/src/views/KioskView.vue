@@ -492,6 +492,12 @@ function exitScreensaver() {
 }
 
 function startCustomerFlow() {
+  if (!wl.kioskCpfRequired) {
+    showCustomerModal.value = false;
+    resetInactivity();
+    focusBarcode();
+    return;
+  }
   resetCustomerFlow();
   showCustomerModal.value = true;
 }

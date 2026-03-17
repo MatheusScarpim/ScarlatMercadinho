@@ -97,7 +97,8 @@
       </div>
 
       <div class="wl-section">
-        <h5 class="section-title">Lançamento do Quiosque</h5>
+        <h5 class="section-title">Quiosque</h5>
+
         <p class="muted small">Quando ativado, o quiosque mostrará uma tela de "em breve" até a data configurada.</p>
         <div class="launch-row">
           <button
@@ -111,6 +112,20 @@
           <div v-if="wlForm.launchDate" class="field">
             <label>Data de lançamento</label>
             <input v-model="wlForm.launchDate" type="date" />
+          </div>
+        </div>
+
+        <div class="kiosk-option" style="margin-top: 16px;">
+          <p class="muted small">Exigir CPF do cliente antes de iniciar uma compra no quiosque.</p>
+          <div class="launch-row">
+            <button
+              type="button"
+              class="btn toggle-btn"
+              :class="{ active: wlForm.kioskCpfRequired }"
+              @click="wlForm.kioskCpfRequired = !wlForm.kioskCpfRequired"
+            >
+              {{ wlForm.kioskCpfRequired ? 'Obrigatório' : 'Opcional' }}
+            </button>
           </div>
         </div>
       </div>
@@ -244,6 +259,7 @@ function copyToForm(cfg: WhiteLabelConfig) {
   wlForm.launchDate = cfg.launchDate || '';
   wlForm.contactPhone = cfg.contactPhone;
   wlForm.contactEmail = cfg.contactEmail;
+  wlForm.kioskCpfRequired = cfg.kioskCpfRequired ?? true;
   Object.assign(wlForm.theme, cfg.theme);
   Object.assign(wlForm.labels, cfg.labels);
 }

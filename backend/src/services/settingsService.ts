@@ -41,6 +41,7 @@ export interface WhiteLabelSettings {
   };
   contactPhone: string;
   contactEmail: string;
+  kioskCpfRequired: boolean;
 }
 
 const DEFAULT_WHITELABEL: WhiteLabelSettings = {
@@ -69,6 +70,7 @@ const DEFAULT_WHITELABEL: WhiteLabelSettings = {
   },
   contactPhone: '',
   contactEmail: '',
+  kioskCpfRequired: true,
 };
 
 export async function getWhiteLabelSettings(): Promise<WhiteLabelSettings> {

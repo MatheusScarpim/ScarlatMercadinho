@@ -30,6 +30,7 @@ export interface WhiteLabelConfig {
   }
   contactPhone: string
   contactEmail: string
+  kioskCpfRequired: boolean
 }
 
 export const defaults: WhiteLabelConfig = {
@@ -58,6 +59,7 @@ export const defaults: WhiteLabelConfig = {
   },
   contactPhone: '',
   contactEmail: '',
+  kioskCpfRequired: true,
 }
 
 // Estado reativo global - começa com os defaults, depois é atualizado pela API
@@ -85,6 +87,7 @@ export function updateConfig(cfg: Partial<WhiteLabelConfig>): void {
   if (cfg.launchDate !== undefined) wl.launchDate = cfg.launchDate
   if (cfg.contactPhone !== undefined) wl.contactPhone = cfg.contactPhone
   if (cfg.contactEmail !== undefined) wl.contactEmail = cfg.contactEmail
+  if (cfg.kioskCpfRequired !== undefined) wl.kioskCpfRequired = cfg.kioskCpfRequired
   if (cfg.theme) Object.assign(wl.theme, cfg.theme)
   if (cfg.labels) Object.assign(wl.labels, cfg.labels)
   applyTheme(wl)
