@@ -203,15 +203,20 @@
           <h3>Buscar produtos</h3>
           <button class="ghost" @click="closeProductSearch">Fechar</button>
         </div>
+
         <div class="search-bar">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
           <input
             ref="searchInput"
             v-model="searchQuery"
-            placeholder="Digite o nome do produto..."
+            placeholder="Buscar por nome..."
             class="search-input"
             @input="onSearchInput"
           />
         </div>
+
         <div class="category-chips">
           <button
             :class="['chip-btn', searchCategory === '' ? 'active' : '']"
@@ -224,7 +229,8 @@
             @click="setSearchCategory(cat._id)"
           >{{ cat.name }}</button>
         </div>
-        <div v-if="searchLoading" class="search-loading">
+
+        <div v-if="searchLoading" class="search-status">
           <div class="pulse-loader"><span></span><span></span><span></span></div>
           <p class="muted sm">Buscando produtos...</p>
         </div>
@@ -236,17 +242,28 @@
             @click="selectProduct(product)"
           >
             <div class="product-card-img">
-              <img v-if="product.imageUrl" :src="product.imageUrl" :alt="product.name" @error="($event.target as HTMLImageElement).style.display='none'" />
-              <div v-else class="no-image">📦</div>
+              <img
+                v-if="product.imageUrl && !productImgErrors[product._id]"
+                :src="product.imageUrl"
+                :alt="product.name"
+                @error="productImgErrors[product._id] = true"
+              />
+              <svg v-else class="product-card-placeholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+              </svg>
             </div>
             <div class="product-card-info">
-              <strong class="product-card-name">{{ product.name }}</strong>
+              <span class="product-card-name">{{ product.name }}</span>
               <span class="product-card-price">R$ {{ Number(product.salePrice).toFixed(2) }}</span>
             </div>
           </div>
         </div>
-        <div v-else class="search-empty">
-          <p class="muted">{{ searchQuery || searchCategory ? 'Nenhum produto encontrado' : 'Digite um nome ou selecione uma categoria' }}</p>
+        <div v-else class="search-status">
+          <svg class="search-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <p class="muted">{{ searchQuery || searchCategory ? 'Nenhum produto encontrado' : 'Busque por nome ou selecione uma categoria' }}</p>
         </div>
       </div>
     </div>
@@ -466,6 +483,7 @@ const searchResults = ref<any[]>([]);
 const searchCategories = ref<any[]>([]);
 const searchLoading = ref(false);
 const searchInput = ref<HTMLInputElement | null>(null);
+const productImgErrors = ref<Record<string, boolean>>({});
 let searchDebounceTimer: number | null = null;
 const PAYMENT_IDLE_TIMEOUT = 180000; // 3 minutos
 const paymentOptions = [
@@ -1051,6 +1069,7 @@ async function fetchProducts() {
     if (searchCategory.value) params.category = searchCategory.value;
     const { data } = await api.get('/products', { params });
     searchResults.value = data.data || data || [];
+    productImgErrors.value = {};
   } catch {
     searchResults.value = [];
   } finally {
@@ -2799,60 +2818,85 @@ button.link:hover {
 
 /* ─── Busca de produtos ────────────────────────────────── */
 .product-search-modal {
-  width: 90vw;
-  max-width: 960px;
-  max-height: 85vh;
+  width: 92vw;
+  max-width: 1100px;
+  height: 88vh;
   display: flex;
   flex-direction: column;
+  padding: 24px 28px;
+  gap: 0;
+}
+
+.product-search-modal .modal-header {
+  margin-bottom: 16px;
 }
 
 .search-bar {
-  margin-bottom: 12px;
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  color: var(--muted, #94a3b8);
+  pointer-events: none;
 }
 
 .search-input {
   width: 100%;
-  padding: 12px 16px;
-  font-size: 18px;
+  padding: 14px 16px 14px 44px;
+  font-size: 16px;
   border: 2px solid var(--border, #e2e8f0);
-  border-radius: 12px;
+  border-radius: 14px;
   outline: none;
-  background: var(--bg, #fff);
+  background: var(--bg, #f8fafc);
   color: var(--text, #1f2937);
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.2s;
   box-sizing: border-box;
 }
 
 .search-input:focus {
   border-color: var(--primary, #10b49d);
+  background: #fff;
+}
+
+.search-input::placeholder {
+  color: var(--muted, #94a3b8);
 }
 
 .category-chips {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 8px;
-  margin-bottom: 12px;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .category-chips::-webkit-scrollbar {
-  height: 4px;
+  height: 3px;
 }
 
 .category-chips::-webkit-scrollbar-thumb {
-  background: var(--border, #e2e8f0);
-  border-radius: 4px;
+  background: var(--border, #d1d5db);
+  border-radius: 3px;
 }
 
 .chip-btn {
   flex-shrink: 0;
-  padding: 6px 16px;
-  border-radius: 20px;
+  padding: 8px 18px;
+  border-radius: 24px;
   border: 1.5px solid var(--border, #e2e8f0);
-  background: transparent;
-  color: var(--text, #1f2937);
-  font-size: 14px;
+  background: #fff;
+  color: var(--muted, #64748b);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
@@ -2861,42 +2905,55 @@ button.link:hover {
 .chip-btn:hover {
   border-color: var(--primary, #10b49d);
   color: var(--primary, #10b49d);
+  background: rgba(16, 180, 157, 0.04);
 }
 
 .chip-btn.active {
   background: var(--primary, #10b49d);
   border-color: var(--primary, #10b49d);
   color: #fff;
+  font-weight: 600;
 }
 
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 14px;
   overflow-y: auto;
   flex: 1;
-  padding: 4px;
+  padding: 8px 4px;
+  scrollbar-width: thin;
+}
+
+.product-grid::-webkit-scrollbar {
+  width: 5px;
+}
+
+.product-grid::-webkit-scrollbar-thumb {
+  background: var(--border, #d1d5db);
+  border-radius: 5px;
 }
 
 .product-card {
   display: flex;
   flex-direction: column;
-  border-radius: 12px;
-  border: 1.5px solid var(--border, #e2e8f0);
-  background: var(--bg, #fff);
+  border-radius: 14px;
+  border: 1.5px solid var(--border, #e5e7eb);
+  background: #fff;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   overflow: hidden;
 }
 
 .product-card:hover {
   border-color: var(--primary, #10b49d);
-  box-shadow: 0 2px 12px rgba(16, 180, 157, 0.15);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(16, 180, 157, 0.12);
+  transform: translateY(-3px);
 }
 
 .product-card:active {
   transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(16, 180, 157, 0.1);
 }
 
 .product-card-img {
@@ -2905,32 +2962,41 @@ button.link:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f9fafb;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   overflow: hidden;
+  position: relative;
 }
 
 .product-card-img img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 8px;
+  padding: 12px;
+  transition: transform 0.2s;
 }
 
-.product-card-img .no-image {
-  font-size: 40px;
-  opacity: 0.4;
+.product-card:hover .product-card-img img {
+  transform: scale(1.05);
+}
+
+.product-card-placeholder {
+  width: 48px;
+  height: 48px;
+  color: var(--border, #cbd5e1);
 }
 
 .product-card-info {
-  padding: 8px 10px 10px;
+  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  border-top: 1px solid var(--border, #f1f5f9);
 }
 
 .product-card-name {
   font-size: 13px;
-  line-height: 1.3;
+  font-weight: 500;
+  line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -2939,26 +3005,25 @@ button.link:hover {
 }
 
 .product-card-price {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--primary, #10b49d);
+  letter-spacing: -0.02em;
 }
 
-.search-loading {
+.search-status {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 40px 0;
+  padding: 48px 0;
 }
 
-.search-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 0;
+.search-status-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--border, #cbd5e1);
 }
 </style>
