@@ -9,7 +9,13 @@ export async function createProduct(req: Request, res: Response) {
     return res.status(400).json({ message: 'Campo category é obrigatório.' });
   }
 
-  const product = await ProductModel.create({ ...req.body, category });
+  // Sempre usar imagem do Cosmos CDN baseada no barcode
+  const barcode = req.body.barcode as string | undefined;
+  const imageUrl = barcode
+    ? `https://cdn-cosmos.bluesoft.com.br/products/${barcode}`
+    : req.body.imageUrl || null;
+
+  const product = await ProductModel.create({ ...req.body, category, imageUrl });
   res.status(201).json(product);
 }
 

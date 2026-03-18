@@ -754,6 +754,16 @@ async function ensureCategoryByName(name: string) {
 
 
 
+function normalizeBarcode(value: string): string {
+  const trimmed = value.trim();
+  // Excel exports large numbers like EAN-13 as "7,9E+12" or "7.9E+12"
+  const normalized = trimmed.replace(',', '.');
+  if (/^[\d.]+[eE][+\-]?\d+$/.test(normalized)) {
+    return String(Math.round(parseFloat(normalized)));
+  }
+  return trimmed;
+}
+
 async function handleImport(event: Event) {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
@@ -769,7 +779,8 @@ async function handleImport(event: Event) {
   for (const row of entries) {
     const name = row['nome'] || row['name'];
     if (!name) continue;
-    const barcode = row['barcode'] || row['código'] || row['codigo'];
+    const rawBarcode = row['barcode'] || row['código'] || row['codigo'];
+    const barcode = rawBarcode ? normalizeBarcode(rawBarcode) : rawBarcode;
     const salePrice = parseFloat(row['Preço de venda'] || row['preço de venda'] || row['saleprice'] || '0');
     const costPrice = parseFloat(row['Preço de custo'] || row['preço de custo'] || row['costprice'] || '0');
     const categoryName = row['categoria'] || '';
