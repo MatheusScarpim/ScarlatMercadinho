@@ -95,6 +95,7 @@
           <span class="chip">{{ totalItems }} itens</span>
           <div class="top-actions">
             <button class="ghost sm" @click="openBarcode">Digitar código</button>
+            <button class="ghost sm" @click="openProductSearch">Buscar produtos</button>
             <button class="ghost sm" @click="openPromos">Promoções</button>
             <button class="ghost sm" @click="showLocationModal = true">Trocar local</button>
           </div>
@@ -191,6 +192,61 @@
         <div class="actions">
           <button class="ghost" @click="closeBarcode">Voltar</button>
           <button class="primary" @click="confirmManualBarcode">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal busca de produtos -->
+    <div v-if="showProductSearch" class="modal">
+      <div class="modal-box glass product-search-modal">
+        <div class="modal-header">
+          <h3>Buscar produtos</h3>
+          <button class="ghost" @click="closeProductSearch">Fechar</button>
+        </div>
+        <div class="search-bar">
+          <input
+            ref="searchInput"
+            v-model="searchQuery"
+            placeholder="Digite o nome do produto..."
+            class="search-input"
+            @input="onSearchInput"
+          />
+        </div>
+        <div class="category-chips">
+          <button
+            :class="['chip-btn', searchCategory === '' ? 'active' : '']"
+            @click="setSearchCategory('')"
+          >Todas</button>
+          <button
+            v-for="cat in searchCategories"
+            :key="cat._id"
+            :class="['chip-btn', searchCategory === cat._id ? 'active' : '']"
+            @click="setSearchCategory(cat._id)"
+          >{{ cat.name }}</button>
+        </div>
+        <div v-if="searchLoading" class="search-loading">
+          <div class="pulse-loader"><span></span><span></span><span></span></div>
+          <p class="muted sm">Buscando produtos...</p>
+        </div>
+        <div v-else-if="searchResults.length" class="product-grid">
+          <div
+            v-for="product in searchResults"
+            :key="product._id"
+            class="product-card"
+            @click="selectProduct(product)"
+          >
+            <div class="product-card-img">
+              <img v-if="product.imageUrl" :src="product.imageUrl" :alt="product.name" @error="($event.target as HTMLImageElement).style.display='none'" />
+              <div v-else class="no-image">📦</div>
+            </div>
+            <div class="product-card-info">
+              <strong class="product-card-name">{{ product.name }}</strong>
+              <span class="product-card-price">R$ {{ Number(product.salePrice).toFixed(2) }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="search-empty">
+          <p class="muted">{{ searchQuery || searchCategory ? 'Nenhum produto encontrado' : 'Digite um nome ou selecione uma categoria' }}</p>
         </div>
       </div>
     </div>
@@ -401,6 +457,16 @@ const pixStatus = ref('');
 const pixCpf = ref('');
 const pixNeedsCpf = ref(false);
 const paymentIdleTimer = ref<number | null>(null);
+
+// Busca de produtos
+const showProductSearch = ref(false);
+const searchQuery = ref('');
+const searchCategory = ref('');
+const searchResults = ref<any[]>([]);
+const searchCategories = ref<any[]>([]);
+const searchLoading = ref(false);
+const searchInput = ref<HTMLInputElement | null>(null);
+let searchDebounceTimer: number | null = null;
 const PAYMENT_IDLE_TIMEOUT = 180000; // 3 minutos
 const paymentOptions = [
   { value: 'CREDIT_CARD', label: 'Credito' },
@@ -457,7 +523,7 @@ async function loadPromos() {
 function startInactivityTimer() {
   clearInactivityTimer();
   inactivityTimer.value = window.setTimeout(() => {
-    if (!paymentOpen.value && !manualBarcodeOpen.value && !showLocationModal.value && !showCustomerModal.value) {
+    if (!paymentOpen.value && !manualBarcodeOpen.value && !showLocationModal.value && !showCustomerModal.value && !showProductSearch.value) {
       enterScreensaver();
     }
   }, INACTIVITY_TIMEOUT);
@@ -965,6 +1031,64 @@ function closeBarcode() {
 function openPromos() {
   clearInactivityTimer();
   enterScreensaver();
+}
+
+// ─── Busca de produtos ────────────────────────────────────────────
+async function loadCategories() {
+  try {
+    const { data } = await api.get('/categories');
+    searchCategories.value = (data || []).filter((c: any) => c.active !== false);
+  } catch {
+    searchCategories.value = [];
+  }
+}
+
+async function fetchProducts() {
+  searchLoading.value = true;
+  try {
+    const params: Record<string, string> = { active: 'true', limit: '50', location: store.selectedLocation };
+    if (searchQuery.value.trim()) params.search = searchQuery.value.trim();
+    if (searchCategory.value) params.category = searchCategory.value;
+    const { data } = await api.get('/products', { params });
+    searchResults.value = data.data || data || [];
+  } catch {
+    searchResults.value = [];
+  } finally {
+    searchLoading.value = false;
+  }
+}
+
+function onSearchInput() {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = window.setTimeout(() => {
+    fetchProducts();
+  }, 300);
+}
+
+function setSearchCategory(catId: string) {
+  searchCategory.value = catId;
+  fetchProducts();
+}
+
+async function openProductSearch() {
+  showProductSearch.value = true;
+  searchQuery.value = '';
+  searchCategory.value = '';
+  searchResults.value = [];
+  await loadCategories();
+  fetchProducts();
+  nextTick(() => searchInput.value?.focus());
+}
+
+function closeProductSearch() {
+  showProductSearch.value = false;
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  focusBarcode();
+}
+
+async function selectProduct(product: any) {
+  await store.addByProduct(product);
+  resetInactivity();
 }
 
 async function confirmManualBarcode() {
@@ -2671,5 +2795,170 @@ button.link:hover {
   .price-current {
     font-size: 24px;
   }
+}
+
+/* ─── Busca de produtos ────────────────────────────────── */
+.product-search-modal {
+  width: 90vw;
+  max-width: 960px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.search-bar {
+  margin-bottom: 12px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 18px;
+  border: 2px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  outline: none;
+  background: var(--bg, #fff);
+  color: var(--text, #1f2937);
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.search-input:focus {
+  border-color: var(--primary, #10b49d);
+}
+
+.category-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.category-chips::-webkit-scrollbar {
+  height: 4px;
+}
+
+.category-chips::-webkit-scrollbar-thumb {
+  background: var(--border, #e2e8f0);
+  border-radius: 4px;
+}
+
+.chip-btn {
+  flex-shrink: 0;
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: transparent;
+  color: var(--text, #1f2937);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.chip-btn:hover {
+  border-color: var(--primary, #10b49d);
+  color: var(--primary, #10b49d);
+}
+
+.chip-btn.active {
+  background: var(--primary, #10b49d);
+  border-color: var(--primary, #10b49d);
+  color: #fff;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+  padding: 4px;
+}
+
+.product-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: var(--bg, #fff);
+  cursor: pointer;
+  transition: all 0.2s;
+  overflow: hidden;
+}
+
+.product-card:hover {
+  border-color: var(--primary, #10b49d);
+  box-shadow: 0 2px 12px rgba(16, 180, 157, 0.15);
+  transform: translateY(-2px);
+}
+
+.product-card:active {
+  transform: translateY(0);
+}
+
+.product-card-img {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f9fafb;
+  overflow: hidden;
+}
+
+.product-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 8px;
+}
+
+.product-card-img .no-image {
+  font-size: 40px;
+  opacity: 0.4;
+}
+
+.product-card-info {
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.product-card-name {
+  font-size: 13px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text, #1f2937);
+}
+
+.product-card-price {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary, #10b49d);
+}
+
+.search-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 0;
+}
+
+.search-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
 }
 </style>
