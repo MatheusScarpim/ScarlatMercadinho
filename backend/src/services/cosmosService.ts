@@ -87,19 +87,21 @@ async function fetchProductFromOpenAi(ean: string, nameHint?: string): Promise<A
   }
 
   const url = `${OPENAI_BASE_URL}/chat/completions`;
+  const messages = buildMessages(ean, nameHint);
 
   const started = Date.now();
-  if (COSMOS_DEBUG) {
-    // eslint-disable-next-line no-console
-    console.log('[COSMOS][OPENAI] request', { url, model: OPENAI_MODEL, ean, nameHint });
-  }
+  console.log('[COSMOS][OPENAI] === ENVIANDO PARA IA ===');
+  console.log('[COSMOS][OPENAI] Model:', OPENAI_MODEL);
+  console.log('[COSMOS][OPENAI] EAN:', ean);
+  console.log('[COSMOS][OPENAI] Nome hint enviado para IA:', nameHint ?? '(nenhum)');
+  console.log('[COSMOS][OPENAI] Prompt user:', messages[1]?.content);
 
   try {
     const { data } = await axios.post(
       url,
       {
         model: OPENAI_MODEL,
-        messages: buildMessages(ean, nameHint),
+        messages,
         temperature: 0,
         response_format: { type: 'json_object' },
       },
@@ -112,17 +114,11 @@ async function fetchProductFromOpenAi(ean: string, nameHint?: string): Promise<A
       },
     );
 
-    if (COSMOS_DEBUG) {
-      // eslint-disable-next-line no-console
-      console.log('[COSMOS][OPENAI] response', {
-        ms: Date.now() - started,
-        id: data?.id,
-        finish_reason: data?.choices?.[0]?.finish_reason,
-        content: data?.choices?.[0]?.message?.content,
-      });
-    }
-
     const content = data?.choices?.[0]?.message?.content;
+    console.log('[COSMOS][OPENAI] === RESPOSTA DA IA ===');
+    console.log('[COSMOS][OPENAI] Tempo:', Date.now() - started, 'ms');
+    console.log('[COSMOS][OPENAI] Resposta bruta:', content);
+
     if (!content || typeof content !== 'string') {
       throw new Error('Resposta vazia da OpenAI');
     }
@@ -131,10 +127,11 @@ async function fetchProductFromOpenAi(ean: string, nameHint?: string): Promise<A
     try {
       parsed = JSON.parse(content);
     } catch {
-      // eslint-disable-next-line no-console
-      console.error('[COSMOS] erro ao parsear resposta da OpenAI', content);
+      console.error('[COSMOS][OPENAI] Erro ao parsear JSON:', content);
       throw new Error('Resposta invalida da OpenAI (nao e JSON)');
     }
+
+    console.log('[COSMOS][OPENAI] JSON parseado:', JSON.stringify(parsed, null, 2));
 
     const { name: safeCategoryName } = sanitizeCategory(
       parsed.category_code ??
@@ -152,7 +149,7 @@ async function fetchProductFromOpenAi(ean: string, nameHint?: string): Promise<A
     const inferred = inferCategoryName(nameHint || parsed.name || parsed.description || '');
     const finalCategoryName = (safeCategoryName ?? inferred ?? null)?.toUpperCase() || null;
 
-    return {
+    const result = {
       ean: parsed.ean ?? ean,
       name: parsed.name ?? null,
       description: parsed.description ?? parsed.name ?? null,
@@ -166,16 +163,15 @@ async function fetchProductFromOpenAi(ean: string, nameHint?: string): Promise<A
         parsed.preco_medio ??
         null,
     };
+
+    console.log('[COSMOS][OPENAI] Resultado final da IA:', JSON.stringify(result));
+    return result;
   } catch (err: any) {
-    if (COSMOS_DEBUG) {
-      // eslint-disable-next-line no-console
-      console.error('[COSMOS][OPENAI] error', {
-        ms: Date.now() - started,
-        status: err?.response?.status,
-        message: err?.response?.data?.error?.message || err?.message,
-        data: err?.response?.data,
-      });
-    }
+    console.error('[COSMOS][OPENAI] ERRO:', {
+      ms: Date.now() - started,
+      status: err?.response?.status,
+      message: err?.response?.data?.error?.message || err?.message,
+    });
     const details =
       err?.response?.data?.error?.message ||
       err?.response?.data?.message ||
@@ -235,16 +231,23 @@ async function ensureProductFromAi(params: {
 }
 
 async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookupDocument> {
-  // 1. Busca nome real via product-search.net (Puppeteer)
+  console.log('[COSMOS] ============================================');
+  console.log('[COSMOS] INICIANDO AUTO-CADASTRO para EAN:', ean);
+  console.log('[COSMOS] Nome hint recebido:', nameHint ?? '(nenhum)');
+  console.log('[COSMOS] ============================================');
+
+  // 1. Busca nome real via product-search.net (scrape)
   let scrapedName: string | null = null;
   try {
     scrapedName = await scrapeProductName(ean);
   } catch (err: any) {
     console.warn('[COSMOS] Falha ao buscar nome via scrape:', err?.message);
   }
+  console.log('[COSMOS] Nome do scrape:', scrapedName ?? '(null - não encontrou)');
 
   // Usa o nome do scrape como hint pro GPT (mais preciso)
   const effectiveHint = scrapedName || nameHint;
+  console.log('[COSMOS] Hint efetivo que será enviado para IA:', effectiveHint ?? '(nenhum - IA vai chutar!)');
 
   // 2. Busca preço e categoria via GPT
   let aiResult: AiProductGuess | null = null;
@@ -260,6 +263,12 @@ async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookup
   const description = aiResult?.description ?? nameHint ?? null;
   const categoryNameRaw = aiResult?.categoryName ?? aiResult?.categoryCode ?? inferCategoryName(effectiveHint) ?? null;
   const averagePrice = aiResult?.averagePrice ?? null;
+
+  console.log('[COSMOS] === DECISÃO FINAL ===');
+  console.log('[COSMOS] Nome final (scrape > IA > hint):', name);
+  console.log('[COSMOS] Descrição:', description);
+  console.log('[COSMOS] Categoria:', categoryNameRaw);
+  console.log('[COSMOS] Preço:', averagePrice);
 
   // Não auto-criar produto sem preço
   if (!averagePrice || Number(averagePrice) <= 0) {

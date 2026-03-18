@@ -1,70 +1,95 @@
-import puppeteer, { type Browser } from 'puppeteer';
+import axios from 'axios';
 
-const PRODUCT_SEARCH_URL = 'https://pt.product-search.net';
 const SCRAPE_TIMEOUT_MS = Number(process.env.SCRAPE_TIMEOUT_MS ?? 15000);
 
-let browserInstance: Browser | null = null;
+/**
+ * Busca o nome do produto via Open Food Facts API (gratuita, sem anti-bot).
+ * Fallback: tenta também o Cosmos CDN.
+ */
+export async function scrapeProductName(ean: string): Promise<string | null> {
+  // 1. Tenta Open Food Facts
+  const offName = await tryOpenFoodFacts(ean);
+  if (offName) return offName;
 
-async function getBrowser(): Promise<Browser> {
-  if (browserInstance && browserInstance.connected) {
-    return browserInstance;
-  }
-  browserInstance = await puppeteer.launch({
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
-  });
-  return browserInstance;
+  // 2. Fallback: tenta Cosmos (bluesoft)
+  const cosmosName = await tryCosmos(ean);
+  if (cosmosName) return cosmosName;
+
+  console.warn('[PRODUCT-SEARCH] Nenhuma fonte encontrou o EAN:', ean);
+  return null;
 }
 
-export async function scrapeProductName(ean: string): Promise<string | null> {
-  let page = null;
+async function tryOpenFoodFacts(ean: string): Promise<string | null> {
   try {
-    const browser = await getBrowser();
-    page = await browser.newPage();
-
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+    console.log('[PRODUCT-SEARCH] Tentando Open Food Facts para EAN:', ean);
+    const { data } = await axios.get(
+      `https://world.openfoodfacts.org/api/v2/product/${ean}.json`,
+      {
+        timeout: SCRAPE_TIMEOUT_MS,
+        headers: {
+          'User-Agent': 'ScarlatMercadinho/1.0 (product lookup)',
+        },
+      },
     );
 
-    // Bloqueia CSS/fontes/imagens pra carregar mais rápido
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
-      const type = req.resourceType();
-      if (type === 'stylesheet' || type === 'font' || type === 'image') {
-        req.abort();
-      } else {
-        req.continue();
-      }
-    });
+    if (data?.status === 1 && data?.product) {
+      const product = data.product;
+      // Prioridade: nome genérico em pt > nome do produto > marca + nome
+      const name =
+        product.product_name_pt_br ||
+        product.product_name_pt ||
+        product.product_name ||
+        (product.brands && product.generic_name
+          ? `${product.brands} ${product.generic_name}`
+          : null);
 
-    await page.goto(`${PRODUCT_SEARCH_URL}/?q=${ean}`, {
-      waitUntil: 'domcontentloaded',
-      timeout: SCRAPE_TIMEOUT_MS,
-    });
+      console.log('[PRODUCT-SEARCH] Open Food Facts encontrou:', name);
+      console.log('[PRODUCT-SEARCH] OFF detalhes:', {
+        product_name: product.product_name,
+        product_name_pt: product.product_name_pt,
+        product_name_pt_br: product.product_name_pt_br,
+        brands: product.brands,
+        generic_name: product.generic_name,
+        quantity: product.quantity,
+      });
 
-    // Nome está em: h1 > a (ex: <h1><a href="/ext/...">Sabonete Dove Cremoso 90g</a> (*)</h1>)
-    const name = await page.evaluate(() => {
-      const link = document.querySelector('h1 a');
-      return link?.textContent?.trim() || null;
-    });
-
-    console.log('[PRODUCT-SEARCH] EAN:', ean, '| Nome:', name);
-    return name;
-  } catch (err: any) {
-    console.error('[PRODUCT-SEARCH] Erro ao buscar nome:', err?.message);
-    return null;
-  } finally {
-    if (page) {
-      try { await page.close(); } catch { /* ignore */ }
+      return name?.trim() || null;
     }
+
+    console.log('[PRODUCT-SEARCH] Open Food Facts: produto não encontrado (status:', data?.status, ')');
+    return null;
+  } catch (err: any) {
+    console.warn('[PRODUCT-SEARCH] Erro Open Food Facts:', err?.message);
+    return null;
   }
 }
 
-process.on('exit', () => {
-  if (browserInstance) browserInstance.close().catch(() => {});
-});
+async function tryCosmos(ean: string): Promise<string | null> {
+  try {
+    console.log('[PRODUCT-SEARCH] Tentando Cosmos para EAN:', ean);
+    const { data } = await axios.get(
+      `https://api.cosmos.bluesoft.com.br/gtins/${ean}`,
+      {
+        timeout: SCRAPE_TIMEOUT_MS,
+        headers: {
+          'User-Agent': 'ScarlatMercadinho/1.0',
+          'X-Cosmos-Token': process.env.COSMOS_API_TOKEN || '',
+        },
+      },
+    );
 
-process.on('SIGINT', () => {
-  if (browserInstance) browserInstance.close().catch(() => {});
-});
+    const name = data?.description || data?.commercial_name || null;
+    console.log('[PRODUCT-SEARCH] Cosmos encontrou:', name);
+    return name?.trim() || null;
+  } catch (err: any) {
+    // 401/403 = sem token, 404 = não encontrado
+    if (err?.response?.status === 404) {
+      console.log('[PRODUCT-SEARCH] Cosmos: produto não encontrado');
+    } else if (err?.response?.status === 401 || err?.response?.status === 403) {
+      console.log('[PRODUCT-SEARCH] Cosmos: sem token ou token inválido');
+    } else {
+      console.warn('[PRODUCT-SEARCH] Erro Cosmos:', err?.message);
+    }
+    return null;
+  }
+}
