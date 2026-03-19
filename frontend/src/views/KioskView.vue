@@ -336,11 +336,6 @@
             <strong>Na maquininha:</strong> aperte o botão <span class="highlight success">verde</span> para pagar ou o
             <span class="highlight danger">vermelho</span> para cancelar.
           </div>
-          <div v-if="paymentMethod === 'PIX' && pixNeedsCpf && !pixData.paymentId" class="field pix-cpf-fallback">
-            <label>CPF do pagador (obrigatório para Pix)</label>
-            <input v-model="pixCpf" placeholder="000.000.000-00" maxlength="14"
-              @input="formatPixCpf" inputmode="numeric" />
-          </div>
         </div>
 
         <div v-if="paymentMethod === 'PIX' && pixData.paymentId" class="pix-block glass">
@@ -487,8 +482,6 @@ const pixData = ref<{ qrCode: string | null; qrCodeBase64: string | null; paymen
   paymentId: null
 });
 const pixStatus = ref('');
-const pixCpf = ref('');
-const pixNeedsCpf = ref(false);
 const paymentIdleTimer = ref<number | null>(null);
 
 // Busca de produtos
@@ -831,8 +824,6 @@ function openPayment() {
   paymentTotal.value = subtotal.value;
   showTerminalHint.value = false;
   terminalHintMode.value = 'pay';
-  pixNeedsCpf.value = false;
-  pixCpf.value = '';
   paymentOpen.value = true;
   startPaymentIdleTimer();
 }
@@ -842,8 +833,6 @@ function closePayment() {
   paymentOpen.value = false;
   pixData.value = { qrCode: null, qrCodeBase64: null, paymentId: null };
   pixStatus.value = '';
-  pixNeedsCpf.value = false;
-  pixCpf.value = '';
   showTerminalHint.value = false;
 }
 
@@ -854,27 +843,9 @@ async function confirmPayment() {
   paymentProcessing.value = true;
 
   if (paymentMethod.value === 'PIX') {
-    // Se o campo de CPF fallback está visível, salvar o CPF na venda antes
-    if (pixNeedsCpf.value) {
-      const cpfDigits = pixCpf.value.replace(/\D/g, '');
-      if (cpfDigits.length !== 11) {
-        paymentError.value = 'Informe um CPF válido com 11 dígitos.';
-        paymentProcessing.value = false;
-        return;
-      }
-      try {
-        await api.put(`/sales/${store.saleId}/customer`, { cpf: cpfDigits });
-      } catch {
-        paymentError.value = 'Erro ao salvar CPF. Tente novamente.';
-        paymentProcessing.value = false;
-        return;
-      }
-    }
-
     paymentStatusText.value = 'Gerando pagamento...';
     try {
-      const cpfForPix = pixNeedsCpf.value ? pixCpf.value.replace(/\D/g, '') : undefined;
-      const result: any = await store.startPayment('PIX', apartmentNote.value, cpfForPix);
+      const result: any = await store.startPayment('PIX', apartmentNote.value);
       const provider = result?.provider || {};
       pixData.value = {
         qrCode: provider.qrCode || null,
@@ -882,18 +853,10 @@ async function confirmPayment() {
         paymentId: provider.paymentId || null
       };
       paymentStatusText.value = 'Aguardando pagamento PIX...';
-      clearPaymentIdleTimer(); // PIX gerado, não expira por idle
+      clearPaymentIdleTimer();
       await pollPixStatus(provider.paymentId);
     } catch (err: any) {
       const data = err?.response?.data;
-      const code = data?.code || '';
-      // Se o erro é falta de CPF, mostrar campo fallback
-      if (code === 'PIX_CPF_REQUIRED' || (data?.detail || '').includes('13253')) {
-        pixNeedsCpf.value = true;
-        paymentError.value = 'Informe seu CPF para pagar com Pix.';
-        paymentProcessing.value = false;
-        return;
-      }
       paymentError.value = data?.message || err?.message || 'Erro ao processar pagamento';
     } finally {
       paymentProcessing.value = false;
@@ -1028,8 +991,18 @@ async function pollPointStatus(intentId: string): Promise<'approved' | 'error' |
 
     console.log('[POINT-POLL] state:', state, '| paymentResult:', paymentResult);
 
-    // APPROVED direto ou FINISHED com payment.id = pagamento aprovado
-    // A API Point do MP não retorna payment.result — FINISHED + payment.id já é aprovação
+    // Verifica se foi explicitamente rejeitado/negado
+    const isRejected = ['rejected', 'refused', 'cc_rejected', 'denied', 'failed'].some(
+      r => paymentResult.includes(r)
+    );
+
+    if (state === 'finished' && isRejected) {
+      console.warn('[POINT-POLL] FINISHED mas pagamento NEGADO:', paymentResult);
+      paymentError.value = data?.error_message || 'Pagamento negado. Tente novamente.';
+      return 'error';
+    }
+
+    // APPROVED direto ou FINISHED com resultado positivo
     const hasPaymentId = !!(data?.payment?.id || data?.payment_id);
     const isApproved =
       state === 'approved' ||
@@ -1169,14 +1142,6 @@ async function confirmManualBarcode() {
   await handleBarcode();
   manualBarcode.value = '';
   closeBarcode();
-}
-
-function formatPixCpf() {
-  let digits = pixCpf.value.replace(/\D/g, '').slice(0, 11);
-  if (digits.length > 9) digits = digits.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4');
-  else if (digits.length > 6) digits = digits.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
-  else if (digits.length > 3) digits = digits.replace(/(\d{3})(\d{1,3})/, '$1.$2');
-  pixCpf.value = digits;
 }
 
 function setPayment(opt: string) {
