@@ -40,7 +40,7 @@ defineProps<{
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
-  transform: translateY(-12%);
+  transform: none;
 }
 .modal-header {
   display: flex;

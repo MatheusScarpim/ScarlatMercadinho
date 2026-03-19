@@ -243,10 +243,9 @@
           >
             <div class="product-card-img">
               <img
-                v-if="product.imageUrl && !productImgErrors[product._id]"
+                v-if="product.imageUrl"
                 :src="product.imageUrl"
                 :alt="product.name"
-                @error="productImgErrors[product._id] = true"
               />
               <svg v-else class="product-card-placeholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
@@ -2820,11 +2819,12 @@ button.link:hover {
 .product-search-modal {
   width: 92vw;
   max-width: 1100px;
-  height: 88vh;
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
   padding: 24px 28px;
   gap: 0;
+  overflow: hidden;
 }
 
 .product-search-modal .modal-header {
@@ -2960,31 +2960,30 @@ button.link:hover {
 
 .product-card-img {
   width: 100%;
-  aspect-ratio: 1;
+  height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   overflow: hidden;
-  position: relative;
 }
 
 .product-card-img img {
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
-  padding: 12px;
+  padding: 8px;
   transition: transform 0.2s;
-}
-
-.product-card:hover .product-card-img img {
-  transform: scale(1.05);
 }
 
 .product-card-placeholder {
   width: 48px;
   height: 48px;
   color: var(--border, #cbd5e1);
+}
+
+.product-card:hover .product-card-img img {
+  transform: scale(1.05);
 }
 
 .product-card-info {
