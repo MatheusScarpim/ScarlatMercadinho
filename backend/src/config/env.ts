@@ -16,6 +16,7 @@ export const env = {
   brandDomain: process.env.BRAND_DOMAIN || 'asyncx.com',
   paymentDescription: process.env.PAYMENT_DESCRIPTION || 'Pagamento',
   payerLastName: process.env.PAYER_LAST_NAME || 'Cliente',
+  pixDefaultCpf: process.env.PIX_DEFAULT_CPF || '',
   botUserAgent: process.env.BOT_USER_AGENT || 'AsyncxBot/1.0',
 };
 

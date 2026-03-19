@@ -150,17 +150,6 @@ function calcTotal(items: any[]) {
 
 // ─── PIX ────────────────────────────────────────────────────────────────────
 
-function isValidCpf(cpf: string): boolean {
-  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
-  for (let t = 9; t < 11; t++) {
-    let d = 0;
-    for (let c = 0; c < t; c++) d += Number(cpf[c]) * (t + 1 - c);
-    d = ((10 * d) % 11) % 10;
-    if (Number(cpf[t]) !== d) return false;
-  }
-  return true;
-}
-
 export async function createPixPaymentIntent(saleId: string, cpfOverride?: string) {
   const sale = await ensureSaleOpen(saleId);
   const { totals } = await sanitizeSaleItems(saleId);
@@ -168,27 +157,19 @@ export async function createPixPaymentIntent(saleId: string, cpfOverride?: strin
   const totalAmount = safeTotalAmount(items, saleId, totals);
   const description = buildDescription(items);
 
-  // CPF do cliente (informado ao entrar) tem prioridade, fallback pro body da request
-  const rawCpf = sale.customer?.cpf || cpfOverride || '';
+  // CPF: cliente > override > env default
+  const rawCpf = sale.customer?.cpf || cpfOverride || env.pixDefaultCpf || '';
   const cpf = rawCpf.replace(/\D/g, '');
-  console.log(`[PIX] Sale ${saleId} customer:`, JSON.stringify(sale.customer), `CPF fallback: "${cpfOverride || ''}"`, `CPF limpo: "${cpf}"`);
-
-  if (!isValidCpf(cpf)) {
-    throw new PaymentError(
-      400,
-      'PIX_CPF_REQUIRED',
-      'CPF do pagador é obrigatório e deve ser válido para pagamento via Pix.',
-      'Informe um CPF válido para pagar com Pix.',
-      false
-    );
-  }
+  console.log(`[PIX] Sale ${saleId} CPF resolvido: "${cpf}"`);
 
   const payer: any = {
-    email: `cliente.${cpf}@pagamentos.${env.brandDomain}`,
+    email: cpf ? `cliente.${cpf}@pagamentos.${env.brandDomain}` : `cliente.${saleId}@pagamentos.${env.brandDomain}`,
     first_name: 'Cliente',
     last_name: env.payerLastName,
-    identification: { type: 'CPF', number: cpf }
   };
+  if (cpf) {
+    payer.identification = { type: 'CPF', number: cpf };
+  }
 
   const payment = new MercadoPagoPayment(getMpClient());
   const body = {
@@ -209,16 +190,6 @@ export async function createPixPaymentIntent(saleId: string, cpfOverride?: strin
   } catch (err: unknown) {
     const paymentError = parseMpSdkError(err);
     console.error('[PIX] Erro ao criar pagamento PIX:', paymentError.code, paymentError.message);
-    // Se MP rejeita a identidade, pedir CPF novamente
-    if (paymentError.message.includes('13253') || paymentError.message.includes('Financial Identity')) {
-      throw new PaymentError(
-        400,
-        'PIX_CPF_REQUIRED',
-        'Mercado Pago rejeitou a identificação do pagador. CPF pode estar inválido.',
-        'CPF inválido ou não informado. Informe um CPF válido para pagar com Pix.',
-        false
-      );
-    }
     throw paymentError;
   }
 
