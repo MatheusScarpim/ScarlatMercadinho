@@ -174,6 +174,48 @@
           </div>
         </div>
 
+        <div class="form-section">
+          <h4 class="section-title">Dados Fiscais</h4>
+          <div class="form-row">
+            <div class="field-group">
+              <label class="field-label">NCM</label>
+              <input v-model="form.ncm" placeholder="00000000" maxlength="8" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">CEST</label>
+              <input v-model="form.cest" placeholder="0000000" maxlength="7" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">CFOP</label>
+              <input v-model="form.cfop" placeholder="5102" maxlength="4" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="field-group">
+              <label class="field-label">CST</label>
+              <input v-model="form.cst" placeholder="00" maxlength="3" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">CSOSN</label>
+              <input v-model="form.csosn" placeholder="102" maxlength="4" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="field-group">
+              <label class="field-label">ICMS (%)</label>
+              <input v-model.number="form.icmsRate" type="number" step="0.01" min="0" placeholder="0" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">PIS (%)</label>
+              <input v-model.number="form.pisRate" type="number" step="0.01" min="0" placeholder="0" />
+            </div>
+            <div class="field-group">
+              <label class="field-label">COFINS (%)</label>
+              <input v-model.number="form.cofinsRate" type="number" step="0.01" min="0" placeholder="0" />
+            </div>
+          </div>
+        </div>
+
         <div class="form-actions">
           <button class="btn btn-ghost" type="button" @click="closeForm">Cancelar</button>
           <button class="btn btn-primary" type="submit">Salvar produto</button>
@@ -459,7 +501,15 @@ const form = reactive<any>({
   category: '',
   unit: '',
   minimumStock: 0,
-  isWeighed: false
+  isWeighed: false,
+  ncm: '',
+  cest: '',
+  cfop: '',
+  cst: '',
+  csosn: '',
+  icmsRate: 0,
+  pisRate: 0,
+  cofinsRate: 0
 });
 const importInput = vueRef<HTMLInputElement | null>(null);
 
@@ -570,7 +620,15 @@ function openForm() {
     category: categories.value[0]._id || '',
     unit: units.value[0]._id || '',
     minimumStock: 0,
-    isWeighed: false
+    isWeighed: false,
+    ncm: '',
+    cest: '',
+    cfop: '',
+    cst: '',
+    csosn: '',
+    icmsRate: 0,
+    pisRate: 0,
+    cofinsRate: 0
   });
 }
 function closeForm() {
@@ -588,7 +646,15 @@ function startEdit(product: any) {
     category: product?.category?._id || product?.category || categories.value[0]?._id || '',
     unit: product?.unit?._id || product?.unit || units.value[0]?._id || '',
     minimumStock: product.minimumStock ?? 0,
-    isWeighed: !!product.isWeighed
+    isWeighed: !!product.isWeighed,
+    ncm: product.ncm || '',
+    cest: product.cest || '',
+    cfop: product.cfop || '',
+    cst: product.cst || '',
+    csosn: product.csosn || '',
+    icmsRate: product.icmsRate ?? 0,
+    pisRate: product.pisRate ?? 0,
+    cofinsRate: product.cofinsRate ?? 0
   });
   showForm.value = true;
 }

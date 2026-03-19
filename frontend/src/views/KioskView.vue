@@ -2917,7 +2917,7 @@ button.link:hover {
 
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   align-content: start;
   gap: 14px;
   overflow-y: auto;
