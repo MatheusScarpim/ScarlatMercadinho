@@ -311,7 +311,7 @@
             <p class="eyebrow">finalizar compra</p>
             <h3>Confirme o pagamento</h3>
           </div>
-          <button class="ghost" @click="closePayment" :disabled="paymentProcessing">Fechar</button>
+          <button class="ghost" @click="closePayment">Fechar</button>
         </div>
 
         <div class="payment-total">
@@ -319,9 +319,9 @@
           <strong>R$ {{ subtotal.toFixed(2) }}</strong>
         </div>
 
-        <div class="field" :class="{ 'field--disabled': paymentProcessing }">
+        <div class="field">
           <label>Apartamento (opcional)</label>
-          <input v-model="apartmentNote" placeholder="Ex: 302B" :disabled="paymentProcessing" />
+          <input v-model="apartmentNote" placeholder="Ex: 302B" />
         </div>
 
         <div class="field" :class="{ 'field--disabled': paymentProcessing }">
@@ -371,7 +371,7 @@
         </div>
 
         <div class="actions modal-actions">
-          <button class="ghost" @click="cancelPayment" :disabled="paymentProcessing">Cancelar pagamento</button>
+          <button class="ghost" @click="cancelPayment">Cancelar pagamento</button>
           <button class="primary" @click="confirmPayment" :disabled="paymentProcessing">
             {{ paymentProcessing ? 'Aguardando...' : 'Confirmar pagamento' }}
           </button>
