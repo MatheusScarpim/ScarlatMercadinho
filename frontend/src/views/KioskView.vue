@@ -609,6 +609,18 @@ function resetInactivity() {
 function enterScreensaver() {
   showCustomerModal.value = false;
   resetCustomerFlow();
+  paymentOpen.value = false;
+  paymentSuccess.value = false;
+  paymentTotal.value = 0;
+  paymentError.value = '';
+  paymentStatusText.value = '';
+  paymentProcessing.value = false;
+  paymentMethod.value = 'PIX';
+  pixData.value = { qrCode: null, qrCodeBase64: null, paymentId: null };
+  pixStatus.value = '';
+  apartmentNote.value = '';
+  showTerminalHint.value = false;
+  clearPaymentIdleTimer();
   showScreensaver.value = true;
   currentPromoIndex.value = 0;
   loadPromos();
@@ -1157,6 +1169,15 @@ function setPayment(opt: string) {
 
 function closeSuccess() {
   paymentSuccess.value = false;
+  paymentTotal.value = 0;
+  paymentError.value = '';
+  paymentStatusText.value = '';
+  paymentProcessing.value = false;
+  paymentMethod.value = 'PIX';
+  pixData.value = { qrCode: null, qrCodeBase64: null, paymentId: null };
+  pixStatus.value = '';
+  apartmentNote.value = '';
+  showTerminalHint.value = false;
   enterScreensaver();
 }
 </script>
