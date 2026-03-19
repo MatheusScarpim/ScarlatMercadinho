@@ -434,7 +434,28 @@ export async function getPointIntentStatus(intentId: string) {
 
   const data = await res.json();
   console.log('[POINT-STATUS] Resposta MP bruta:', JSON.stringify(data));
-  const state = (data as any)?.state || (data as any)?.status;
+  const state = ((data as any)?.state || (data as any)?.status || '').toUpperCase();
+
+  // Quando FINISHED com payment.id, consultar a API de pagamentos para saber o resultado real
+  const paymentId = (data as any)?.payment?.id || (data as any)?.payment_id;
+  if (state === 'FINISHED' && paymentId) {
+    try {
+      const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        headers: {
+          Authorization: `Bearer ${env.mpAccessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (paymentRes.ok) {
+        const paymentData = await paymentRes.json() as any;
+        console.log('[POINT-STATUS] Status real do pagamento:', paymentData.status, paymentData.status_detail);
+        (data as any).payment.result = paymentData.status;
+        (data as any).payment.status_detail = paymentData.status_detail;
+      }
+    } catch (err) {
+      console.warn('[POINT-STATUS] Erro ao consultar pagamento:', err);
+    }
+  }
 
   // Adiciona info de erro se for estado terminal com erro
   if (state) {

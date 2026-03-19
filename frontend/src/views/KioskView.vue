@@ -991,24 +991,35 @@ async function pollPointStatus(intentId: string): Promise<'approved' | 'error' |
 
     console.log('[POINT-POLL] state:', state, '| paymentResult:', paymentResult);
 
-    // Verifica se foi explicitamente rejeitado/negado
-    const isRejected = ['rejected', 'refused', 'cc_rejected', 'denied', 'failed'].some(
-      r => paymentResult.includes(r)
-    );
+    // FINISHED — verificar resultado real do pagamento (vem do backend via /v1/payments)
+    if (state === 'finished') {
+      const isApproved = ['approved', 'success', 'accredited'].includes(paymentResult);
+      const isRejected = ['rejected', 'refused', 'cc_rejected', 'denied', 'failed'].some(
+        r => paymentResult.includes(r)
+      );
 
-    if (state === 'finished' && isRejected) {
-      console.warn('[POINT-POLL] FINISHED mas pagamento NEGADO:', paymentResult);
-      paymentError.value = data?.error_message || 'Pagamento negado. Tente novamente.';
+      if (isApproved) {
+        const totalPaid = subtotal.value || paymentTotal.value;
+        await store.finalizeSale(paymentMethod.value, apartmentNote.value);
+        paymentOpen.value = false;
+        paymentTotal.value = totalPaid;
+        paymentSuccess.value = true;
+        paymentProcessing.value = false;
+        return 'approved';
+      }
+
+      // Negado ou sem resultado claro
+      const detail = data?.payment?.status_detail || '';
+      const msg = isRejected
+        ? 'Pagamento negado. Tente novamente.'
+        : 'Pagamento não confirmado pela maquininha.';
+      console.warn('[POINT-POLL] FINISHED resultado:', paymentResult, detail);
+      paymentError.value = data?.error_message || msg;
       return 'error';
     }
 
-    // APPROVED direto ou FINISHED com resultado positivo
-    const hasPaymentId = !!(data?.payment?.id || data?.payment_id);
-    const isApproved =
-      state === 'approved' ||
-      (state === 'finished' && (hasPaymentId || ['approved', 'success', 'accredited'].includes(paymentResult)));
-
-    if (isApproved) {
+    // APPROVED direto (raro mas possível)
+    if (state === 'approved') {
       const totalPaid = subtotal.value || paymentTotal.value;
       await store.finalizeSale(paymentMethod.value, apartmentNote.value);
       paymentOpen.value = false;
@@ -1016,13 +1027,6 @@ async function pollPointStatus(intentId: string): Promise<'approved' | 'error' |
       paymentSuccess.value = true;
       paymentProcessing.value = false;
       return 'approved';
-    }
-
-    // FINISHED sem payment.id e sem resultado claro = erro real
-    if (state === 'finished') {
-      console.warn('[POINT-POLL] FINISHED sem payment.id, paymentResult:', paymentResult);
-      paymentError.value = data?.error_message || 'Pagamento não confirmado pela maquininha.';
-      return 'error';
     }
 
     // Estados terminais de erro → retry
