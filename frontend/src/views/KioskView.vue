@@ -2918,9 +2918,11 @@ button.link:hover {
 .product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  align-content: start;
   gap: 14px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
   padding: 8px 4px;
   scrollbar-width: thin;
 }
