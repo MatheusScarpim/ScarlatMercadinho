@@ -131,18 +131,24 @@
           <div class="form-grid">
             <div class="field-block full">
               <label>Fornecedor</label>
-              <select v-model="form.supplier" required>
-                <option value="" disabled>Selecione o fornecedor</option>
-                <option v-for="s in suppliers" :key="s._id" :value="s._id">{{ s.name }}</option>
-              </select>
+              <div class="field-with-add">
+                <select v-model="form.supplier" required>
+                  <option value="" disabled>Selecione o fornecedor</option>
+                  <option v-for="s in suppliers" :key="s._id" :value="s._id">{{ s.name }}</option>
+                </select>
+                <button type="button" class="btn-add" title="Novo fornecedor" @click="showQuickSupplier = true">+</button>
+              </div>
             </div>
             <div class="field-block">
               <label>Local</label>
-              <select v-model="form.location" required>
-                <option v-for="loc in locations" :key="loc._id" :value="loc.code">
-                  {{ loc.name }} ({{ loc.code }})
-                </option>
-              </select>
+              <div class="field-with-add">
+                <select v-model="form.location" required>
+                  <option v-for="loc in locations" :key="loc._id" :value="loc.code">
+                    {{ loc.name }} ({{ loc.code }})
+                  </option>
+                </select>
+                <button type="button" class="btn-add" title="Novo local" @click="showQuickLocation = true">+</button>
+              </div>
             </div>
             <div class="field-block">
               <label>Nota / Pedido</label>
@@ -331,6 +337,31 @@
       </div>
     </BaseModal>
   </div>
+
+  <!-- Quick Add modals via Teleport so they render above the purchase modal -->
+  <Teleport to="body">
+    <BaseModal :open="showQuickSupplier" title="Novo fornecedor" :onClose="() => showQuickSupplier = false" small top>
+      <form @submit.prevent="saveQuickSupplier" class="quick-add-form">
+        <label>Nome<input v-model="quickSupplierForm.name" required /></label>
+        <label>CNPJ<input v-model="quickSupplierForm.cnpj" /></label>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" type="button" @click="showQuickSupplier = false">Cancelar</button>
+          <button class="btn btn-primary" type="submit">Salvar</button>
+        </div>
+      </form>
+    </BaseModal>
+
+    <BaseModal :open="showQuickLocation" title="Novo local" :onClose="() => showQuickLocation = false" small top>
+      <form @submit.prevent="saveQuickLocation" class="quick-add-form">
+        <label>Nome<input v-model="quickLocationForm.name" required /></label>
+        <label>Código<input v-model="quickLocationForm.code" required maxlength="12" @input="quickLocationForm.code = quickLocationForm.code.toUpperCase().trim()" /></label>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" type="button" @click="showQuickLocation = false">Cancelar</button>
+          <button class="btn btn-primary" type="submit">Salvar</button>
+        </div>
+      </form>
+    </BaseModal>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -373,6 +404,37 @@ const form = reactive<any>({
   invoiceNumber: '',
   items: [{ product: '', name: '', barcode: '', quantity: 1, unitCost: 0, salePrice: 0, batchCode: '', expiryDate: '' }]
 });
+
+const showQuickSupplier = ref(false);
+const showQuickLocation = ref(false);
+const quickSupplierForm = reactive({ name: '', cnpj: '' });
+const quickLocationForm = reactive({ name: '', code: '' });
+
+async function saveQuickSupplier() {
+  const { data } = await api.post('/suppliers', {
+    name: quickSupplierForm.name,
+    cnpj: quickSupplierForm.cnpj || undefined,
+    active: true
+  });
+  suppliers.value.push(data);
+  form.supplier = data._id;
+  showQuickSupplier.value = false;
+  quickSupplierForm.name = '';
+  quickSupplierForm.cnpj = '';
+}
+
+async function saveQuickLocation() {
+  const { data } = await api.post('/locations', {
+    name: quickLocationForm.name,
+    code: quickLocationForm.code,
+    active: true
+  });
+  locations.value.push(data);
+  form.location = data.code;
+  showQuickLocation.value = false;
+  quickLocationForm.name = '';
+  quickLocationForm.code = '';
+}
 
 const total = computed(() => form.items.reduce((sum: number, i: any) => sum + i.quantity * i.unitCost, 0));
 
@@ -1035,6 +1097,58 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   border-radius: 10px;
   animation: slideDown 0.3s ease;
+}
+
+/* Field with add button */
+.field-with-add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.field-with-add select {
+  flex: 1;
+}
+
+.btn-add {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(91, 231, 196, 0.1);
+  color: var(--primary);
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.btn-add:hover {
+  background: rgba(91, 231, 196, 0.2);
+  border-color: var(--primary);
+  transform: scale(1.05);
+}
+
+/* Quick Add Form */
+.quick-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quick-add-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
 }
 
 /* Form Grid */

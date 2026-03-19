@@ -234,29 +234,16 @@
           <div class="pulse-loader"><span></span><span></span><span></span></div>
           <p class="muted sm">Buscando produtos...</p>
         </div>
-        <div v-else-if="searchResults.length" class="product-grid">
-          <div
+        <div v-else-if="searchResults.length" class="product-list">
+          <button
             v-for="product in searchResults"
             :key="product._id"
-            class="product-card"
+            class="product-list-item"
             @click="selectProduct(product)"
           >
-            <div class="product-card-img">
-              <img
-                v-if="product.imageUrl"
-                :src="product.imageUrl"
-                :alt="product.name"
-              />
-              <svg v-else class="product-card-placeholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
-              </svg>
-            </div>
-            <div class="product-card-info">
-              <span class="product-card-name">{{ product.name }}</span>
-              <span class="product-card-price">R$ {{ Number(product.salePrice).toFixed(2) }}</span>
-            </div>
-          </div>
+            <span class="product-list-name">{{ product.name }}</span>
+            <span class="product-list-price">R$ {{ Number(product.salePrice).toFixed(2) }}</span>
+          </button>
         </div>
         <div v-else class="search-status">
           <svg class="search-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -556,6 +543,9 @@ function clearInactivityTimer() {
 function resetInactivity() {
   if (showScreensaver.value) return;
   startInactivityTimer();
+  if (!showProductSearch.value && !showCustomerModal.value && !manualBarcodeOpen.value) {
+    focusBarcode();
+  }
 }
 
 function enterScreensaver() {
@@ -1205,10 +1195,10 @@ function closeSuccess() {
 
 .scan-input {
   position: absolute;
+  left: -9999px;
   opacity: 0;
-  pointer-events: none;
-  height: 0;
-  width: 0;
+  height: 1px;
+  width: 1px;
 }
 
 .right {
@@ -2820,11 +2810,8 @@ button.link:hover {
   width: 92vw;
   max-width: 1100px;
   max-height: 88vh;
-  display: flex;
-  flex-direction: column;
   padding: 24px 28px;
-  gap: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .product-search-modal .modal-header {
@@ -2915,100 +2902,61 @@ button.link:hover {
   font-weight: 600;
 }
 
-.product-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  align-content: start;
-  gap: 14px;
+.product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0;
   overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-  padding: 8px 4px;
-  scrollbar-width: thin;
+  max-height: 55vh;
 }
 
-.product-grid::-webkit-scrollbar {
+.product-list::-webkit-scrollbar {
   width: 5px;
 }
 
-.product-grid::-webkit-scrollbar-thumb {
+.product-list::-webkit-scrollbar-thumb {
   background: var(--border, #d1d5db);
   border-radius: 5px;
 }
 
-.product-card {
+.product-list-item {
   display: flex;
-  flex-direction: column;
-  border-radius: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-radius: 12px;
   border: 1.5px solid var(--border, #e5e7eb);
   background: #fff;
   cursor: pointer;
   transition: all 0.2s ease;
-  overflow: hidden;
+  text-align: left;
+  gap: 12px;
+  min-height: 52px;
 }
 
-.product-card:hover {
+.product-list-item:hover {
   border-color: var(--primary, #10b49d);
-  box-shadow: 0 4px 20px rgba(16, 180, 157, 0.12);
-  transform: translateY(-3px);
+  background: rgba(16, 180, 157, 0.04);
 }
 
-.product-card:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(16, 180, 157, 0.1);
+.product-list-item:active {
+  background: rgba(16, 180, 157, 0.08);
 }
 
-.product-card-img {
-  width: 100%;
-  height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  overflow: hidden;
-}
-
-.product-card-img img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  padding: 8px;
-  transition: transform 0.2s;
-}
-
-.product-card-placeholder {
-  width: 48px;
-  height: 48px;
-  color: var(--border, #cbd5e1);
-}
-
-.product-card:hover .product-card-img img {
-  transform: scale(1.05);
-}
-
-.product-card-info {
-  padding: 10px 12px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border-top: 1px solid var(--border, #f1f5f9);
-}
-
-.product-card-name {
-  font-size: 13px;
+.product-list-name {
+  font-size: 15px;
   font-weight: 500;
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.3;
   color: var(--text, #1f2937);
+  flex: 1;
 }
 
-.product-card-price {
+.product-list-price {
   font-size: 16px;
   font-weight: 700;
   color: var(--primary, #10b49d);
+  white-space: nowrap;
   letter-spacing: -0.02em;
 }
 

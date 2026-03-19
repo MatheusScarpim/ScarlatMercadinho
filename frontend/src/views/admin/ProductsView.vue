@@ -138,6 +138,15 @@
               </select>
             </div>
           </div>
+          <div class="form-row">
+            <div class="field-group full">
+              <label class="field-label">URL da imagem</label>
+              <input v-model="form.imageUrl" placeholder="https://..." />
+              <div v-if="form.imageUrl" class="image-preview">
+                <img :src="form.imageUrl" alt="Preview" />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="form-section">
@@ -502,6 +511,7 @@ const form = reactive<any>({
   unit: '',
   minimumStock: 0,
   isWeighed: false,
+  imageUrl: '',
   ncm: '',
   cest: '',
   cfop: '',
@@ -621,6 +631,7 @@ function openForm() {
     unit: units.value[0]._id || '',
     minimumStock: 0,
     isWeighed: false,
+    imageUrl: '',
     ncm: '',
     cest: '',
     cfop: '',
@@ -647,6 +658,7 @@ function startEdit(product: any) {
     unit: product?.unit?._id || product?.unit || units.value[0]?._id || '',
     minimumStock: product.minimumStock ?? 0,
     isWeighed: !!product.isWeighed,
+    imageUrl: product.imageUrl || '',
     ncm: product.ncm || '',
     cest: product.cest || '',
     cfop: product.cfop || '',
@@ -1654,6 +1666,22 @@ function prevPage() {
 
 .field-group.full {
   grid-column: 1 / -1;
+}
+
+.image-preview {
+  margin-top: 8px;
+  width: 120px;
+  height: 120px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .field-label {

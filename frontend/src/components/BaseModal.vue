@@ -1,6 +1,6 @@
 <template>
-  <div v-if="open" class="modal-backdrop" @click.self="onClose">
-    <div class="modal">
+  <div v-if="open" class="modal-backdrop" :class="{ 'modal-backdrop--top': top }" @click.self="onClose">
+    <div class="modal" :class="{ 'modal--small': small }">
       <header class="modal-header">
         <h3>{{ title }}</h3>
         <button class="btn btn-ghost" @click="onClose">Fechar</button>
@@ -13,11 +13,16 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+withDefaults(defineProps<{
   open: boolean;
   title: string;
   onClose: () => void;
-}>();
+  small?: boolean;
+  top?: boolean;
+}>(), {
+  small: false,
+  top: false
+});
 </script>
 
 <style scoped>
@@ -25,11 +30,14 @@ defineProps<{
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.35);
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 16px;
   z-index: 50;
+}
+.modal-backdrop--top {
+  z-index: 100;
 }
 .modal {
   width: min(1200px, 95%);
@@ -40,7 +48,9 @@ defineProps<{
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
-  transform: none;
+}
+.modal--small {
+  width: min(500px, 95%);
 }
 .modal-header {
   display: flex;
