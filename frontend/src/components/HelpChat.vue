@@ -91,6 +91,8 @@
             placeholder="Digite sua mensagem..."
             @keyup.enter="sendMessage"
             :disabled="loading"
+            readonly
+            @click="openVk()"
             maxlength="1000"
           />
           <button class="send-btn" @click="sendMessage" :disabled="!inputMsg.trim() || loading">
@@ -99,6 +101,16 @@
         </div>
       </div>
     </transition>
+
+    <!-- Virtual Keyboard -->
+    <VirtualKeyboard
+      v-model="vkValue"
+      :visible="vkOpen"
+      label="Digite sua mensagem"
+      @update:modelValue="onVkUpdate"
+      @confirm="onVkConfirm"
+      @cancel="onVkCancel"
+    />
   </div>
 </template>
 
@@ -106,6 +118,7 @@
 import { ref, onMounted, nextTick, watch, computed } from 'vue';
 import axios from 'axios';
 import wl from '../config/whitelabel';
+import VirtualKeyboard from './VirtualKeyboard.vue';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -116,6 +129,8 @@ const loading = ref(false);
 const messages = ref<any[]>([]);
 const messagesRef = ref<HTMLElement | null>(null);
 const isBusinessHoursLocal = ref(false);
+const vkOpen = ref(false);
+const vkValue = ref('');
 
 const contactInfo = computed(() => ({
   phone: wl.contactPhone,
@@ -185,6 +200,24 @@ function scrollToBottom() {
   if (messagesRef.value) {
     messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
   }
+}
+
+function openVk() {
+  vkValue.value = inputMsg.value;
+  vkOpen.value = true;
+}
+
+function onVkUpdate(val: string) {
+  vkValue.value = val;
+  inputMsg.value = val;
+}
+
+function onVkConfirm() {
+  vkOpen.value = false;
+}
+
+function onVkCancel() {
+  vkOpen.value = false;
 }
 
 async function sendMessage() {

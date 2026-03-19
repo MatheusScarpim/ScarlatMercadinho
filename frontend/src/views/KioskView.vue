@@ -608,7 +608,7 @@ function clearInactivityTimer() {
 function resetInactivity() {
   if (showScreensaver.value) return;
   startInactivityTimer();
-  if (!showProductSearch.value && !showCustomerModal.value && !manualBarcodeOpen.value) {
+  if (!showProductSearch.value && !showCustomerModal.value && !manualBarcodeOpen.value && !showLocationModal.value && !vkTarget.value && !paymentOpen.value) {
     focusBarcode();
   }
 }
