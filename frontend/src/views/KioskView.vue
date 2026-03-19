@@ -311,7 +311,7 @@
             <p class="eyebrow">finalizar compra</p>
             <h3>Confirme o pagamento</h3>
           </div>
-          <button class="ghost" @click="closePayment">Fechar</button>
+          <button class="ghost" @click="closePayment" :disabled="paymentProcessing">Fechar</button>
         </div>
 
         <div class="payment-total">
@@ -319,16 +319,17 @@
           <strong>R$ {{ subtotal.toFixed(2) }}</strong>
         </div>
 
-        <div class="field">
+        <div class="field" :class="{ 'field--disabled': paymentProcessing }">
           <label>Apartamento (opcional)</label>
-          <input v-model="apartmentNote" placeholder="Ex: 302B" />
+          <input v-model="apartmentNote" placeholder="Ex: 302B" :disabled="paymentProcessing" />
         </div>
 
-        <div class="field">
+        <div class="field" :class="{ 'field--disabled': paymentProcessing }">
           <label>Forma de pagamento</label>
           <div class="payment-options">
             <button v-for="opt in paymentOptions" :key="opt.value" type="button"
-              :class="['pay-chip', paymentMethod === opt.value ? 'active' : '']" @click="setPayment(opt.value)">
+              :class="['pay-chip', paymentMethod === opt.value ? 'active' : '']"
+              @click="setPayment(opt.value)" :disabled="paymentProcessing">
               {{ opt.label }}
             </button>
           </div>
@@ -370,7 +371,7 @@
         </div>
 
         <div class="actions modal-actions">
-          <button class="ghost" @click="cancelPayment">Cancelar pagamento</button>
+          <button class="ghost" @click="cancelPayment" :disabled="paymentProcessing">Cancelar pagamento</button>
           <button class="primary" @click="confirmPayment" :disabled="paymentProcessing">
             {{ paymentProcessing ? 'Aguardando...' : 'Confirmar pagamento' }}
           </button>
@@ -1701,6 +1702,11 @@ button.link:hover {
   display: grid;
   gap: 8px;
   margin-top: 12px;
+}
+
+.field--disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .field label {
