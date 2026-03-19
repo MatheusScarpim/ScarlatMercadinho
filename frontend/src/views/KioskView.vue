@@ -169,8 +169,8 @@
         </div>
         <div class="field">
           <label>Senha de troca</label>
-          <input type="password" v-model="locationPasswordInput" placeholder="Digite a senha"
-            @input="locationPasswordError = ''" />
+          <input type="password" :value="locationPasswordInput" placeholder="Digite a senha"
+            readonly @click="openVk('locationPassword')" />
           <p v-if="locationPasswordError" class="warning sm">{{ locationPasswordError }}</p>
         </div>
         <div class="actions modal-actions">
@@ -187,8 +187,8 @@
           <h3>Digite o código de barras</h3>
           <button class="ghost" @click="closeBarcode">Fechar</button>
         </div>
-        <input id="manual-barcode" v-model="manualBarcode" placeholder="Código de barras"
-          @keyup.enter="confirmManualBarcode" />
+        <input id="manual-barcode" :value="manualBarcode" placeholder="Código de barras"
+          readonly @click="openVk('manualBarcode')" />
         <div class="actions">
           <button class="ghost" @click="closeBarcode">Voltar</button>
           <button class="primary" @click="confirmManualBarcode">Confirmar</button>
@@ -210,10 +210,11 @@
           </svg>
           <input
             ref="searchInput"
-            v-model="searchQuery"
+            :value="searchQuery"
             placeholder="Buscar por nome..."
             class="search-input"
-            @input="onSearchInput"
+            readonly
+            @click="openVk('search')"
           />
         </div>
 
@@ -411,6 +412,34 @@
       </div>
     </div>
 
+    <!-- Teclado virtual -->
+    <VirtualKeyboard
+      :visible="vkTarget === 'search'"
+      :model-value="vkValue"
+      label="Buscar produto"
+      @update:model-value="onVkUpdate"
+      @confirm="onVkConfirm"
+      @cancel="onVkCancel"
+    />
+    <VirtualKeyboard
+      :visible="vkTarget === 'locationPassword'"
+      :model-value="vkValue"
+      label="Senha de troca"
+      :is-password="true"
+      @update:model-value="onVkUpdate"
+      @confirm="onVkConfirm"
+      @cancel="onVkCancel"
+    />
+    <VirtualKeyboard
+      :visible="vkTarget === 'manualBarcode'"
+      :model-value="vkValue"
+      label="Código de barras"
+      :numbers-only="true"
+      @update:model-value="onVkUpdate"
+      @confirm="onVkConfirm"
+      @cancel="onVkCancel"
+    />
+
     <!-- Chat de ajuda -->
     <HelpChat />
   </div>
@@ -422,6 +451,7 @@ import { useKioskStore } from '../stores/kiosk';
 import api from '../services/api';
 import wl from '../config/whitelabel';
 import HelpChat from '../components/HelpChat.vue';
+import VirtualKeyboard from '../components/VirtualKeyboard.vue';
 
 const store = useKioskStore();
 
@@ -489,6 +519,41 @@ const showLocationModal = ref(!chosenLocation.value);
 const locationPasswordInput = ref('');
 const locationPasswordError = ref('');
 const LOCATION_PASSWORD = import.meta.env.VITE_LOCATION_PASSWORD || '1234';
+
+// Virtual keyboard
+const vkTarget = ref<'search' | 'locationPassword' | 'manualBarcode' | null>(null);
+const vkValue = ref('');
+
+function openVk(target: 'search' | 'locationPassword' | 'manualBarcode') {
+  if (target === 'search') vkValue.value = searchQuery.value;
+  else if (target === 'locationPassword') vkValue.value = locationPasswordInput.value;
+  else if (target === 'manualBarcode') vkValue.value = manualBarcode.value;
+  vkTarget.value = target;
+}
+
+function onVkUpdate(val: string) {
+  vkValue.value = val;
+  if (vkTarget.value === 'search') {
+    searchQuery.value = val;
+    onSearchInput();
+  } else if (vkTarget.value === 'locationPassword') {
+    locationPasswordInput.value = val;
+    locationPasswordError.value = '';
+  } else if (vkTarget.value === 'manualBarcode') {
+    manualBarcode.value = val;
+  }
+}
+
+function onVkConfirm() {
+  if (vkTarget.value === 'manualBarcode') {
+    confirmManualBarcode();
+  }
+  vkTarget.value = null;
+}
+
+function onVkCancel() {
+  vkTarget.value = null;
+}
 const customerStep = ref<'prompt' | 'cpf' | 'register'>('prompt');
 const customerCpf = ref('');
 const customerPhone = ref('');
