@@ -1,6 +1,7 @@
 <template>
   <div class="vk-overlay" v-if="visible">
     <div class="vk-container">
+      <button class="vk-close" @click="$emit('cancel')">✕</button>
       <div class="vk-display">
         <span class="vk-label">{{ label }}</span>
         <span class="vk-value">{{ isPassword ? '•'.repeat(modelValue.length) : modelValue }}<span class="vk-cursor">|</span></span>
@@ -111,12 +112,43 @@ function onKey(key: string) {
 }
 
 .vk-container {
+  position: relative;
   width: 100%;
   max-width: 720px;
   background: #f1f3f5;
   border-radius: 18px 18px 0 0;
   padding: 16px 12px 12px;
   box-shadow: 0 -8px 40px rgba(0,0,0,0.18);
+}
+
+.vk-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  z-index: 1;
+}
+
+.vk-close:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.vk-close:active {
+  background: #fecaca;
+  color: #dc2626;
 }
 
 .vk-display {
