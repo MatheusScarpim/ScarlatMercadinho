@@ -167,14 +167,12 @@ function removeOutliers(raw: number[]): number[] {
 function sanitizePrices(p: { min: number | null; avg: number | null; max: number | null }) {
   let { min, avg, max } = p;
 
-  // Se tem min e avg, e avg é absurdo (>3x min) → usa min como base
-  if (min && avg && avg > min * 3) {
-    avg = Math.round(min * 1.3 * 100) / 100; // avg ~ 30% acima do min
+  if (min && avg && avg > min * 2) {
+    avg = Math.round(min * 1.3 * 100) / 100;
   }
 
-  // max nunca deveria ser mais que 2x o avg corrigido
-  if (max && avg && max > avg * 2) {
-    max = Math.round(avg * 1.5 * 100) / 100;
+  if (max && avg && max > avg * 1.5) {
+    max = Math.round(avg * 1.4 * 100) / 100;
   }
 
   return { min, avg, max };

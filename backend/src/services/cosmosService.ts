@@ -137,12 +137,12 @@ async function fetchFromCosmosApi(ean: string): Promise<CosmosApiResponse | null
 function sanitizePrices(p: PriceInfo): PriceInfo {
   let { min, avg, max } = p;
 
-  if (min && avg && avg > min * 3) {
+  if (min && avg && avg > min * 2) {
     avg = Math.round(min * 1.3 * 100) / 100;
   }
 
-  if (max && avg && max > avg * 2) {
-    max = Math.round(avg * 1.5 * 100) / 100;
+  if (max && avg && max > avg * 1.5) {
+    max = Math.round(avg * 1.4 * 100) / 100;
   }
 
   return { min, avg, max };

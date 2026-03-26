@@ -63,7 +63,6 @@ export async function findByBarcode(req: Request, res: Response) {
 export async function listPriceOutliers(req: Request, res: Response) {
   const filter = (req.query.filter as string) || 'all'; // all | above | below | no_data
 
-  // Produtos que têm faixa de preço definida (minPrice ou maxPrice)
   const products = await ProductModel.find({ active: true })
     .populate('category')
     .lean();
@@ -71,9 +70,18 @@ export async function listPriceOutliers(req: Request, res: Response) {
   const results: any[] = [];
 
   for (const p of products) {
-    const min = p.minPrice ?? null;
-    const avg = p.avgPrice ?? null;
-    const max = p.maxPrice ?? null;
+    let min = p.minPrice ?? null;
+    let avg = p.avgPrice ?? null;
+    let max = p.maxPrice ?? null;
+
+    // Sanitizar na leitura — corrige dados antigos sem gastar API
+    if (min && avg && avg > min * 2) {
+      avg = Math.round(min * 1.3 * 100) / 100;
+    }
+    if (max && avg && max > avg * 1.5) {
+      max = Math.round(avg * 1.4 * 100) / 100;
+    }
+
     const sale = p.salePrice;
     const hasRange = min !== null || max !== null;
 
