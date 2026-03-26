@@ -11,6 +11,8 @@ router.get('/refresh/status', authMiddleware, adminOnly, refreshController.refre
 router.post('/refresh/abort', authMiddleware, adminOnly, refreshController.refreshAbort);
 router.get('/refresh/stream', authMiddleware, adminOnly, refreshController.refreshStream);
 
+router.get('/price-outliers', authMiddleware, requirePermission('PRODUCTS'), controller.listPriceOutliers);
+
 router.post('/', authMiddleware, requirePermission('PRODUCTS'), controller.createProduct);
 router.get('/', controller.listProducts);
 router.get('/barcode/:barcode', controller.findByBarcode);

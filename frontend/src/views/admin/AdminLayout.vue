@@ -40,6 +40,10 @@
               <span v-if="criticalBatchCount > 0" class="critical-badge">{{ criticalBatchCount }}</span>
             </span>
           </RouterLink>
+          <RouterLink v-if="can('PRODUCTS')" to="/admin/price-review" class="nav-item">
+            <span class="icon">💲</span>
+            <span>Revisão de Preços</span>
+          </RouterLink>
           <RouterLink v-if="can('CATEGORIES')" to="/admin/categories" class="nav-item">
             <span class="icon">🏷️</span>
             <span>Categorias</span>

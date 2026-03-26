@@ -59,3 +59,68 @@ export async function findByBarcode(req: Request, res: Response) {
   if (!product) return res.status(404).json({ message: 'Produto não encontrado' });
   res.json(product);
 }
+
+export async function listPriceOutliers(req: Request, res: Response) {
+  const filter = (req.query.filter as string) || 'all'; // all | above | below | no_data
+
+  // Produtos que têm faixa de preço definida (minPrice ou maxPrice)
+  const products = await ProductModel.find({ active: true })
+    .populate('category')
+    .lean();
+
+  const results: any[] = [];
+
+  for (const p of products) {
+    const min = p.minPrice ?? null;
+    const avg = p.avgPrice ?? null;
+    const max = p.maxPrice ?? null;
+    const sale = p.salePrice;
+    const hasRange = min !== null || max !== null;
+
+    let status: 'ok' | 'above' | 'below' | 'no_data' = 'ok';
+
+    if (!hasRange) {
+      status = 'no_data';
+    } else if (max !== null && sale > max) {
+      status = 'above';
+    } else if (min !== null && min > 0 && sale < min) {
+      status = 'below';
+    }
+
+    if (filter === 'all' || filter === status) {
+      results.push({
+        _id: p._id,
+        name: p.name,
+        barcode: p.barcode,
+        imageUrl: p.imageUrl,
+        category: p.category,
+        salePrice: sale,
+        costPrice: p.costPrice,
+        minPrice: min,
+        avgPrice: avg,
+        maxPrice: max,
+        status,
+        diffPercent:
+          status === 'above' && max
+            ? Math.round(((sale - max) / max) * 100)
+            : status === 'below' && min
+              ? Math.round(((min - sale) / min) * 100)
+              : 0,
+      });
+    }
+  }
+
+  // Ordena: problemas primeiro (above/below), depois no_data, depois ok
+  const order: Record<string, number> = { above: 0, below: 1, no_data: 2, ok: 3 };
+  results.sort((a, b) => (order[a.status] ?? 4) - (order[b.status] ?? 4));
+
+  const summary = {
+    total: products.length,
+    above: results.filter((r) => r.status === 'above').length,
+    below: results.filter((r) => r.status === 'below').length,
+    ok: results.filter((r) => r.status === 'ok').length,
+    noData: results.filter((r) => r.status === 'no_data').length,
+  };
+
+  res.json({ summary, items: results });
+}
