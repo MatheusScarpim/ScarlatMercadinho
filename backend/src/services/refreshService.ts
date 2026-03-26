@@ -178,6 +178,84 @@ function sanitizePrices(p: { min: number | null; avg: number | null; max: number
   return { min, avg, max };
 }
 
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
+
+/**
+ * Envia os resultados do Google Shopping pra IA analisar.
+ * A IA filtra packs/kits/atacado/marcas diferentes e retorna
+ * direto o min, avg e max do preço unitário correto.
+ */
+async function analyzePricesWithAi(
+  productName: string,
+  results: Array<{ title: string; price: number }>,
+): Promise<{ min: number; avg: number; max: number } | null> {
+  if (!OPENAI_API_KEY || !results.length) return null;
+
+  const listings = results
+    .map((r, i) => `${i + 1}. "${r.title}" — R$ ${r.price.toFixed(2)}`)
+    .join('\n');
+
+  try {
+    const { data } = await axios.post(
+      `${OPENAI_BASE_URL}/chat/completions`,
+      {
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: `Você é um analista de preços de varejo brasileiro. Recebe o nome exato de um produto (com marca, tipo e gramatura) e uma lista de resultados do Google Shopping.
+
+Sua tarefa:
+1. Identificar quais resultados são venda UNITÁRIA do EXATO mesmo produto (mesma marca, mesmo tipo, mesma gramatura/tamanho)
+2. DESCARTAR: packs, kits, caixas, multipacks, atacado, frete incluído no preço, marcas diferentes, sabores diferentes, tamanhos/gramaturas diferentes
+3. Com os preços válidos, calcular min, média e máximo
+4. Se NENHUM resultado for válido, retorne null em todos os campos
+
+Responda SOMENTE um JSON compacto:
+{"min": 3.49, "avg": 3.79, "max": 4.29, "valid_count": 3, "reason": "3 resultados unitários da mesma marca e gramatura"}
+
+Se nenhum resultado for válido:
+{"min": null, "avg": null, "max": null, "valid_count": 0, "reason": "nenhum resultado compatível"}`,
+          },
+          {
+            role: 'user',
+            content: `Produto: "${productName}"\n\nResultados do Google Shopping:\n${listings}`,
+          },
+        ],
+        temperature: 0,
+        response_format: { type: 'json_object' },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 12000,
+      },
+    );
+
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) return null;
+
+    const parsed = JSON.parse(content);
+    console.log(`[AI-PRICE] ${productName}: ${parsed.valid_count ?? 0} válidos — ${parsed.reason ?? ''}`);
+
+    if (!parsed.min && !parsed.avg && !parsed.max) return null;
+    if (!parsed.avg || parsed.avg <= 0) return null;
+
+    return {
+      min: parsed.min && parsed.min > 0 ? Math.round(parsed.min * 100) / 100 : parsed.avg,
+      avg: Math.round(parsed.avg * 100) / 100,
+      max: parsed.max && parsed.max > 0 ? Math.round(parsed.max * 100) / 100 : parsed.avg,
+    };
+  } catch (err: any) {
+    console.warn('[AI-PRICE] Erro:', err?.message);
+    return null;
+  }
+}
+
 async function fetchSerpPrices(productName: string) {
   const keyInfo = getAvailableSerpKey();
   if (!keyInfo) return null;
@@ -188,11 +266,20 @@ async function fetchSerpPrices(productName: string) {
       params: { engine: 'google_shopping', q: productName, gl: 'br', hl: 'pt', api_key: keyInfo.key },
       timeout: 12000,
     });
-    const raw: number[] = (data.shopping_results || [])
-      .map((r: any) => parseFloat(r.extracted_price))
-      .filter((p: number) => !isNaN(p) && p > 0);
-    if (!raw.length) return null;
-    const prices = removeOutliers(raw);
+
+    const rawResults: Array<{ title: string; price: number }> = (data.shopping_results || [])
+      .map((r: any) => ({ title: r.title || '', price: parseFloat(r.extracted_price) }))
+      .filter((r: any) => !isNaN(r.price) && r.price > 0);
+
+    if (!rawResults.length) return null;
+
+    // IA analisa e retorna min/avg/max filtrado
+    const aiResult = await analyzePricesWithAi(productName, rawResults);
+    if (aiResult) return aiResult;
+
+    // Fallback: clustering se IA falhar
+    const prices = removeOutliers(rawResults.map((r) => r.price));
+    if (!prices.length) return null;
     prices.sort((a, b) => a - b);
     return {
       min: Math.round(prices[0] * 100) / 100,
