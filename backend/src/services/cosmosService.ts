@@ -130,13 +130,31 @@ async function fetchFromCosmosApi(ean: string): Promise<CosmosApiResponse | null
   }
 }
 
+/**
+ * Sanitiza preços — Cosmos retorna max/avg de caixa/atacado.
+ * No varejo unitário, min é o preço mais confiável.
+ */
+function sanitizePrices(p: PriceInfo): PriceInfo {
+  let { min, avg, max } = p;
+
+  if (min && avg && avg > min * 3) {
+    avg = Math.round(min * 1.3 * 100) / 100;
+  }
+
+  if (max && avg && max > avg * 2) {
+    max = Math.round(avg * 1.5 * 100) / 100;
+  }
+
+  return { min, avg, max };
+}
+
 function extractCosmosPrices(data: CosmosApiResponse): PriceInfo {
   const min = data.min_price && data.min_price > 0 ? data.min_price : null;
   const avg = data.avg_price && data.avg_price > 0 ? data.avg_price : null;
   const max = data.max_price && data.max_price > 0 ? data.max_price : null;
-  // price campo avulso como fallback do avg
   const fallbackAvg = data.price && data.price > 0 ? data.price : null;
-  return { min, avg: avg ?? fallbackAvg, max };
+  const raw: PriceInfo = { min, avg: avg ?? fallbackAvg, max };
+  return sanitizePrices(raw);
 }
 
 function hasSomePrice(p: PriceInfo): boolean {
@@ -146,32 +164,45 @@ function hasSomePrice(p: PriceInfo): boolean {
 // ── 2. SERPAPI GOOGLE SHOPPING (fallback de preço) ──────────────────
 
 /**
- * Remove outliers de preço (kits atacado, importados absurdos).
- * 1. Corta tudo acima de 3x a mediana (um Twix de R$3 nunca custa R$85)
- * 2. Depois aplica IQR se ainda sobrar >= 4 itens
+ * Remove outliers de preço (kits, caixas, atacado, importados).
+ *
+ * Lógica: pega o cluster de preços mais denso (próximos entre si).
+ * Ex: [3.50, 4.00, 4.50, 5.00, 45.00, 85.00, 233.00]
+ *   → cluster denso = [3.50, 4.00, 4.50, 5.00]
+ *   → descarta 45, 85, 233 (saltos grandes)
  */
 function removeOutliers(raw: number[]): number[] {
   if (raw.length < 2) return raw;
   const sorted = [...raw].sort((a, b) => a - b);
 
-  // Passo 1: corte pela mediana — nada acima de 3x a mediana
-  const median = sorted[Math.floor(sorted.length / 2)];
-  const ceiling = median * 3;
-  let filtered = sorted.filter((p) => p <= ceiling);
-  if (!filtered.length) filtered = sorted;
+  // Passo 1: agrupar preços próximos (gap máximo de 2x entre vizinhos)
+  const clusters: number[][] = [[sorted[0]]];
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const curr = sorted[i];
+    // Se o preço atual é mais que 2x o anterior, novo cluster
+    if (curr > prev * 2) {
+      clusters.push([curr]);
+    } else {
+      clusters[clusters.length - 1].push(curr);
+    }
+  }
 
-  // Passo 2: IQR se tiver amostra suficiente
-  if (filtered.length >= 4) {
-    const q1 = filtered[Math.floor(filtered.length * 0.25)];
-    const q3 = filtered[Math.floor(filtered.length * 0.75)];
+  // Passo 2: pegar o cluster com mais itens (preço unitário real)
+  const biggest = clusters.reduce((a, b) => (a.length >= b.length ? a : b));
+
+  // Passo 3: se sobrou só 1 cluster, aplicar IQR como refinamento
+  if (biggest.length >= 4) {
+    const q1 = biggest[Math.floor(biggest.length * 0.25)];
+    const q3 = biggest[Math.floor(biggest.length * 0.75)];
     const iqr = q3 - q1;
     const lower = q1 - 1.5 * iqr;
     const upper = q3 + 1.5 * iqr;
-    const iqrFiltered = filtered.filter((p) => p >= lower && p <= upper);
-    if (iqrFiltered.length) filtered = iqrFiltered;
+    const refined = biggest.filter((p) => p >= lower && p <= upper);
+    if (refined.length) return refined;
   }
 
-  return filtered;
+  return biggest;
 }
 
 async function fetchPriceFromSerpApi(productName: string): Promise<PriceInfo | null> {

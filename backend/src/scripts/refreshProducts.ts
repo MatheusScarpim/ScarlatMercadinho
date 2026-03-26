@@ -57,27 +57,41 @@ async function fetchCosmos(ean: string) {
   }
 }
 
-// ── Filtro de outliers (IQR) ─────────────────────────────────────────
+// ── Sanitiza preços Cosmos (max/avg inclui caixa/atacado) ────────────
+function sanitizePrices(p: { min: number | null; avg: number | null; max: number | null }) {
+  let { min, avg, max } = p;
+  if (min && avg && avg > min * 3) { avg = Math.round(min * 1.3 * 100) / 100; }
+  if (max && avg && max > avg * 2) { max = Math.round(avg * 1.5 * 100) / 100; }
+  return { min, avg, max };
+}
+
+// ── Filtro de outliers (clustering) ──────────────────────────────────
 function removeOutliers(raw: number[]): number[] {
   if (raw.length < 2) return raw;
   const sorted = [...raw].sort((a, b) => a - b);
 
-  const median = sorted[Math.floor(sorted.length / 2)];
-  const ceiling = median * 3;
-  let filtered = sorted.filter((p) => p <= ceiling);
-  if (!filtered.length) filtered = sorted;
+  const clusters: number[][] = [[sorted[0]]];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] > sorted[i - 1] * 2) {
+      clusters.push([sorted[i]]);
+    } else {
+      clusters[clusters.length - 1].push(sorted[i]);
+    }
+  }
 
-  if (filtered.length >= 4) {
-    const q1 = filtered[Math.floor(filtered.length * 0.25)];
-    const q3 = filtered[Math.floor(filtered.length * 0.75)];
+  const biggest = clusters.reduce((a, b) => (a.length >= b.length ? a : b));
+
+  if (biggest.length >= 4) {
+    const q1 = biggest[Math.floor(biggest.length * 0.25)];
+    const q3 = biggest[Math.floor(biggest.length * 0.75)];
     const iqr = q3 - q1;
     const lower = q1 - 1.5 * iqr;
     const upper = q3 + 1.5 * iqr;
-    const iqrFiltered = filtered.filter((p) => p >= lower && p <= upper);
-    if (iqrFiltered.length) filtered = iqrFiltered;
+    const refined = biggest.filter((p) => p >= lower && p <= upper);
+    if (refined.length) return refined;
   }
 
-  return filtered;
+  return biggest;
 }
 
 // ── SerpAPI ─────────────────────────────────────────────────────────
@@ -183,14 +197,20 @@ async function main() {
 
       if (cosmos) {
         cosmosName = cosmos.description ?? null;
-        minPrice = cosmos.min_price && cosmos.min_price > 0 ? cosmos.min_price : null;
-        avgPrice = cosmos.avg_price && cosmos.avg_price > 0 ? cosmos.avg_price : null;
-        maxPrice = cosmos.max_price && cosmos.max_price > 0 ? cosmos.max_price : null;
-        if (!avgPrice && cosmos.price && cosmos.price > 0) avgPrice = cosmos.price;
+        const rawMin = cosmos.min_price && cosmos.min_price > 0 ? cosmos.min_price : null;
+        let rawAvg = cosmos.avg_price && cosmos.avg_price > 0 ? cosmos.avg_price : null;
+        const rawMax = cosmos.max_price && cosmos.max_price > 0 ? cosmos.max_price : null;
+        if (!rawAvg && cosmos.price && cosmos.price > 0) rawAvg = cosmos.price;
+
+        const sanitized = sanitizePrices({ min: rawMin, avg: rawAvg, max: rawMax });
+        minPrice = sanitized.min;
+        avgPrice = sanitized.avg;
+        maxPrice = sanitized.max;
+
         ncm = cosmos.ncm?.code ?? null;
         imageUrl = cosmos.thumbnail ?? null;
         categoryName = cosmos.category?.description ?? null;
-        console.log(`  Cosmos: ${cosmosName ?? '?'} | avg=${avgPrice ?? '-'} min=${minPrice ?? '-'} max=${maxPrice ?? '-'}`);
+        console.log(`  Cosmos: ${cosmosName ?? '?'} | avg=${avgPrice ?? '-'} min=${minPrice ?? '-'} max=${maxPrice ?? '-'} (raw: avg=${rawAvg} min=${rawMin} max=${rawMax})`);
       } else {
         console.log(`  Cosmos: não encontrado`);
       }

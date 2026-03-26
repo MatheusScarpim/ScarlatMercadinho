@@ -132,22 +132,52 @@ function removeOutliers(raw: number[]): number[] {
   if (raw.length < 2) return raw;
   const sorted = [...raw].sort((a, b) => a - b);
 
-  const median = sorted[Math.floor(sorted.length / 2)];
-  const ceiling = median * 3;
-  let filtered = sorted.filter((p) => p <= ceiling);
-  if (!filtered.length) filtered = sorted;
+  // Agrupar preços próximos — gap > 2x = cluster novo
+  const clusters: number[][] = [[sorted[0]]];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] > sorted[i - 1] * 2) {
+      clusters.push([sorted[i]]);
+    } else {
+      clusters[clusters.length - 1].push(sorted[i]);
+    }
+  }
 
-  if (filtered.length >= 4) {
-    const q1 = filtered[Math.floor(filtered.length * 0.25)];
-    const q3 = filtered[Math.floor(filtered.length * 0.75)];
+  // Pegar o cluster mais populoso (preço unitário real)
+  const biggest = clusters.reduce((a, b) => (a.length >= b.length ? a : b));
+
+  // IQR como refinamento se tiver amostra
+  if (biggest.length >= 4) {
+    const q1 = biggest[Math.floor(biggest.length * 0.25)];
+    const q3 = biggest[Math.floor(biggest.length * 0.75)];
     const iqr = q3 - q1;
     const lower = q1 - 1.5 * iqr;
     const upper = q3 + 1.5 * iqr;
-    const iqrFiltered = filtered.filter((p) => p >= lower && p <= upper);
-    if (iqrFiltered.length) filtered = iqrFiltered;
+    const refined = biggest.filter((p) => p >= lower && p <= upper);
+    if (refined.length) return refined;
   }
 
-  return filtered;
+  return biggest;
+}
+
+/**
+ * Sanitiza preços do Cosmos — max/avg deles inclui caixa/atacado.
+ * Regra: no varejo unitário, min é o preço real mais confiável.
+ * Se avg ou max são muito maiores que min, estão poluídos por atacado.
+ */
+function sanitizePrices(p: { min: number | null; avg: number | null; max: number | null }) {
+  let { min, avg, max } = p;
+
+  // Se tem min e avg, e avg é absurdo (>3x min) → usa min como base
+  if (min && avg && avg > min * 3) {
+    avg = Math.round(min * 1.3 * 100) / 100; // avg ~ 30% acima do min
+  }
+
+  // max nunca deveria ser mais que 2x o avg corrigido
+  if (max && avg && max > avg * 2) {
+    max = Math.round(avg * 1.5 * 100) / 100;
+  }
+
+  return { min, avg, max };
 }
 
 async function fetchSerpPrices(productName: string) {
@@ -266,10 +296,16 @@ export async function startRefresh(forceAll = false) {
 
         if (cosmos) {
           cosmosName = cosmos.description ?? null;
-          minPrice = cosmos.min_price && cosmos.min_price > 0 ? cosmos.min_price : null;
-          avgPrice = cosmos.avg_price && cosmos.avg_price > 0 ? cosmos.avg_price : null;
-          maxPrice = cosmos.max_price && cosmos.max_price > 0 ? cosmos.max_price : null;
-          if (!avgPrice && cosmos.price && cosmos.price > 0) avgPrice = cosmos.price;
+          const rawMin = cosmos.min_price && cosmos.min_price > 0 ? cosmos.min_price : null;
+          let rawAvg = cosmos.avg_price && cosmos.avg_price > 0 ? cosmos.avg_price : null;
+          const rawMax = cosmos.max_price && cosmos.max_price > 0 ? cosmos.max_price : null;
+          if (!rawAvg && cosmos.price && cosmos.price > 0) rawAvg = cosmos.price;
+
+          const sanitized = sanitizePrices({ min: rawMin, avg: rawAvg, max: rawMax });
+          minPrice = sanitized.min;
+          avgPrice = sanitized.avg;
+          maxPrice = sanitized.max;
+
           ncm = cosmos.ncm?.code ?? null;
           imageUrl = cosmos.thumbnail ?? null;
           categoryName = cosmos.category?.description ?? null;
