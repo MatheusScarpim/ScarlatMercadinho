@@ -60,8 +60,8 @@ async function fetchCosmos(ean: string) {
 // ── Sanitiza preços Cosmos (max/avg inclui caixa/atacado) ────────────
 function sanitizePrices(p: { min: number | null; avg: number | null; max: number | null }) {
   let { min, avg, max } = p;
-  if (min && avg && avg > min * 2) { avg = Math.round(min * 1.3 * 100) / 100; }
-  if (max && avg && max > avg * 1.5) { max = Math.round(avg * 1.4 * 100) / 100; }
+  if (max && avg && max > avg * 2) { max = Math.round(avg * 1.5 * 100) / 100; }
+  if (min && avg && min < avg * 0.3) { min = Math.round(avg * 0.7 * 100) / 100; }
   return { min, avg, max };
 }
 

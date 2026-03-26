@@ -74,12 +74,14 @@ export async function listPriceOutliers(req: Request, res: Response) {
     let avg = p.avgPrice ?? null;
     let max = p.maxPrice ?? null;
 
-    // Sanitizar na leitura — corrige dados antigos sem gastar API
-    if (min && avg && avg > min * 2) {
-      avg = Math.round(min * 1.3 * 100) / 100;
+    // Sanitizar na leitura — Cosmos mistura unitário com caixa/atacado
+    // Confia no avg como referência principal, corta max se absurdo
+    if (max && avg && max > avg * 2) {
+      max = Math.round(avg * 1.5 * 100) / 100;
     }
-    if (max && avg && max > avg * 1.5) {
-      max = Math.round(avg * 1.4 * 100) / 100;
+    // Se min parece muito baixo (preço defasado/embalagem diferente)
+    if (min && avg && min < avg * 0.3) {
+      min = Math.round(avg * 0.7 * 100) / 100;
     }
 
     const sale = p.salePrice;
