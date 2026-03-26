@@ -4,16 +4,11 @@ import { authMiddleware, adminOnly } from '../middlewares/auth';
 
 const router = Router();
 
-// Todas as rotas exigem admin
-router.use(authMiddleware, adminOnly);
+// Rota pública - o kiosk consulta se precisa recarregar (polling)
+router.get('/check-reload/:code', controller.checkReload);
 
-// Recarrega todos os kiosks
-router.post('/reload-all', controller.reloadAllKiosks);
-
-// Recarrega kiosk de um local específico
-router.post('/:id/reload', controller.reloadKiosk);
-
-// Limpa cache e recarrega kiosk de um local específico
-router.post('/:id/clear-reload', controller.clearCacheAndReload);
+// Rotas admin - solicitar reload
+router.post('/reload-all', authMiddleware, adminOnly, controller.requestReloadAll);
+router.post('/:id/reload', authMiddleware, adminOnly, controller.requestReload);
 
 export default router;

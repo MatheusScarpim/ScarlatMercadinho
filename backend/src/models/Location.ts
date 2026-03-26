@@ -5,7 +5,7 @@ export interface LocationDocument extends Document {
   code: string;
   description?: string;
   active: boolean;
-  kioskIp?: string;
+  reloadRequested: boolean;
 }
 
 const locationSchema = new Schema(
@@ -14,7 +14,7 @@ const locationSchema = new Schema(
     code: { type: String, required: true, unique: true, uppercase: true, trim: true },
     description: { type: String },
     active: { type: Boolean, default: true },
-    kioskIp: { type: String, trim: true }
+    reloadRequested: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

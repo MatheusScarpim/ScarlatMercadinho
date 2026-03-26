@@ -1,6 +1,15 @@
 <template>
   <div class="kiosk" @click="resetInactivity" @mousemove="resetInactivity" @keypress="resetInactivity"
     @touchstart="resetInactivity">
+    <!-- Reload Overlay -->
+    <div v-if="reloadingScreen" class="reload-overlay">
+      <div class="reload-content">
+        <div class="reload-spinner"></div>
+        <h2 class="reload-title">Atualizando...</h2>
+        <p class="reload-subtitle">O sistema está sendo atualizado, aguarde um momento.</p>
+      </div>
+    </div>
+
     <!-- Not Launched -->
     <div v-if="notLaunched" class="not-launched-overlay">
       <div class="not-launched-content">
@@ -450,6 +459,7 @@ import HelpChat from '../components/HelpChat.vue';
 import VirtualKeyboard from '../components/VirtualKeyboard.vue';
 
 const store = useKioskStore();
+const reloadingScreen = ref(false);
 
 const notLaunched = computed(() => {
   if (!wl.launchDate) return false;
@@ -1061,6 +1071,36 @@ function focusBarcode() {
   setTimeout(() => barcodeInput.value?.focus(), 50);
 }
 
+// Polling de reload remoto (a cada 30s verifica se o admin solicitou reload)
+let reloadPollTimer: number | null = null;
+
+function startReloadPolling() {
+  if (reloadPollTimer) return;
+  reloadPollTimer = window.setInterval(async () => {
+    const loc = store.selectedLocation;
+    if (!loc) return;
+    try {
+      const { data } = await api.get(`/kiosks/check-reload/${loc}`);
+      if (data.reload) {
+        console.log('[KIOSK] Reload solicitado pelo admin, recarregando...');
+        reloadingScreen.value = true;
+        stopReloadPolling();
+        setTimeout(() => window.location.reload(), 2000);
+        return;
+      }
+    } catch {
+      // ignora erros de rede no polling
+    }
+  }, 10000);
+}
+
+function stopReloadPolling() {
+  if (reloadPollTimer) {
+    clearInterval(reloadPollTimer);
+    reloadPollTimer = null;
+  }
+}
+
 onMounted(() => {
   loadLocations().finally(() => {
     if (store.selectedLocation) {
@@ -1069,12 +1109,14 @@ onMounted(() => {
     }
   });
   startInactivityTimer();
+  startReloadPolling();
 });
 
 onUnmounted(() => {
   clearInactivityTimer();
   clearPaymentIdleTimer();
   stopCarousel();
+  stopReloadPolling();
 });
 
 function openBarcode() {
@@ -1184,6 +1226,42 @@ function closeSuccess() {
 </script>
 
 <style scoped>
+.reload-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: var(--bg, #f6f8fb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.reload-content {
+  text-align: center;
+  padding: 40px;
+}
+.reload-spinner {
+  width: 56px;
+  height: 56px;
+  border: 4px solid var(--border, #e0e0e0);
+  border-top-color: var(--primary, #4f46e5);
+  border-radius: 50%;
+  margin: 0 auto 24px;
+  animation: reload-spin 0.8s linear infinite;
+}
+@keyframes reload-spin {
+  to { transform: rotate(360deg); }
+}
+.reload-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text, #1a1a2e);
+}
+.reload-subtitle {
+  font-size: 1rem;
+  color: var(--muted, #6b7280);
+}
+
 .not-launched-overlay {
   position: fixed;
   inset: 0;
