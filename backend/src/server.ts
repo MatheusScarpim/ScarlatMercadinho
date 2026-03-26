@@ -25,6 +25,7 @@ import settingsRoutes from './routes/settingsRoutes';
 import batchRoutes from './routes/batchRoutes';
 import customerRoutes from './routes/customerRoutes';
 import chatRoutes from './routes/chatRoutes';
+import kioskRoutes from './routes/kioskRoutes';
 import { createAdminSeed } from './services/authService';
 import { startExpiryNotificationJob } from './jobs/expiryNotificationJob';
 import { migrateBatchesWithSalePrice } from './services/batchService';
@@ -57,6 +58,7 @@ app.use('/settings', settingsRoutes);
 app.use('/batches', batchRoutes);
 app.use('/customers', customerRoutes);
 app.use('/chat', chatRoutes);
+app.use('/kiosks', kioskRoutes);
 
 app.use(errorHandler);
 
