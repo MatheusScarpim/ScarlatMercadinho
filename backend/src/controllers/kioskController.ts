@@ -1,70 +1,40 @@
 import { Request, Response } from 'express';
 import { LocationModel } from '../models/Location';
 
-async function sendKioskCommand(ip: string, endpoint: string): Promise<{ success: boolean; error?: string }> {
-  const url = `http://${ip}/${endpoint}`;
-  console.log(`[KIOSK] Enviando comando: POST ${url}`);
-  try {
-    const start = Date.now();
-    const res = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(5000) });
-    const elapsed = Date.now() - start;
-    const body = await res.text();
-    console.log(`[KIOSK] Resposta de ${url}: status=${res.status} tempo=${elapsed}ms body=${body.substring(0, 200)}`);
-    if (res.ok) return { success: true };
-    return { success: false, error: `HTTP ${res.status} - ${body.substring(0, 100)}` };
-  } catch (err: any) {
-    console.error(`[KIOSK] Erro ao conectar em ${url}:`, err.message);
-    console.error(`[KIOSK] Tipo do erro: ${err.name} | Cause:`, err.cause?.message || 'N/A');
-    return { success: false, error: `${err.name}: ${err.message}` };
-  }
-}
-
-// Recarrega o kiosk de um local específico
-export async function reloadKiosk(req: Request, res: Response) {
-  const location = await LocationModel.findById(req.params.id);
-  if (!location) return res.status(404).json({ message: 'Local não encontrado' });
-  if (!location.kioskIp) return res.status(400).json({ message: 'Este local não possui IP de kiosk configurado' });
-
-  const result = await sendKioskCommand(location.kioskIp, 'api/reload');
-  if (result.success) {
-    return res.json({ message: `Kiosk "${location.name}" recarregado com sucesso` });
-  }
-  return res.status(502).json({ message: `Falha ao recarregar kiosk "${location.name}"`, error: result.error });
-}
-
-// Recarrega todos os kiosks que possuem IP configurado
-export async function reloadAllKiosks(_req: Request, res: Response) {
-  const locations = await LocationModel.find({ active: true, kioskIp: { $exists: true, $ne: '' } });
-
-  if (locations.length === 0) {
-    return res.json({ message: 'Nenhum kiosk com IP configurado', results: [] });
-  }
-
-  const results = await Promise.all(
-    locations.map(async (loc) => {
-      const result = await sendKioskCommand(loc.kioskIp!, 'api/reload');
-      return { location: loc.name, ip: loc.kioskIp, ...result };
-    })
+// Marca um local específico para recarregar
+export async function requestReload(req: Request, res: Response) {
+  const location = await LocationModel.findByIdAndUpdate(
+    req.params.id,
+    { reloadRequested: true },
+    { new: true }
   );
-
-  const successCount = results.filter((r) => r.success).length;
-  res.json({
-    message: `${successCount}/${results.length} kiosks recarregados`,
-    results
-  });
+  if (!location) return res.status(404).json({ message: 'Local não encontrado' });
+  console.log(`[KIOSK] Reload solicitado para "${location.name}" (${location.code})`);
+  res.json({ message: `Reload solicitado para "${location.name}"` });
 }
 
-// Limpa cache e recarrega o kiosk
-export async function clearCacheAndReload(req: Request, res: Response) {
-  const location = await LocationModel.findById(req.params.id);
-  if (!location) return res.status(404).json({ message: 'Local não encontrado' });
-  if (!location.kioskIp) return res.status(400).json({ message: 'Este local não possui IP de kiosk configurado' });
+// Marca todos os locais ativos para recarregar
+export async function requestReloadAll(_req: Request, res: Response) {
+  const result = await LocationModel.updateMany(
+    { active: true },
+    { reloadRequested: true }
+  );
+  console.log(`[KIOSK] Reload solicitado para ${result.modifiedCount} locais`);
+  res.json({ message: `Reload solicitado para ${result.modifiedCount} locais` });
+}
 
-  await sendKioskCommand(location.kioskIp, 'api/clearCache');
-  const result = await sendKioskCommand(location.kioskIp, 'api/reload');
+// O kiosk chama essa rota para verificar se precisa recarregar (polling)
+export async function checkReload(req: Request, res: Response) {
+  const code = req.params.code?.toUpperCase();
+  const location = await LocationModel.findOne({ code });
+  if (!location) return res.json({ reload: false });
 
-  if (result.success) {
-    return res.json({ message: `Cache limpo e kiosk "${location.name}" recarregado` });
+  if (location.reloadRequested) {
+    // Limpa a flag para não recarregar em loop
+    await LocationModel.updateOne({ _id: location._id }, { reloadRequested: false });
+    console.log(`[KIOSK] Kiosk "${location.name}" vai recarregar agora`);
+    return res.json({ reload: true });
   }
-  return res.status(502).json({ message: `Falha ao recarregar kiosk "${location.name}"`, error: result.error });
+
+  res.json({ reload: false });
 }

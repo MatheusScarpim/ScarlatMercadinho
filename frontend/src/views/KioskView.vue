@@ -1061,6 +1061,33 @@ function focusBarcode() {
   setTimeout(() => barcodeInput.value?.focus(), 50);
 }
 
+// Polling de reload remoto (a cada 30s verifica se o admin solicitou reload)
+let reloadPollTimer: number | null = null;
+
+function startReloadPolling() {
+  if (reloadPollTimer) return;
+  reloadPollTimer = window.setInterval(async () => {
+    const loc = store.selectedLocation;
+    if (!loc) return;
+    try {
+      const { data } = await api.get(`/kiosks/check-reload/${loc}`);
+      if (data.reload) {
+        console.log('[KIOSK] Reload solicitado pelo admin, recarregando...');
+        window.location.reload();
+      }
+    } catch {
+      // ignora erros de rede no polling
+    }
+  }, 30000);
+}
+
+function stopReloadPolling() {
+  if (reloadPollTimer) {
+    clearInterval(reloadPollTimer);
+    reloadPollTimer = null;
+  }
+}
+
 onMounted(() => {
   loadLocations().finally(() => {
     if (store.selectedLocation) {
@@ -1069,12 +1096,14 @@ onMounted(() => {
     }
   });
   startInactivityTimer();
+  startReloadPolling();
 });
 
 onUnmounted(() => {
   clearInactivityTimer();
   clearPaymentIdleTimer();
   stopCarousel();
+  stopReloadPolling();
 });
 
 function openBarcode() {

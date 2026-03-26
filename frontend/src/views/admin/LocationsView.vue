@@ -33,15 +33,8 @@
           <p>{{ loc.description }}</p>
         </div>
 
-        <div class="kiosk-ip-row" v-if="loc.kioskIp">
-          <svg viewBox="0 0 20 20" fill="currentColor" class="kiosk-ip-icon">
-            <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
-          </svg>
-          <span class="kiosk-ip-text">{{ loc.kioskIp }}</span>
-        </div>
-
         <div class="location-actions">
-          <button v-if="loc.kioskIp" class="btn btn-ghost" @click="reloadKiosk(loc)" :disabled="reloadingId === loc._id">
+          <button class="btn btn-ghost" @click="reloadKiosk(loc)" :disabled="reloadingId === loc._id">
             <svg viewBox="0 0 20 20" fill="none" class="btn-icon">
               <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" fill="currentColor"/>
             </svg>
@@ -91,10 +84,6 @@
         <label class="span-2">
           Descrição
           <textarea v-model="form.description" rows="2" placeholder="Opcional"></textarea>
-        </label>
-        <label class="span-2">
-          IP do Kiosk (Fully Kiosk Browser)
-          <input v-model="form.kioskIp" placeholder="Ex: 192.168.1.135:8080" />
         </label>
         <div class="checkbox-row">
           <input type="checkbox" v-model="form.active" />
@@ -284,8 +273,7 @@ const form = reactive<any>({
   name: '',
   code: '',
   description: '',
-  active: true,
-  kioskIp: ''
+  active: true
 });
 
 async function load() {
@@ -296,7 +284,7 @@ async function load() {
 function openForm() {
   showForm.value = true;
   editingId.value = null;
-  Object.assign(form, { name: '', code: '', description: '', active: true, kioskIp: '' });
+  Object.assign(form, { name: '', code: '', description: '', active: true });
 }
 
 function closeForm() {
@@ -311,7 +299,6 @@ function startEdit(loc: any) {
     code: loc.code,
     description: loc.description || '',
     active: loc.active,
-    kioskIp: loc.kioskIp || ''
   });
   showForm.value = true;
 }
@@ -351,7 +338,7 @@ async function reloadKiosk(loc: any) {
     const { data } = await api.post(`/kiosks/${loc._id}/reload`);
     alert(data.message);
   } catch (err: any) {
-    alert(err.response?.data?.message || 'Erro ao recarregar kiosk');
+    alert(err.response?.data?.message || 'Erro ao solicitar reload');
   } finally {
     reloadingId.value = null;
   }
@@ -361,10 +348,9 @@ async function reloadAllKiosks() {
   reloadingAll.value = true;
   try {
     const { data } = await api.post('/kiosks/reload-all');
-    const msgs = data.results.map((r: any) => `${r.location}: ${r.success ? 'OK' : r.error}`).join('\n');
-    alert(`${data.message}\n\n${msgs}`);
+    alert(data.message);
   } catch (err: any) {
-    alert(err.response?.data?.message || 'Erro ao recarregar kiosks');
+    alert(err.response?.data?.message || 'Erro ao solicitar reload');
   } finally {
     reloadingAll.value = false;
   }
@@ -574,23 +560,6 @@ async function submitTransfer() {
   font-size: 14px;
   color: var(--muted);
   line-height: 1.5;
-}
-
-.kiosk-ip-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 0;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-.kiosk-ip-icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-}
-.kiosk-ip-text {
-  font-family: monospace;
 }
 
 .location-actions {
