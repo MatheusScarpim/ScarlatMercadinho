@@ -2,13 +2,20 @@ import { Request, Response } from 'express';
 import { LocationModel } from '../models/Location';
 
 async function sendKioskCommand(ip: string, endpoint: string): Promise<{ success: boolean; error?: string }> {
+  const url = `http://${ip}/${endpoint}`;
+  console.log(`[KIOSK] Enviando comando: POST ${url}`);
   try {
-    const url = `http://${ip}/${endpoint}`;
+    const start = Date.now();
     const res = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(5000) });
+    const elapsed = Date.now() - start;
+    const body = await res.text();
+    console.log(`[KIOSK] Resposta de ${url}: status=${res.status} tempo=${elapsed}ms body=${body.substring(0, 200)}`);
     if (res.ok) return { success: true };
-    return { success: false, error: `HTTP ${res.status}` };
+    return { success: false, error: `HTTP ${res.status} - ${body.substring(0, 100)}` };
   } catch (err: any) {
-    return { success: false, error: err.message };
+    console.error(`[KIOSK] Erro ao conectar em ${url}:`, err.message);
+    console.error(`[KIOSK] Tipo do erro: ${err.name} | Cause:`, err.cause?.message || 'N/A');
+    return { success: false, error: `${err.name}: ${err.message}` };
   }
 }
 
