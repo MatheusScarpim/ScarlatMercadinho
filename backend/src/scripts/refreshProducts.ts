@@ -218,7 +218,7 @@ async function main() {
       // SerpAPI se Cosmos não tem preço
       if (!avgPrice && SERPAPI_KEY && serpUsed < SERPAPI_MONTHLY_LIMIT) {
         console.log(`  SerpAPI (${serpUsed + 1}/${SERPAPI_MONTHLY_LIMIT})...`);
-        const serp = await fetchSerpPrices(product.name || ean);
+        const serp = await fetchSerpPrices(cosmosName || product.name || ean);
         if (serp) {
           minPrice = minPrice ?? serp.min;
           avgPrice = serp.avg;

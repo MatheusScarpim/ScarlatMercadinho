@@ -310,7 +310,8 @@ export async function startRefresh(forceAll = false) {
         }
 
         if (!avgPrice && getAvailableSerpKey()) {
-          const serp = await fetchSerpPrices(product.name || ean);
+          // Usa o nome do Cosmos (completo com gramatura) > nome do banco > EAN
+          const serp = await fetchSerpPrices(cosmosName || product.name || ean);
           if (serp) {
             minPrice = minPrice ?? serp.min;
             avgPrice = serp.avg;
