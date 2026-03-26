@@ -9,7 +9,10 @@ export interface GtinLookupDocument extends Document {
   categoryName: string | null;
   imageUrl: string | null;
   averagePrice: string | null;
+  minPrice: string | null;
+  maxPrice: string | null;
   sourceUrl: string | null;
+  refreshedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,7 +27,10 @@ const gtinLookupSchema = new Schema(
     categoryName: { type: String, default: null },
     imageUrl: { type: String, default: null },
     averagePrice: { type: String, default: null },
+    minPrice: { type: String, default: null },
+    maxPrice: { type: String, default: null },
     sourceUrl: { type: String, default: null },
+    refreshedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
