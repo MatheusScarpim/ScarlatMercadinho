@@ -24,6 +24,9 @@ export interface ProductDocument extends Document {
   pisRate?: number | null;
   cofinsRate?: number | null;
   unit?: string | null;
+  minPrice?: number | null;
+  avgPrice?: number | null;
+  maxPrice?: number | null;
 }
 
 const productSchema = new Schema(
@@ -55,7 +58,10 @@ const productSchema = new Schema(
     icmsRate: { type: Number, default: null },
     pisRate: { type: Number, default: null },
     cofinsRate: { type: Number, default: null },
-    unit: { type: String, default: null }
+    unit: { type: String, default: null },
+    minPrice: { type: Number, default: null },
+    avgPrice: { type: Number, default: null },
+    maxPrice: { type: Number, default: null }
   },
   { timestamps: true }
 );

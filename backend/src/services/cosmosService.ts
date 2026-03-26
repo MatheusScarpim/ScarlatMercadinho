@@ -2,25 +2,58 @@ import axios from 'axios';
 import { GtinLookupModel, type GtinLookupDocument } from '../models/GtinLookup';
 import { CategoryModel } from '../models/Category';
 import { ProductModel } from '../models/Product';
-import { scrapeProductName } from './productSearchService';
 
-export interface CosmosProduct {
-  ean: string;
-  name: string | null;
-  description: string | null;
-  averagePrice: string | null;
-  imageUrl: string | null;
-  globalProductCategory?: string | null;
-  categoryCode?: string | null;
-  categoryName?: string | null;
-  url: string;
-}
+// ── Config ──────────────────────────────────────────────────────────
+const COSMOS_API_TOKEN = process.env.COSMOS_API_TOKEN || '';
+const COSMOS_API_TIMEOUT = Number(process.env.COSMOS_API_TIMEOUT_MS ?? 10000);
+
+const SERPAPI_KEY = process.env.SERPAPI_KEY || '';
+const SERPAPI_TIMEOUT = Number(process.env.SERPAPI_TIMEOUT_MS ?? 12000);
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
 const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS ?? 15000);
-const COSMOS_DEBUG = process.env.COSMOS_DEBUG;
+
+// ── Types ───────────────────────────────────────────────────────────
+export interface CosmosProduct {
+  ean: string;
+  name: string | null;
+  description: string | null;
+  averagePrice: string | null;
+  minPrice: string | null;
+  maxPrice: string | null;
+  imageUrl: string | null;
+  globalProductCategory?: string | null;
+  categoryCode?: string | null;
+  categoryName?: string | null;
+  ncm?: string | null;
+  brand?: string | null;
+  gpcDescription?: string | null;
+  url: string;
+}
+
+interface PriceInfo {
+  min: number | null;
+  avg: number | null;
+  max: number | null;
+}
+
+interface CosmosApiResponse {
+  description: string | null;
+  gtin: number;
+  thumbnail: string | null;
+  price: number | null;
+  avg_price: number | null;
+  max_price: number | null;
+  min_price: number | null;
+  brand?: { name: string; picture?: string } | null;
+  gpc?: { code: string; description: string } | null;
+  ncm?: { code: string; description: string; full_description?: string } | null;
+  category?: { id: number; description: string; parent_id?: number } | null;
+  net_weight: number | null;
+  gross_weight: number | null;
+}
 
 type AiProductGuess = {
   ean: string;
@@ -31,42 +64,111 @@ type AiProductGuess = {
   averagePrice: string | null;
 };
 
-function sanitizeCategory(code: string | null | undefined, name: string | null | undefined) {
-  const cleanName = typeof name === 'string' ? name.trim() : '';
-  const validName = cleanName.length ? cleanName : null;
-
-  // Ignora qualquer codigo vindo da IA; usamos apenas nome
-  return { code: null, name: validName };
-}
-
-function inferCategoryName(nameHint: string | null | undefined) {
-  const text = (nameHint || '').toLowerCase();
-  const rules: Array<{ test: RegExp; name: string }> = [
-    { test: /(coca|cola|refrigerante|guarana|soda|refri)/, name: 'Refrigerantes' },
-    { test: /(cerveja|brew|lager|pilsen)/, name: 'Cervejas' },
-    { test: /(agua|mineral)/, name: 'Água' },
-    { test: /(suco|nectar)/, name: 'Sucos' },
-    { test: /(vinho)/, name: 'Vinhos' },
-    { test: /(carne|bovino|frango|suino)/, name: 'Carnes' },
-    { test: /(arroz)/, name: 'Arroz' },
-    { test: /(feijao|feijão)/, name: 'Feijão' },
-    { test: /(pao|pão|panetone|pao de forma)/, name: 'Padaria' },
-    { test: /(leite|lactic)/, name: 'Laticínios' },
-    { test: /(iogurte)/, name: 'Iogurtes' },
-    { test: /(queijo)/, name: 'Queijos' },
-    { test: /(sabao|detergente|limpeza)/, name: 'Limpeza' },
-    { test: /(sabonete|shampoo|higiene|desodorante|creme dental|escova)/, name: 'Higiene Pessoal' },
-    { test: /(cachorro|gato|pet|ração|racao)/, name: 'Pet' },
-    { test: /(fruta|banana|ma\w*|laranja|uva|hortifruti|legume|verdura)/, name: 'Hortifruti' },
-  ];
-  for (const rule of rules) {
-    if (rule.test.test(text)) {
-      return rule.name;
-    }
+// ── 1. COSMOS API REAL ──────────────────────────────────────────────
+async function fetchFromCosmosApi(ean: string): Promise<CosmosApiResponse | null> {
+  if (!COSMOS_API_TOKEN) {
+    console.warn('[COSMOS-API] Token não configurado (COSMOS_API_TOKEN)');
+    return null;
   }
-  return null;
+
+  try {
+    console.log('[COSMOS-API] Buscando EAN:', ean);
+    const { data } = await axios.get<CosmosApiResponse>(
+      `https://api.cosmos.bluesoft.com.br/gtins/${ean}`,
+      {
+        timeout: COSMOS_API_TIMEOUT,
+        headers: {
+          'X-Cosmos-Token': COSMOS_API_TOKEN,
+          'User-Agent': 'ScarlatMercadinho/1.0',
+        },
+      },
+    );
+
+    console.log('[COSMOS-API] Resultado:', {
+      description: data.description,
+      avg_price: data.avg_price,
+      max_price: data.max_price,
+      brand: data.brand?.name,
+      category: data.category?.description,
+      ncm: data.ncm?.code,
+      gpc: data.gpc?.description,
+    });
+
+    return data;
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      console.log('[COSMOS-API] Produto não encontrado no Cosmos:', ean);
+    } else if (err?.response?.status === 401 || err?.response?.status === 403) {
+      console.warn('[COSMOS-API] Token inválido ou expirado');
+    } else {
+      console.warn('[COSMOS-API] Erro:', err?.message);
+    }
+    return null;
+  }
 }
 
+function extractCosmosPrices(data: CosmosApiResponse): PriceInfo {
+  const min = data.min_price && data.min_price > 0 ? data.min_price : null;
+  const avg = data.avg_price && data.avg_price > 0 ? data.avg_price : null;
+  const max = data.max_price && data.max_price > 0 ? data.max_price : null;
+  // price campo avulso como fallback do avg
+  const fallbackAvg = data.price && data.price > 0 ? data.price : null;
+  return { min, avg: avg ?? fallbackAvg, max };
+}
+
+function hasSomePrice(p: PriceInfo): boolean {
+  return p.avg !== null || p.min !== null || p.max !== null;
+}
+
+// ── 2. SERPAPI GOOGLE SHOPPING (fallback de preço) ──────────────────
+async function fetchPriceFromSerpApi(productName: string): Promise<PriceInfo | null> {
+  if (!SERPAPI_KEY) {
+    console.warn('[SERPAPI] Chave não configurada (SERPAPI_KEY)');
+    return null;
+  }
+
+  try {
+    console.log('[SERPAPI] Buscando preço para:', productName);
+    const { data } = await axios.get('https://serpapi.com/search.json', {
+      params: {
+        engine: 'google_shopping',
+        q: productName,
+        gl: 'br',
+        hl: 'pt',
+        api_key: SERPAPI_KEY,
+      },
+      timeout: SERPAPI_TIMEOUT,
+    });
+
+    const results = data.shopping_results || [];
+    if (!results.length) {
+      console.log('[SERPAPI] Nenhum resultado encontrado');
+      return null;
+    }
+
+    const prices: number[] = results
+      .map((r: any) => parseFloat(r.extracted_price))
+      .filter((p: number) => !isNaN(p) && p > 0);
+
+    if (!prices.length) {
+      console.log('[SERPAPI] Resultados sem preço extraível');
+      return null;
+    }
+
+    prices.sort((a, b) => a - b);
+    const min = Math.round(prices[0] * 100) / 100;
+    const max = Math.round(prices[prices.length - 1] * 100) / 100;
+    const avg = Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100;
+
+    console.log('[SERPAPI] Preços:', { min, avg, max, total: prices.length });
+    return { min, avg, max };
+  } catch (err: any) {
+    console.warn('[SERPAPI] Erro:', err?.message);
+    return null;
+  }
+}
+
+// ── 3. OPENAI (último fallback) ─────────────────────────────────────
 function buildMessages(ean: string, nameHint?: string) {
   const system =
     'Voce e um catalogador de produtos brasileiro. Recebe apenas um codigo EAN/GTIN-13 e deve responder estritamente um JSON compacto com os campos: ean, name (nome curto comercial), category_name (apenas nome da categoria, sem codigo), category_code (sempre null) e average_price_brl (preco de venda mais alto que voce ja observou no varejo brasileiro em reais). IMPORTANTE: o preco NUNCA pode ser null ou zero — sempre retorne o valor mais alto que conhecer para esse produto. Se nao souber o preco exato, estime com base em produtos similares usando o valor mais alto da faixa. Nao inclua texto explicativo. Prefira categorias GENERICAS do varejo brasileiro (refrigerantes, cervejas, sucos, agua, laticinios, carnes, hortifruti, limpeza, higiene pessoal, bazar, pet, etc.).';
@@ -74,10 +176,9 @@ function buildMessages(ean: string, nameHint?: string) {
   if (nameHint) {
     userLines.push(`Nome NFCe: ${nameHint}`);
   }
-  const user = userLines.join('\n');
   return [
     { role: 'system', content: system },
-    { role: 'user', content: user },
+    { role: 'user', content: userLines.join('\n') },
   ];
 }
 
@@ -88,13 +189,8 @@ async function fetchProductFromOpenAi(ean: string, nameHint?: string): Promise<A
 
   const url = `${OPENAI_BASE_URL}/chat/completions`;
   const messages = buildMessages(ean, nameHint);
-
   const started = Date.now();
-  console.log('[COSMOS][OPENAI] === ENVIANDO PARA IA ===');
-  console.log('[COSMOS][OPENAI] Model:', OPENAI_MODEL);
-  console.log('[COSMOS][OPENAI] EAN:', ean);
-  console.log('[COSMOS][OPENAI] Nome hint enviado para IA:', nameHint ?? '(nenhum)');
-  console.log('[COSMOS][OPENAI] Prompt user:', messages[1]?.content);
+  console.log('[COSMOS][OPENAI] Enviando para IA | EAN:', ean, '| hint:', nameHint ?? '(nenhum)');
 
   try {
     const { data } = await axios.post(
@@ -115,102 +211,120 @@ async function fetchProductFromOpenAi(ean: string, nameHint?: string): Promise<A
     );
 
     const content = data?.choices?.[0]?.message?.content;
-    console.log('[COSMOS][OPENAI] === RESPOSTA DA IA ===');
-    console.log('[COSMOS][OPENAI] Tempo:', Date.now() - started, 'ms');
-    console.log('[COSMOS][OPENAI] Resposta bruta:', content);
+    console.log('[COSMOS][OPENAI] Resposta em', Date.now() - started, 'ms:', content);
 
     if (!content || typeof content !== 'string') {
       throw new Error('Resposta vazia da OpenAI');
     }
 
-    let parsed: any;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      console.error('[COSMOS][OPENAI] Erro ao parsear JSON:', content);
-      throw new Error('Resposta invalida da OpenAI (nao e JSON)');
-    }
-
-    console.log('[COSMOS][OPENAI] JSON parseado:', JSON.stringify(parsed, null, 2));
-
-    const { name: safeCategoryName } = sanitizeCategory(
-      parsed.category_code ??
-        parsed.categoryCode ??
-        parsed.global_product_category_code ??
-        parsed.globalProductCategory ??
-        null,
-      parsed.category_name ??
-        parsed.categoryName ??
-        parsed.global_product_category_name ??
-        parsed.globalProductCategoryName ??
-        null,
-    );
+    const parsed = JSON.parse(content);
 
     const inferred = inferCategoryName(nameHint || parsed.name || parsed.description || '');
-    const finalCategoryName = (safeCategoryName ?? inferred ?? null)?.toUpperCase() || null;
+    const categoryName = (
+      parsed.category_name ?? parsed.categoryName ?? inferred ?? null
+    )?.toString().toUpperCase() || null;
 
-    const result = {
+    return {
       ean: parsed.ean ?? ean,
       name: parsed.name ?? null,
       description: parsed.description ?? parsed.name ?? null,
       categoryCode: null,
-      categoryName: finalCategoryName,
+      categoryName,
       averagePrice:
         parsed.average_price_brl ??
         parsed.averagePrice ??
         parsed.average_price ??
         parsed.price ??
-        parsed.preco_medio ??
         null,
     };
-
-    console.log('[COSMOS][OPENAI] Resultado final da IA:', JSON.stringify(result));
-    return result;
   } catch (err: any) {
-    console.error('[COSMOS][OPENAI] ERRO:', {
-      ms: Date.now() - started,
-      status: err?.response?.status,
-      message: err?.response?.data?.error?.message || err?.message,
-    });
-    const details =
-      err?.response?.data?.error?.message ||
-      err?.response?.data?.message ||
-      err?.message ||
-      'Erro ao consultar OpenAI';
-    throw new Error(details);
+    console.error('[COSMOS][OPENAI] ERRO:', err?.response?.data?.error?.message || err?.message);
+    throw new Error(err?.response?.data?.error?.message || err?.message || 'Erro OpenAI');
   }
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+function inferCategoryName(nameHint: string | null | undefined) {
+  const text = (nameHint || '').toLowerCase();
+  const rules: Array<{ test: RegExp; name: string }> = [
+    { test: /(coca|cola|refrigerante|guarana|soda|refri)/, name: 'Refrigerantes' },
+    { test: /(cerveja|brew|lager|pilsen)/, name: 'Cervejas' },
+    { test: /(agua|mineral)/, name: 'Água' },
+    { test: /(suco|nectar)/, name: 'Sucos' },
+    { test: /(vinho)/, name: 'Vinhos' },
+    { test: /(carne|bovino|frango|suino)/, name: 'Carnes' },
+    { test: /(arroz)/, name: 'Arroz' },
+    { test: /(feijao|feijão)/, name: 'Feijão' },
+    { test: /(pao|pão|panetone|pao de forma)/, name: 'Padaria' },
+    { test: /(leite|lactic)/, name: 'Laticínios' },
+    { test: /(iogurte)/, name: 'Iogurtes' },
+    { test: /(queijo)/, name: 'Queijos' },
+    { test: /(sabao|detergente|limpeza|desinfetante)/, name: 'Limpeza' },
+    { test: /(sabonete|shampoo|higiene|desodorante|creme dental|escova)/, name: 'Higiene Pessoal' },
+    { test: /(cachorro|gato|pet|ração|racao)/, name: 'Pet' },
+    { test: /(fruta|banana|ma\w*|laranja|uva|hortifruti|legume|verdura)/, name: 'Hortifruti' },
+  ];
+  for (const rule of rules) {
+    if (rule.test.test(text)) return rule.name;
+  }
+  return null;
 }
 
 async function ensureCategory(name: string | null) {
   const normalized = (name || 'OUTROS').toUpperCase();
-
   const existing = await CategoryModel.findOne({ name: normalized }).lean();
   if (existing) return { name: existing.name, id: existing._id?.toString?.() ?? null };
-
   const created = await CategoryModel.create({ name: normalized, active: true });
   return { name: created.name, id: created._id?.toString?.() ?? null };
 }
 
-async function ensureProductFromAi(params: {
+async function ensureProduct(params: {
   ean: string;
   name: string | null;
   description: string | null;
   categoryId: string | null;
   averagePrice: string | null;
+  minPrice: string | null;
+  maxPrice: string | null;
   imageUrl?: string | null;
+  ncm?: string | null;
 }) {
-  const { ean, name, description, categoryId, averagePrice, imageUrl } = params;
+  const { ean, name, description, categoryId, averagePrice, minPrice, maxPrice, imageUrl, ncm } = params;
   const existing = await ProductModel.findOne({ barcode: ean });
   if (existing) {
+    let changed = false;
     if (imageUrl && existing.imageUrl !== imageUrl) {
       existing.imageUrl = imageUrl;
-      await existing.save();
+      changed = true;
     }
+    if (ncm && !existing.ncm) {
+      existing.ncm = ncm;
+      changed = true;
+    }
+    const parsedMin = Number(minPrice);
+    const parsedAvg = Number(averagePrice);
+    const parsedMax = Number(maxPrice);
+    if (Number.isFinite(parsedMin) && parsedMin > 0 && existing.minPrice !== parsedMin) {
+      existing.minPrice = parsedMin;
+      changed = true;
+    }
+    if (Number.isFinite(parsedAvg) && parsedAvg > 0 && existing.avgPrice !== parsedAvg) {
+      existing.avgPrice = parsedAvg;
+      changed = true;
+    }
+    if (Number.isFinite(parsedMax) && parsedMax > 0 && existing.maxPrice !== parsedMax) {
+      existing.maxPrice = parsedMax;
+      changed = true;
+    }
+    if (changed) await existing.save();
     return existing._id.toString();
   }
 
   const sale = Number(averagePrice ?? '');
   const salePrice = Number.isFinite(sale) && sale > 0 ? sale : 0;
+  const minP = Number(minPrice ?? '');
+  const maxP = Number(maxPrice ?? '');
+  const avgP = Number(averagePrice ?? '');
 
   const created = await ProductModel.create({
     name: name || description || 'Produto sem nome',
@@ -220,103 +334,160 @@ async function ensureProductFromAi(params: {
     imageUrl: imageUrl || null,
     costPrice: 0,
     salePrice,
+    minPrice: Number.isFinite(minP) && minP > 0 ? minP : null,
+    avgPrice: Number.isFinite(avgP) && avgP > 0 ? avgP : null,
+    maxPrice: Number.isFinite(maxP) && maxP > 0 ? maxP : null,
     stockQuantity: 0,
     stockByLocation: [],
     minimumStock: 0,
     active: true,
     isWeighed: false,
+    ncm: ncm || null,
   });
 
   return created._id.toString();
 }
 
+// ── MAIN: fetchAndCache ─────────────────────────────────────────────
 async function fetchAndCache(ean: string, nameHint?: string): Promise<GtinLookupDocument> {
   console.log('[COSMOS] ============================================');
   console.log('[COSMOS] INICIANDO AUTO-CADASTRO para EAN:', ean);
-  console.log('[COSMOS] Nome hint recebido:', nameHint ?? '(nenhum)');
   console.log('[COSMOS] ============================================');
 
-  // 1. Busca nome real via product-search.net (scrape)
-  let scrapedName: string | null = null;
-  try {
-    scrapedName = await scrapeProductName(ean);
-  } catch (err: any) {
-    console.warn('[COSMOS] Falha ao buscar nome via scrape:', err?.message);
+  // ── PASSO 1: Cosmos API real ──
+  const cosmosData = await fetchFromCosmosApi(ean);
+
+  let name: string | null = cosmosData?.description ?? null;
+  let categoryName: string | null = cosmosData?.category?.description?.toUpperCase() ?? null;
+  let ncm: string | null = cosmosData?.ncm?.code ?? null;
+  let brand: string | null = cosmosData?.brand?.name ?? null;
+  let gpcDescription: string | null = cosmosData?.gpc?.description ?? null;
+  let imageUrl: string | null = cosmosData?.thumbnail ?? `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
+  let prices: PriceInfo = cosmosData ? extractCosmosPrices(cosmosData) : { min: null, avg: null, max: null };
+  let priceSource = hasSomePrice(prices) ? 'cosmos-api' : null;
+
+  console.log('[COSMOS] Cosmos API:', {
+    name,
+    categoryName,
+    ncm,
+    brand,
+    prices,
+  });
+
+  // Se não achou categoria no Cosmos, tenta inferir pelo nome
+  if (!categoryName && name) {
+    categoryName = inferCategoryName(name)?.toUpperCase() ?? null;
   }
-  console.log('[COSMOS] Nome do scrape:', scrapedName ?? '(null - não encontrou)');
 
-  // Usa o nome do scrape como hint pro GPT (mais preciso)
-  const effectiveHint = scrapedName || nameHint;
-  console.log('[COSMOS] Hint efetivo que será enviado para IA:', effectiveHint ?? '(nenhum - IA vai chutar!)');
-
-  // 2. Busca preço e categoria via GPT
-  let aiResult: AiProductGuess | null = null;
-  try {
-    aiResult = await fetchProductFromOpenAi(ean, effectiveHint);
-  } catch (err: any) {
-    console.error('[COSMOS] OpenAI indisponivel:', err?.message);
-    throw new Error('Não foi possível obter dados do produto via IA');
+  // ── PASSO 2: Se sem preço → SerpAPI Google Shopping ──
+  if (!prices.avg) {
+    const searchQuery = name || nameHint || ean;
+    console.log('[COSMOS] Sem preço no Cosmos, tentando SerpAPI para:', searchQuery);
+    const serpPrices = await fetchPriceFromSerpApi(searchQuery);
+    if (serpPrices && serpPrices.avg) {
+      prices = {
+        min: prices.min ?? serpPrices.min,
+        avg: prices.avg ?? serpPrices.avg,
+        max: prices.max ?? serpPrices.max,
+      };
+      priceSource = 'serpapi';
+      console.log('[COSMOS] SerpAPI retornou preços:', prices);
+    }
   }
 
-  // Nome: prioridade scrape > IA > hint
-  const name = scrapedName || aiResult?.name || nameHint || null;
-  const description = aiResult?.description ?? nameHint ?? null;
-  const categoryNameRaw = aiResult?.categoryName ?? aiResult?.categoryCode ?? inferCategoryName(effectiveHint) ?? null;
-  const averagePrice = aiResult?.averagePrice ?? null;
+  // ── PASSO 3: Se ainda sem preço OU sem nome → OpenAI ──
+  if (!prices.avg || !name) {
+    console.log('[COSMOS] Fallback OpenAI | sem preço:', !prices.avg, '| sem nome:', !name);
+    try {
+      const aiResult = await fetchProductFromOpenAi(ean, name || nameHint);
 
-  console.log('[COSMOS] === DECISÃO FINAL ===');
-  console.log('[COSMOS] Nome final (scrape > IA > hint):', name);
-  console.log('[COSMOS] Descrição:', description);
-  console.log('[COSMOS] Categoria:', categoryNameRaw);
-  console.log('[COSMOS] Preço:', averagePrice);
+      if (!name) {
+        name = aiResult.name;
+      }
+      if (!categoryName && aiResult.categoryName) {
+        categoryName = aiResult.categoryName;
+      }
+      if (!prices.avg) {
+        const aiPrice = Number(aiResult.averagePrice);
+        if (Number.isFinite(aiPrice) && aiPrice > 0) {
+          prices.avg = aiPrice;
+          priceSource = 'openai';
+          console.log('[COSMOS] OpenAI retornou preço:', aiPrice);
+        }
+      }
+    } catch (err: any) {
+      console.error('[COSMOS] OpenAI indisponivel:', err?.message);
+    }
+  }
 
-  // Não auto-criar produto sem preço
+  // ── Validação final ──
+  const averagePrice = prices.avg ? String(prices.avg) : null;
+  const minPrice = prices.min ? String(prices.min) : null;
+  const maxPrice = prices.max ? String(prices.max) : null;
+
   if (!averagePrice || Number(averagePrice) <= 0) {
-    console.warn('[COSMOS] IA retornou sem preço para EAN:', ean, '– produto não será auto-criado');
+    console.warn('[COSMOS] Nenhuma fonte retornou preço para EAN:', ean);
     throw new Error('Preço não disponível para auto-cadastro');
   }
 
-  const ensuredCategory = await ensureCategory(categoryNameRaw);
+  console.log('[COSMOS] === DECISÃO FINAL ===');
+  console.log('[COSMOS] Nome:', name);
+  console.log('[COSMOS] Categoria:', categoryName);
+  console.log('[COSMOS] NCM:', ncm);
+  console.log('[COSMOS] Marca:', brand);
+  console.log('[COSMOS] Preços: min=', minPrice, '| avg=', averagePrice, '| max=', maxPrice, '| Fonte:', priceSource);
+  console.log('[COSMOS] Imagem:', imageUrl);
 
-  // 3. Imagem: sempre usar Cosmos CDN
-  const cosmosImageUrl = `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
+  // Garantir categoria
+  const ensuredCategory = await ensureCategory(categoryName);
 
-  await ensureProductFromAi({
-    ean: aiResult?.ean ?? ean,
+  // Garantir produto
+  await ensureProduct({
+    ean,
     name,
-    description,
+    description: name,
     categoryId: ensuredCategory.id,
     averagePrice,
-    imageUrl: cosmosImageUrl,
+    minPrice,
+    maxPrice,
+    imageUrl,
+    ncm,
   });
 
+  // Cache no GtinLookup
   const created = await GtinLookupModel.create({
-    ean: aiResult?.ean ?? ean,
+    ean,
     name,
-    description: description ?? name,
-    globalProductCategory: ensuredCategory.name ?? categoryNameRaw,
+    description: name,
+    globalProductCategory: ensuredCategory.name ?? categoryName,
     categoryId: ensuredCategory.id ?? null,
-    categoryName: ensuredCategory.name ?? categoryNameRaw,
-    imageUrl: cosmosImageUrl,
+    categoryName: ensuredCategory.name ?? categoryName,
+    imageUrl,
     averagePrice,
-    sourceUrl: aiResult ? 'openai' : 'nfce-fallback',
+    minPrice,
+    maxPrice,
+    sourceUrl: priceSource ?? 'unknown',
   });
 
   return created;
 }
 
+// ── EXPORT: fetchCosmosProduct ──────────────────────────────────────
 export async function fetchCosmosProduct(ean: string, nameHint?: string): Promise<CosmosProduct> {
+  // Verifica cache existente
   const existing = await GtinLookupModel.findOne({ ean }).lean<GtinLookupDocument | null>();
   if (existing) {
-    const cosmosImage = `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
+    const cosmosImage = existing.imageUrl ?? `https://cdn-cosmos.bluesoft.com.br/products/${ean}`;
 
     const ensuredCategory = await ensureCategory(existing.globalProductCategory ?? null);
-    await ensureProductFromAi({
+    await ensureProduct({
       ean,
       name: existing.name,
       description: existing.description,
       categoryId: ensuredCategory.id,
       averagePrice: existing.averagePrice,
+      minPrice: existing.minPrice ?? null,
+      maxPrice: existing.maxPrice ?? null,
       imageUrl: cosmosImage,
     });
 
@@ -325,14 +496,17 @@ export async function fetchCosmosProduct(ean: string, nameHint?: string): Promis
       name: existing.name ?? null,
       description: existing.description ?? existing.name ?? null,
       averagePrice: existing.averagePrice ?? null,
+      minPrice: existing.minPrice ?? null,
+      maxPrice: existing.maxPrice ?? null,
       imageUrl: cosmosImage,
       globalProductCategory: existing.globalProductCategory ?? existing.categoryName ?? null,
       categoryCode: null,
       categoryName: existing.categoryName ?? existing.globalProductCategory ?? null,
-      url: existing.sourceUrl ?? 'openai',
+      url: existing.sourceUrl ?? 'cosmos-api',
     };
   }
 
+  // Busca e cacheia
   const created = await fetchAndCache(ean, nameHint);
 
   return {
@@ -340,10 +514,12 @@ export async function fetchCosmosProduct(ean: string, nameHint?: string): Promis
     name: created.name ?? null,
     description: created.description ?? created.name ?? null,
     averagePrice: created.averagePrice ?? null,
+    minPrice: created.minPrice ?? null,
+    maxPrice: created.maxPrice ?? null,
     imageUrl: created.imageUrl ?? null,
     globalProductCategory: created.globalProductCategory ?? created.categoryName ?? null,
     categoryCode: null,
     categoryName: created.categoryName ?? created.globalProductCategory ?? null,
-    url: created.sourceUrl ?? 'openai',
+    url: created.sourceUrl ?? 'cosmos-api',
   };
 }
