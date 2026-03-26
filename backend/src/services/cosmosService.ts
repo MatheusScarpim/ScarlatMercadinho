@@ -3,12 +3,34 @@ import { GtinLookupModel, type GtinLookupDocument } from '../models/GtinLookup';
 import { CategoryModel } from '../models/Category';
 import { ProductModel } from '../models/Product';
 
-// ── Config ──────────────────────────────────────────────────────────
-const COSMOS_API_TOKEN = process.env.COSMOS_API_TOKEN || '';
-const COSMOS_API_TIMEOUT = Number(process.env.COSMOS_API_TIMEOUT_MS ?? 10000);
+// ── Config (multi-key) ──────────────────────────────────────────────
+function parseKeys(envVar: string): string[] {
+  const val = process.env[envVar] || '';
+  return val.split(',').map((k) => k.trim()).filter(Boolean);
+}
 
-const SERPAPI_KEY = process.env.SERPAPI_KEY || '';
+const COSMOS_TOKENS = parseKeys('COSMOS_API_TOKEN');
+const SERPAPI_KEYS = parseKeys('SERPAPI_KEY');
+const COSMOS_API_TIMEOUT = Number(process.env.COSMOS_API_TIMEOUT_MS ?? 10000);
 const SERPAPI_TIMEOUT = Number(process.env.SERPAPI_TIMEOUT_MS ?? 12000);
+
+// Round-robin simples para distribuir entre keys
+let cosmosKeyIndex = 0;
+let serpKeyIndex = 0;
+
+function nextCosmosToken(): string | null {
+  if (!COSMOS_TOKENS.length) return null;
+  const token = COSMOS_TOKENS[cosmosKeyIndex % COSMOS_TOKENS.length];
+  cosmosKeyIndex++;
+  return token;
+}
+
+function nextSerpKey(): string | null {
+  if (!SERPAPI_KEYS.length) return null;
+  const key = SERPAPI_KEYS[serpKeyIndex % SERPAPI_KEYS.length];
+  serpKeyIndex++;
+  return key;
+}
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -66,8 +88,9 @@ type AiProductGuess = {
 
 // ── 1. COSMOS API REAL ──────────────────────────────────────────────
 async function fetchFromCosmosApi(ean: string): Promise<CosmosApiResponse | null> {
-  if (!COSMOS_API_TOKEN) {
-    console.warn('[COSMOS-API] Token não configurado (COSMOS_API_TOKEN)');
+  const token = nextCosmosToken();
+  if (!token) {
+    console.warn('[COSMOS-API] Nenhum token configurado (COSMOS_API_TOKEN)');
     return null;
   }
 
@@ -78,7 +101,7 @@ async function fetchFromCosmosApi(ean: string): Promise<CosmosApiResponse | null
       {
         timeout: COSMOS_API_TIMEOUT,
         headers: {
-          'X-Cosmos-Token': COSMOS_API_TOKEN,
+          'X-Cosmos-Token': token,
           'User-Agent': 'ScarlatMercadinho/1.0',
         },
       },
@@ -121,9 +144,40 @@ function hasSomePrice(p: PriceInfo): boolean {
 }
 
 // ── 2. SERPAPI GOOGLE SHOPPING (fallback de preço) ──────────────────
+
+/**
+ * Remove outliers de preço (kits atacado, importados absurdos).
+ * 1. Corta tudo acima de 3x a mediana (um Twix de R$3 nunca custa R$85)
+ * 2. Depois aplica IQR se ainda sobrar >= 4 itens
+ */
+function removeOutliers(raw: number[]): number[] {
+  if (raw.length < 2) return raw;
+  const sorted = [...raw].sort((a, b) => a - b);
+
+  // Passo 1: corte pela mediana — nada acima de 3x a mediana
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const ceiling = median * 3;
+  let filtered = sorted.filter((p) => p <= ceiling);
+  if (!filtered.length) filtered = sorted;
+
+  // Passo 2: IQR se tiver amostra suficiente
+  if (filtered.length >= 4) {
+    const q1 = filtered[Math.floor(filtered.length * 0.25)];
+    const q3 = filtered[Math.floor(filtered.length * 0.75)];
+    const iqr = q3 - q1;
+    const lower = q1 - 1.5 * iqr;
+    const upper = q3 + 1.5 * iqr;
+    const iqrFiltered = filtered.filter((p) => p >= lower && p <= upper);
+    if (iqrFiltered.length) filtered = iqrFiltered;
+  }
+
+  return filtered;
+}
+
 async function fetchPriceFromSerpApi(productName: string): Promise<PriceInfo | null> {
-  if (!SERPAPI_KEY) {
-    console.warn('[SERPAPI] Chave não configurada (SERPAPI_KEY)');
+  const apiKey = nextSerpKey();
+  if (!apiKey) {
+    console.warn('[SERPAPI] Nenhuma chave configurada (SERPAPI_KEY)');
     return null;
   }
 
@@ -135,7 +189,7 @@ async function fetchPriceFromSerpApi(productName: string): Promise<PriceInfo | n
         q: productName,
         gl: 'br',
         hl: 'pt',
-        api_key: SERPAPI_KEY,
+        api_key: apiKey,
       },
       timeout: SERPAPI_TIMEOUT,
     });
@@ -146,21 +200,22 @@ async function fetchPriceFromSerpApi(productName: string): Promise<PriceInfo | n
       return null;
     }
 
-    const prices: number[] = results
+    const raw: number[] = results
       .map((r: any) => parseFloat(r.extracted_price))
       .filter((p: number) => !isNaN(p) && p > 0);
 
-    if (!prices.length) {
+    if (!raw.length) {
       console.log('[SERPAPI] Resultados sem preço extraível');
       return null;
     }
 
+    const prices = removeOutliers(raw);
     prices.sort((a, b) => a - b);
     const min = Math.round(prices[0] * 100) / 100;
     const max = Math.round(prices[prices.length - 1] * 100) / 100;
     const avg = Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100;
 
-    console.log('[SERPAPI] Preços:', { min, avg, max, total: prices.length });
+    console.log('[SERPAPI] Preços (após filtro outliers):', { min, avg, max, total: prices.length, descartados: raw.length - prices.length });
     return { min, avg, max };
   } catch (err: any) {
     console.warn('[SERPAPI] Erro:', err?.message);

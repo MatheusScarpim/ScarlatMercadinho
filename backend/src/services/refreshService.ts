@@ -3,11 +3,44 @@ import { ProductModel } from '../models/Product';
 import { GtinLookupModel } from '../models/GtinLookup';
 import { CategoryModel } from '../models/Category';
 
-const COSMOS_API_TOKEN = process.env.COSMOS_API_TOKEN || '';
-const SERPAPI_KEY = process.env.SERPAPI_KEY || '';
-const COSMOS_DAILY_LIMIT = Number(process.env.COSMOS_DAILY_LIMIT ?? 25);
-const SERPAPI_MONTHLY_LIMIT = Number(process.env.SERPAPI_MONTHLY_LIMIT ?? 250);
+// ── Multi-key config ────────────────────────────────────────────────
+// .env: COSMOS_API_TOKEN=key1,key2   SERPAPI_KEY=key1,key2
+function parseKeys(envVar: string): string[] {
+  const val = process.env[envVar] || '';
+  return val.split(',').map((k) => k.trim()).filter(Boolean);
+}
+
+const COSMOS_TOKENS = parseKeys('COSMOS_API_TOKEN');
+const SERPAPI_KEYS = parseKeys('SERPAPI_KEY');
+const COSMOS_LIMIT_PER_KEY = Number(process.env.COSMOS_DAILY_LIMIT ?? 25);
+const SERPAPI_LIMIT_PER_KEY = Number(process.env.SERPAPI_MONTHLY_LIMIT ?? 250);
 const DELAY_MS = Number(process.env.REFRESH_DELAY_MS ?? 1000);
+
+// Limite total = soma de todas as keys
+const COSMOS_TOTAL_LIMIT = COSMOS_LIMIT_PER_KEY * COSMOS_TOKENS.length;
+const SERPAPI_TOTAL_LIMIT = SERPAPI_LIMIT_PER_KEY * SERPAPI_KEYS.length;
+
+// Contadores por key
+const cosmosKeyUsage: number[] = COSMOS_TOKENS.map(() => 0);
+const serpKeyUsage: number[] = SERPAPI_KEYS.map(() => 0);
+
+function getAvailableCosmosKey(): { token: string; index: number } | null {
+  for (let i = 0; i < COSMOS_TOKENS.length; i++) {
+    if (cosmosKeyUsage[i] < COSMOS_LIMIT_PER_KEY) {
+      return { token: COSMOS_TOKENS[i], index: i };
+    }
+  }
+  return null;
+}
+
+function getAvailableSerpKey(): { key: string; index: number } | null {
+  for (let i = 0; i < SERPAPI_KEYS.length; i++) {
+    if (serpKeyUsage[i] < SERPAPI_LIMIT_PER_KEY) {
+      return { key: SERPAPI_KEYS[i], index: i };
+    }
+  }
+  return null;
+}
 
 // ── Estado global do job ────────────────────────────────────────────
 interface RefreshState {
@@ -18,7 +51,9 @@ interface RefreshState {
   noChanges: number;
   failed: number;
   cosmosUsed: number;
+  cosmosTotal: number;
   serpUsed: number;
+  serpTotal: number;
   currentProduct: string | null;
   stoppedReason: string | null;
   startedAt: Date | null;
@@ -33,7 +68,9 @@ const state: RefreshState = {
   noChanges: 0,
   failed: 0,
   cosmosUsed: 0,
+  cosmosTotal: COSMOS_TOTAL_LIMIT,
   serpUsed: 0,
+  serpTotal: SERPAPI_TOTAL_LIMIT,
   currentProduct: null,
   stoppedReason: null,
   startedAt: null,
@@ -69,42 +106,75 @@ export function abortRefresh() {
 
 // ── APIs ────────────────────────────────────────────────────────────
 async function fetchCosmos(ean: string) {
-  if (!COSMOS_API_TOKEN || state.cosmosUsed >= COSMOS_DAILY_LIMIT) return null;
+  const keyInfo = getAvailableCosmosKey();
+  if (!keyInfo) return null;
   try {
+    cosmosKeyUsage[keyInfo.index]++;
     state.cosmosUsed++;
     const { data } = await axios.get(
       `https://api.cosmos.bluesoft.com.br/gtins/${ean}`,
       {
         timeout: 10000,
-        headers: { 'X-Cosmos-Token': COSMOS_API_TOKEN, 'User-Agent': 'ScarlatMercadinho/1.0' },
+        headers: { 'X-Cosmos-Token': keyInfo.token, 'User-Agent': 'ScarlatMercadinho/1.0' },
       },
     );
     return data;
   } catch (err: any) {
-    if (err?.response?.status === 429) state.cosmosUsed = COSMOS_DAILY_LIMIT;
+    if (err?.response?.status === 429) {
+      // Esgotou essa key
+      cosmosKeyUsage[keyInfo.index] = COSMOS_LIMIT_PER_KEY;
+    }
     return null;
   }
 }
 
+function removeOutliers(raw: number[]): number[] {
+  if (raw.length < 2) return raw;
+  const sorted = [...raw].sort((a, b) => a - b);
+
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const ceiling = median * 3;
+  let filtered = sorted.filter((p) => p <= ceiling);
+  if (!filtered.length) filtered = sorted;
+
+  if (filtered.length >= 4) {
+    const q1 = filtered[Math.floor(filtered.length * 0.25)];
+    const q3 = filtered[Math.floor(filtered.length * 0.75)];
+    const iqr = q3 - q1;
+    const lower = q1 - 1.5 * iqr;
+    const upper = q3 + 1.5 * iqr;
+    const iqrFiltered = filtered.filter((p) => p >= lower && p <= upper);
+    if (iqrFiltered.length) filtered = iqrFiltered;
+  }
+
+  return filtered;
+}
+
 async function fetchSerpPrices(productName: string) {
-  if (!SERPAPI_KEY || state.serpUsed >= SERPAPI_MONTHLY_LIMIT) return null;
+  const keyInfo = getAvailableSerpKey();
+  if (!keyInfo) return null;
   try {
+    serpKeyUsage[keyInfo.index]++;
     state.serpUsed++;
     const { data } = await axios.get('https://serpapi.com/search.json', {
-      params: { engine: 'google_shopping', q: productName, gl: 'br', hl: 'pt', api_key: SERPAPI_KEY },
+      params: { engine: 'google_shopping', q: productName, gl: 'br', hl: 'pt', api_key: keyInfo.key },
       timeout: 12000,
     });
-    const prices: number[] = (data.shopping_results || [])
+    const raw: number[] = (data.shopping_results || [])
       .map((r: any) => parseFloat(r.extracted_price))
       .filter((p: number) => !isNaN(p) && p > 0);
-    if (!prices.length) return null;
+    if (!raw.length) return null;
+    const prices = removeOutliers(raw);
     prices.sort((a, b) => a - b);
     return {
       min: Math.round(prices[0] * 100) / 100,
       avg: Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100,
       max: Math.round(prices[prices.length - 1] * 100) / 100,
     };
-  } catch {
+  } catch (err: any) {
+    if (err?.response?.status === 429) {
+      serpKeyUsage[keyInfo.index] = SERPAPI_LIMIT_PER_KEY;
+    }
     return null;
   }
 }
@@ -131,12 +201,18 @@ export async function startRefresh(forceAll = false) {
   state.noChanges = 0;
   state.failed = 0;
   state.cosmosUsed = 0;
+  state.cosmosTotal = COSMOS_TOTAL_LIMIT;
   state.serpUsed = 0;
+  state.serpTotal = SERPAPI_TOTAL_LIMIT;
   state.currentProduct = null;
   state.stoppedReason = null;
   state.startedAt = new Date();
   state.finishedAt = null;
   abortRequested = false;
+
+  // Reset contadores por key
+  cosmosKeyUsage.fill(0);
+  serpKeyUsage.fill(0);
 
   try {
     const allProducts = await ProductModel.find({}).lean();
@@ -152,8 +228,10 @@ export async function startRefresh(forceAll = false) {
     emit('start', {
       total: pendentes.length,
       jaProcessados: allProducts.length - pendentes.length,
-      cosmosLimit: COSMOS_DAILY_LIMIT,
-      serpLimit: SERPAPI_KEY ? SERPAPI_MONTHLY_LIMIT : 0,
+      cosmosKeys: COSMOS_TOKENS.length,
+      cosmosLimitTotal: COSMOS_TOTAL_LIMIT,
+      serpKeys: SERPAPI_KEYS.length,
+      serpLimitTotal: SERPAPI_TOTAL_LIMIT,
     });
 
     for (let i = 0; i < pendentes.length; i++) {
@@ -163,8 +241,8 @@ export async function startRefresh(forceAll = false) {
         break;
       }
 
-      if (state.cosmosUsed >= COSMOS_DAILY_LIMIT) {
-        state.stoppedReason = `Limite diário Cosmos (${COSMOS_DAILY_LIMIT})`;
+      if (!getAvailableCosmosKey()) {
+        state.stoppedReason = `Todas as keys Cosmos esgotadas (${COSMOS_TOKENS.length} keys × ${COSMOS_LIMIT_PER_KEY}/dia = ${COSMOS_TOTAL_LIMIT} total)`;
         emit('stopped', { reason: state.stoppedReason, restantes: pendentes.length - i });
         break;
       }
@@ -197,7 +275,7 @@ export async function startRefresh(forceAll = false) {
           categoryName = cosmos.category?.description ?? null;
         }
 
-        if (!avgPrice && SERPAPI_KEY && state.serpUsed < SERPAPI_MONTHLY_LIMIT) {
+        if (!avgPrice && getAvailableSerpKey()) {
           const serp = await fetchSerpPrices(product.name || ean);
           if (serp) {
             minPrice = minPrice ?? serp.min;

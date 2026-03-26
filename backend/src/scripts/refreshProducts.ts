@@ -57,6 +57,29 @@ async function fetchCosmos(ean: string) {
   }
 }
 
+// ── Filtro de outliers (IQR) ─────────────────────────────────────────
+function removeOutliers(raw: number[]): number[] {
+  if (raw.length < 2) return raw;
+  const sorted = [...raw].sort((a, b) => a - b);
+
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const ceiling = median * 3;
+  let filtered = sorted.filter((p) => p <= ceiling);
+  if (!filtered.length) filtered = sorted;
+
+  if (filtered.length >= 4) {
+    const q1 = filtered[Math.floor(filtered.length * 0.25)];
+    const q3 = filtered[Math.floor(filtered.length * 0.75)];
+    const iqr = q3 - q1;
+    const lower = q1 - 1.5 * iqr;
+    const upper = q3 + 1.5 * iqr;
+    const iqrFiltered = filtered.filter((p) => p >= lower && p <= upper);
+    if (iqrFiltered.length) filtered = iqrFiltered;
+  }
+
+  return filtered;
+}
+
 // ── SerpAPI ─────────────────────────────────────────────────────────
 async function fetchSerpPrices(productName: string) {
   if (!SERPAPI_KEY || serpUsed >= SERPAPI_MONTHLY_LIMIT) return null;
@@ -66,10 +89,11 @@ async function fetchSerpPrices(productName: string) {
       params: { engine: 'google_shopping', q: productName, gl: 'br', hl: 'pt', api_key: SERPAPI_KEY },
       timeout: 12000,
     });
-    const prices: number[] = (data.shopping_results || [])
+    const raw: number[] = (data.shopping_results || [])
       .map((r: any) => parseFloat(r.extracted_price))
       .filter((p: number) => !isNaN(p) && p > 0);
-    if (!prices.length) return null;
+    if (!raw.length) return null;
+    const prices = removeOutliers(raw);
     prices.sort((a, b) => a - b);
     return {
       min: Math.round(prices[0] * 100) / 100,

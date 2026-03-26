@@ -37,7 +37,7 @@
     <div class="refresh-status glass" v-if="refreshStatus && refreshStatus.running">
       <div class="refresh-info">
         <span>Refresh em andamento: {{ refreshStatus.processed }}/{{ refreshStatus.total }}</span>
-        <span class="muted">Cosmos: {{ refreshStatus.cosmosUsed }}/25 | Serp: {{ refreshStatus.serpUsed }}</span>
+        <span class="muted">Cosmos: {{ refreshStatus.cosmosUsed }}/{{ refreshStatus.cosmosTotal }} | Serp: {{ refreshStatus.serpUsed }}/{{ refreshStatus.serpTotal }}</span>
       </div>
       <div class="refresh-bar">
         <div class="refresh-progress" :style="{ width: refreshPercent + '%' }"></div>
@@ -97,9 +97,19 @@
           </div>
 
           <div class="price-details">
+            <div class="price-col col-cost">
+              <span class="price-title">Custo</span>
+              <span class="price-small">R$ {{ fmt(item.costPrice) }}</span>
+            </div>
             <div class="price-col">
               <span class="price-title">Seu preço</span>
               <span class="price-big" :class="item.status">R$ {{ fmt(item.salePrice) }}</span>
+            </div>
+            <div class="price-col col-margin">
+              <span class="price-title">Margem atual</span>
+              <span class="price-small" :class="marginClass(item.costPrice, item.salePrice)">
+                {{ marginPercent(item.costPrice, item.salePrice) }}%
+              </span>
             </div>
             <div class="price-col" v-if="item.minPrice">
               <span class="price-title">Mín. mercado</span>
@@ -116,9 +126,12 @@
           </div>
         </div>
 
-        <div class="diff-indicator" v-if="item.diffPercent">
+        <div class="diff-indicator" v-if="item.diffPercent || item.costPrice > 0">
           <span v-if="item.status === 'above'" class="diff above">{{ item.diffPercent }}% acima do máximo</span>
           <span v-else-if="item.status === 'below'" class="diff below">{{ item.diffPercent }}% abaixo do mínimo</span>
+          <span v-if="item.avgPrice && item.costPrice > 0" class="diff margin-hint">
+            Se usar média: margem de {{ marginPercent(item.costPrice, item.avgPrice) }}%
+          </span>
         </div>
 
         <div class="card-actions">
@@ -142,13 +155,20 @@
                 Salvar
               </button>
             </div>
+            <p class="margin-preview" v-if="item.newPrice && item.newPrice > 0 && item.costPrice > 0">
+              Nova margem:
+              <strong :class="marginClass(item.costPrice, item.newPrice)">
+                {{ marginPercent(item.costPrice, item.newPrice) }}%
+              </strong>
+              (lucro R$ {{ fmt(item.newPrice - item.costPrice) }})
+            </p>
           </div>
           <button
             v-if="item.avgPrice && item.status !== 'ok'"
             class="btn btn-sm btn-ghost"
             @click="setToAvg(item)"
           >
-            Usar preço médio (R$ {{ fmt(item.avgPrice) }})
+            Usar preço médio (R$ {{ fmt(item.avgPrice) }}) — margem {{ marginPercent(item.costPrice, item.avgPrice) }}%
           </button>
         </div>
       </div>
@@ -221,6 +241,21 @@ const refreshPercent = computed(() => {
 function fmt(val: number | null | undefined): string {
   if (val === null || val === undefined) return '-';
   return val.toFixed(2);
+}
+
+function marginPercent(cost: number | null | undefined, sale: number | null | undefined): string {
+  if (!cost || !sale || cost <= 0) return '—';
+  const margin = ((sale - cost) / cost) * 100;
+  return margin.toFixed(1);
+}
+
+function marginClass(cost: number | null | undefined, sale: number | null | undefined): string {
+  if (!cost || !sale || cost <= 0) return '';
+  const margin = ((sale - cost) / cost) * 100;
+  if (margin < 0) return 'margin-negative';
+  if (margin < 15) return 'margin-low';
+  if (margin < 40) return 'margin-ok';
+  return 'margin-high';
 }
 
 function statusLabel(status: string): string {
@@ -785,6 +820,32 @@ onMounted(async () => {
   font-size: 11px;
   border-radius: 5px;
   white-space: nowrap;
+}
+
+/* Margin colors */
+.margin-negative { color: #ef4444; font-weight: 700; }
+.margin-low { color: #f59e0b; font-weight: 700; }
+.margin-ok { color: #22c55e; font-weight: 700; }
+.margin-high { color: #3b82f6; font-weight: 700; }
+
+.col-cost {
+  border-left: 2px solid var(--border);
+}
+
+.col-margin {
+  border-right: 2px solid var(--border);
+}
+
+.margin-preview {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.margin-hint {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  margin-left: 6px;
 }
 
 .muted { color: var(--muted); }
