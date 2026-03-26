@@ -1091,7 +1091,7 @@ function startReloadPolling() {
     } catch {
       // ignora erros de rede no polling
     }
-  }, 30000);
+  }, 10000);
 }
 
 function stopReloadPolling() {

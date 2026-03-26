@@ -26,8 +26,13 @@ export async function requestReloadAll(_req: Request, res: Response) {
 // O kiosk chama essa rota para verificar se precisa recarregar (polling)
 export async function checkReload(req: Request, res: Response) {
   const code = req.params.code?.toUpperCase();
+  console.log(`[KIOSK] check-reload recebido para code="${code}"`);
   const location = await LocationModel.findOne({ code });
-  if (!location) return res.json({ reload: false });
+  if (!location) {
+    console.log(`[KIOSK] Local com code="${code}" NÃO encontrado no banco`);
+    return res.json({ reload: false });
+  }
+  console.log(`[KIOSK] Local "${location.name}" encontrado, reloadRequested=${location.reloadRequested}`);
 
   if (location.reloadRequested) {
     // Limpa a flag para não recarregar em loop
