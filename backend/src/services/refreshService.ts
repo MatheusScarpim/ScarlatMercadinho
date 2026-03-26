@@ -107,10 +107,15 @@ export function abortRefresh() {
 // ── APIs ────────────────────────────────────────────────────────────
 async function fetchCosmos(ean: string) {
   const keyInfo = getAvailableCosmosKey();
-  if (!keyInfo) return null;
+  if (!keyInfo) {
+    console.log('[COSMOS] Sem key disponível');
+    return null;
+  }
   try {
     cosmosKeyUsage[keyInfo.index]++;
     state.cosmosUsed++;
+    console.log(`[COSMOS] Buscando EAN: ${ean} (key ${keyInfo.index + 1}/${COSMOS_TOKENS.length}, uso ${cosmosKeyUsage[keyInfo.index]}/${COSMOS_LIMIT_PER_KEY})`);
+
     const { data } = await axios.get(
       `https://api.cosmos.bluesoft.com.br/gtins/${ean}`,
       {
@@ -118,11 +123,20 @@ async function fetchCosmos(ean: string) {
         headers: { 'X-Cosmos-Token': keyInfo.token, 'User-Agent': 'ScarlatMercadinho/1.0' },
       },
     );
+
+    console.log(`[COSMOS] Encontrado: "${data.description ?? '?'}"`);
+    console.log(`[COSMOS]   Preços brutos: min=${data.min_price} avg=${data.avg_price} max=${data.max_price} price=${data.price}`);
+    console.log(`[COSMOS]   Categoria: ${data.category?.description ?? '?'} | NCM: ${data.ncm?.code ?? '?'} | Marca: ${data.brand?.name ?? '?'}`);
+
     return data;
   } catch (err: any) {
     if (err?.response?.status === 429) {
-      // Esgotou essa key
       cosmosKeyUsage[keyInfo.index] = COSMOS_LIMIT_PER_KEY;
+      console.warn(`[COSMOS] Key ${keyInfo.index + 1} esgotada (429)`);
+    } else if (err?.response?.status === 404) {
+      console.log(`[COSMOS] EAN ${ean} não encontrado`);
+    } else {
+      console.error(`[COSMOS] ERRO: ${err?.response?.status ?? ''} ${err?.message}`);
     }
     return null;
   }
@@ -178,30 +192,137 @@ function sanitizePrices(p: { min: number | null; avg: number | null; max: number
   return { min, avg, max };
 }
 
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
+
+/**
+ * Envia os resultados do Google Shopping pra IA analisar.
+ * A IA filtra packs/kits/atacado/marcas diferentes e retorna
+ * direto o min, avg e max do preço unitário correto.
+ */
+async function analyzePricesWithAi(
+  productName: string,
+  results: Array<{ title: string; price: number }>,
+): Promise<{ min: number; avg: number; max: number } | null> {
+  if (!OPENAI_API_KEY || !results.length) return null;
+
+  const listings = results
+    .map((r, i) => `${i + 1}. "${r.title}" — R$ ${r.price.toFixed(2)}`)
+    .join('\n');
+
+  try {
+    const { data } = await axios.post(
+      `${OPENAI_BASE_URL}/chat/completions`,
+      {
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: `Você é um analista de preços de varejo brasileiro. Recebe o nome exato de um produto (com marca, tipo e gramatura) e uma lista de resultados do Google Shopping.
+
+Sua tarefa:
+1. Identificar quais resultados são venda UNITÁRIA do EXATO mesmo produto (mesma marca, mesmo tipo, mesma gramatura/tamanho)
+2. DESCARTAR: packs, kits, caixas, multipacks, atacado, frete incluído no preço, marcas diferentes, sabores diferentes, tamanhos/gramaturas diferentes
+3. Com os preços válidos, calcular min, média e máximo
+4. Se NENHUM resultado for válido, retorne null em todos os campos
+
+Responda SOMENTE um JSON compacto:
+{"min": 3.49, "avg": 3.79, "max": 4.29, "valid_count": 3, "reason": "3 resultados unitários da mesma marca e gramatura"}
+
+Se nenhum resultado for válido:
+{"min": null, "avg": null, "max": null, "valid_count": 0, "reason": "nenhum resultado compatível"}`,
+          },
+          {
+            role: 'user',
+            content: `Produto: "${productName}"\n\nResultados do Google Shopping:\n${listings}`,
+          },
+        ],
+        temperature: 0,
+        response_format: { type: 'json_object' },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 12000,
+      },
+    );
+
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) return null;
+
+    const parsed = JSON.parse(content);
+    console.log(`[AI-PRICE] ${productName}: ${parsed.valid_count ?? 0} válidos — ${parsed.reason ?? ''}`);
+
+    if (!parsed.min && !parsed.avg && !parsed.max) return null;
+    if (!parsed.avg || parsed.avg <= 0) return null;
+
+    return {
+      min: parsed.min && parsed.min > 0 ? Math.round(parsed.min * 100) / 100 : parsed.avg,
+      avg: Math.round(parsed.avg * 100) / 100,
+      max: parsed.max && parsed.max > 0 ? Math.round(parsed.max * 100) / 100 : parsed.avg,
+    };
+  } catch (err: any) {
+    console.warn('[AI-PRICE] Erro:', err?.message);
+    return null;
+  }
+}
+
 async function fetchSerpPrices(productName: string) {
   const keyInfo = getAvailableSerpKey();
-  if (!keyInfo) return null;
+  if (!keyInfo) {
+    console.log('[SERP] Sem key disponível');
+    return null;
+  }
   try {
     serpKeyUsage[keyInfo.index]++;
     state.serpUsed++;
+    console.log(`[SERP] Buscando: "${productName}" (key ${keyInfo.index + 1}/${SERPAPI_KEYS.length}, uso ${serpKeyUsage[keyInfo.index]}/${SERPAPI_LIMIT_PER_KEY})`);
+
     const { data } = await axios.get('https://serpapi.com/search.json', {
       params: { engine: 'google_shopping', q: productName, gl: 'br', hl: 'pt', api_key: keyInfo.key },
       timeout: 12000,
     });
-    const raw: number[] = (data.shopping_results || [])
-      .map((r: any) => parseFloat(r.extracted_price))
-      .filter((p: number) => !isNaN(p) && p > 0);
-    if (!raw.length) return null;
-    const prices = removeOutliers(raw);
+
+    const rawResults: Array<{ title: string; price: number }> = (data.shopping_results || [])
+      .map((r: any) => ({ title: r.title || '', price: parseFloat(r.extracted_price) }))
+      .filter((r: any) => !isNaN(r.price) && r.price > 0);
+
+    console.log(`[SERP] ${rawResults.length} resultados encontrados:`);
+    rawResults.forEach((r, i) => console.log(`  ${i + 1}. "${r.title}" — R$ ${r.price.toFixed(2)}`));
+
+    if (!rawResults.length) {
+      console.log('[SERP] Nenhum resultado com preço');
+      return null;
+    }
+
+    // IA analisa e retorna min/avg/max filtrado
+    console.log('[SERP] Enviando para IA analisar...');
+    const aiResult = await analyzePricesWithAi(productName, rawResults);
+    if (aiResult) {
+      console.log(`[SERP] IA retornou: min=${aiResult.min} avg=${aiResult.avg} max=${aiResult.max}`);
+      return aiResult;
+    }
+
+    // Fallback: clustering se IA falhar
+    console.log('[SERP] IA falhou, usando fallback clustering');
+    const prices = removeOutliers(rawResults.map((r) => r.price));
+    if (!prices.length) return null;
     prices.sort((a, b) => a - b);
-    return {
+    const fallback = {
       min: Math.round(prices[0] * 100) / 100,
       avg: Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100,
       max: Math.round(prices[prices.length - 1] * 100) / 100,
     };
+    console.log(`[SERP] Fallback: min=${fallback.min} avg=${fallback.avg} max=${fallback.max}`);
+    return fallback;
   } catch (err: any) {
+    console.error(`[SERP] ERRO: ${err?.response?.status ?? ''} ${err?.message}`);
     if (err?.response?.status === 429) {
       serpKeyUsage[keyInfo.index] = SERPAPI_LIMIT_PER_KEY;
+      console.warn(`[SERP] Key ${keyInfo.index + 1} esgotada (429)`);
     }
     return null;
   }
@@ -281,6 +402,10 @@ export async function startRefresh(forceAll = false) {
       state.processed = i + 1;
 
       try {
+        console.log(`\n${'═'.repeat(60)}`);
+        console.log(`[REFRESH] [${i + 1}/${pendentes.length}] ${ean} — ${product.name ?? '?'}`);
+        console.log(`${'═'.repeat(60)}`);
+
         const cosmos = await fetchCosmos(ean);
 
         let minPrice: number | null = null;
@@ -304,21 +429,32 @@ export async function startRefresh(forceAll = false) {
           avgPrice = sanitized.avg;
           maxPrice = sanitized.max;
 
+          console.log(`[REFRESH]   Cosmos preços sanitizados: min=${minPrice} avg=${avgPrice} max=${maxPrice}`);
+
           ncm = cosmos.ncm?.code ?? null;
           imageUrl = cosmos.thumbnail ?? null;
           categoryName = cosmos.category?.description ?? null;
+        } else {
+          console.log('[REFRESH]   Cosmos: sem dados');
         }
 
         if (!avgPrice && getAvailableSerpKey()) {
-          // Usa o nome do Cosmos (completo com gramatura) > nome do banco > EAN
-          const serp = await fetchSerpPrices(cosmosName || product.name || ean);
+          const searchName = cosmosName || product.name || ean;
+          console.log(`[REFRESH]   Cosmos sem preço → SerpAPI com: "${searchName}"`);
+          const serp = await fetchSerpPrices(searchName);
           if (serp) {
             minPrice = minPrice ?? serp.min;
             avgPrice = serp.avg;
             maxPrice = maxPrice ?? serp.max;
             priceSource = 'serpapi';
+          } else {
+            console.log('[REFRESH]   SerpAPI: sem resultado');
           }
+        } else if (!avgPrice) {
+          console.log('[REFRESH]   Sem preço e sem SerpAPI key disponível');
         }
+
+        console.log(`[REFRESH]   RESULTADO FINAL: min=${minPrice} avg=${avgPrice} max=${maxPrice} fonte=${priceSource}`);
 
         // Atualizar Product
         const productUpdate: any = {};
