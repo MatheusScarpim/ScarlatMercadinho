@@ -12,6 +12,9 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
+# Injeta o script de reload no index.html depois do build
+RUN sed -i "s|</head>|<script src=\"${VITE_API_BASE_URL}/kiosks/reload.js\"></script></head>|" /app/dist/index.html
+
 FROM nginx:1.27-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY ./nginx.conf /etc/nginx/conf.d/default.conf

@@ -809,7 +809,9 @@ function triggerImport() {
 }
 
 function parseCsv(content: string) {
-  const lines = content.split(/\r\n/).filter((l) => l.trim().length);
+  // Strip UTF-8 BOM if present
+  const clean = content.replace(/^\uFEFF/, '');
+  const lines = clean.split(/\r?\n/).filter((l) => l.trim().length);
   if (!lines.length) return [];
   const delimiter = lines[0].includes(';') ? ';' : ',';
   const [headerLine, ...rows] = lines;
@@ -854,15 +856,18 @@ async function handleImport(event: Event) {
     return;
   }
 
+  let ok = 0;
+  let errors: string[] = [];
+
   for (const row of entries) {
     const name = row['nome'] || row['name'];
     if (!name) continue;
     const rawBarcode = row['barcode'] || row['código'] || row['codigo'];
     const barcode = rawBarcode ? normalizeBarcode(rawBarcode) : rawBarcode;
-    const salePrice = parseFloat(row['Preço de venda'] || row['preço de venda'] || row['saleprice'] || '0');
-    const costPrice = parseFloat(row['Preço de custo'] || row['preço de custo'] || row['costprice'] || '0');
+    const salePrice = parseFloat((row['preço de venda'] || row['saleprice'] || '0').replace(',', '.'));
+    const costPrice = parseFloat((row['preço de custo'] || row['costprice'] || '0').replace(',', '.'));
     const categoryName = row['categoria'] || '';
-    const minimumStock = parseFloat(row['estoque minimo'] || row['Estoque mínimo'] || row['minimumstock'] || '0');
+    const minimumStock = parseFloat(row['estoque minimo'] || row['estoque mínimo'] || row['minimumstock'] || '0');
     const activeRaw = (row['ativo'] || row['status'] || '').toLowerCase();
     const active = activeRaw ? activeRaw === 'ativo' || activeRaw === 'true' || activeRaw === '1' : true;
 
@@ -882,11 +887,23 @@ async function handleImport(event: Event) {
       isWeighed: false,
       active
     };
-    await api.post('/products', payload);
+    try {
+      await api.post('/products', payload);
+      ok++;
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e.message || 'Erro desconhecido';
+      errors.push(`"${name}": ${msg}`);
+    }
   }
 
   await load();
   target.value = '';
+
+  if (errors.length) {
+    alert(`Importados: ${ok} | Erros: ${errors.length}\n\n${errors.join('\n')}`);
+  } else {
+    alert(`${ok} produto(s) importado(s) com sucesso!`);
+  }
 }
 
 async function exportProducts() {
