@@ -891,6 +891,17 @@ async function handleImport(event: Event) {
       await api.post('/products', payload);
       ok++;
     } catch (e: any) {
+      // Se barcode já existe, atualiza o produto existente
+      if (e?.response?.status === 500 && barcode) {
+        try {
+          const { data: existing } = await api.get(`/products/barcode/${barcode}`);
+          if (existing?._id) {
+            await api.put(`/products/${existing._id}`, payload);
+            ok++;
+            continue;
+          }
+        } catch {}
+      }
       const msg = e?.response?.data?.message || e.message || 'Erro desconhecido';
       errors.push(`"${name}": ${msg}`);
     }
