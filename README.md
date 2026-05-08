@@ -1,3 +1,5 @@
+<!-- Atualizado em: 2026-05-08 -->
+
 # Asyncx Market – Autoatendimento e Painel Admin
 
 Sistema completo de autoatendimento (quiosque) e painel administrativo para gestão de estoque, compras, produtos e vendas.
