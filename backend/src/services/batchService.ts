@@ -312,3 +312,30 @@ export async function updateBatchDiscountById(
   await batch.save();
   return batch;
 }
+
+/**
+ * Atualiza a data de vencimento de um lote específico
+ */
+export async function updateBatchExpiryDateById(
+  batchId: string,
+  expiryDate: Date | string
+) {
+  const batch = await BatchModel.findById(batchId).populate('product');
+
+  if (!batch) {
+    throw new Error('Lote não encontrado');
+  }
+
+  const parsed = expiryDate instanceof Date ? expiryDate : new Date(expiryDate);
+
+  if (isNaN(parsed.getTime())) {
+    throw new Error('Data de vencimento inválida');
+  }
+
+  batch.expiryDate = parsed;
+
+  // O pre-save hook irá recalcular discountPercent/currentPrice a partir do novo expiryDate
+  // (a menos que manualDiscount esteja true).
+  await batch.save();
+  return batch;
+}

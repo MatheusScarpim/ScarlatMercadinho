@@ -15,5 +15,6 @@ router.post('/update-prices', authMiddleware, requirePermission('EXPIRING_PRODUC
 router.post('/migrate', authMiddleware, requirePermission('EXPIRING_PRODUCTS'), controller.migrateBatches);
 router.post('/write-off-expired', authMiddleware, requirePermission('EXPIRING_PRODUCTS'), controller.writeOffExpired);
 router.patch('/:id/discount', authMiddleware, requirePermission('EXPIRING_PRODUCTS'), controller.updateBatchDiscount);
+router.patch('/:id/expiry', authMiddleware, requirePermission('EXPIRING_PRODUCTS'), controller.updateBatchExpiryDate);
 
 export default router;

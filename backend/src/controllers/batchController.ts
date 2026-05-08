@@ -8,6 +8,7 @@ import {
   getCriticalBatchesCount,
   migrateBatchesWithSalePrice,
   updateBatchDiscountById,
+  updateBatchExpiryDateById,
   writeOffExpiredBatches
 } from '../services/batchService';
 import { Types } from 'mongoose';
@@ -101,5 +102,26 @@ export async function updateBatchDiscount(req: AuthRequest, res: Response) {
     res.json({ message: 'Desconto atualizado com sucesso', batch });
   } catch (error: any) {
     res.status(500).json({ message: error?.message || 'Erro ao atualizar desconto' });
+  }
+}
+
+export async function updateBatchExpiryDate(req: AuthRequest, res: Response) {
+  try {
+    const { id } = req.params;
+    const { expiryDate } = req.body;
+
+    if (!expiryDate) {
+      return res.status(400).json({ message: 'expiryDate é obrigatório.' });
+    }
+
+    const parsed = new Date(expiryDate);
+    if (isNaN(parsed.getTime())) {
+      return res.status(400).json({ message: 'Data de vencimento inválida.' });
+    }
+
+    const batch = await updateBatchExpiryDateById(id, parsed);
+    res.json({ message: 'Vencimento atualizado com sucesso', batch });
+  } catch (error: any) {
+    res.status(500).json({ message: error?.message || 'Erro ao atualizar vencimento' });
   }
 }

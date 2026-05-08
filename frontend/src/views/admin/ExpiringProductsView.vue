@@ -1,5 +1,25 @@
 <template>
   <div class="view-container">
+    <transition name="toast">
+      <div v-if="toast.visible" class="toast" :class="`toast-${toast.type}`" role="status">
+        <div class="toast-icon">
+          <span v-if="toast.type === 'success'">✅</span>
+          <span v-else-if="toast.type === 'error'">⚠️</span>
+          <span v-else>ℹ️</span>
+        </div>
+        <div class="toast-body">
+          <div class="toast-title">{{ toast.title }}</div>
+          <div class="toast-message" v-if="toast.message">{{ toast.message }}</div>
+          <div class="toast-dates" v-if="toast.oldDate && toast.newDate">
+            <span class="toast-old">{{ toast.oldDate }}</span>
+            <span class="toast-arrow">→</span>
+            <span class="toast-new">{{ toast.newDate }}</span>
+          </div>
+        </div>
+        <button class="toast-close" @click="hideToast" aria-label="Fechar">✕</button>
+      </div>
+    </transition>
+
     <div class="header">
       <h3>Produtos Próximos do Vencimento</h3>
       <div class="header-actions">
@@ -87,6 +107,23 @@
               </button>
             </div>
           </div>
+          <div class="discount-control">
+            <label>Editar Vencimento</label>
+            <div class="control-group">
+              <input
+                type="date"
+                v-model="batch.newExpiryDate"
+                class="discount-input"
+              />
+              <button
+                class="btn btn-sm btn-primary"
+                @click="applyExpiryDate(batch)"
+                :disabled="!batch.newExpiryDate || batch.newExpiryDate === toInputDate(batch.expiryDate)"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
           <button
             class="btn btn-sm btn-ghost"
             @click="removeDiscount(batch)"
@@ -115,14 +152,80 @@ const daysFilter = ref('30');
 const updating = ref(false);
 const writingOff = ref(false);
 
+interface ToastState {
+  visible: boolean;
+  type: 'success' | 'error' | 'info';
+  title: string;
+  message?: string;
+  oldDate?: string;
+  newDate?: string;
+}
+
+const toast = ref<ToastState>({ visible: false, type: 'success', title: '' });
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showToast(payload: Omit<ToastState, 'visible'>, durationMs = 4000) {
+  if (toastTimer) clearTimeout(toastTimer);
+  toast.value = { ...payload, visible: true };
+  toastTimer = setTimeout(() => hideToast(), durationMs);
+}
+
+function hideToast() {
+  toast.value = { ...toast.value, visible: false };
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+}
+
 async function load() {
   try {
     const { data } = await api.get('/batches/expiring', {
       params: { days: daysFilter.value }
     });
-    batches.value = data;
+    batches.value = (data as any[]).map((b) => ({
+      ...b,
+      newExpiryDate: toInputDate(b.expiryDate)
+    }));
   } catch (error) {
     console.error('Failed to load expiring batches:', error);
+  }
+}
+
+function toInputDate(dateStr: string | Date | undefined): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+async function applyExpiryDate(batch: any) {
+  try {
+    if (!batch.newExpiryDate) return;
+    const oldDateFormatted = formatDate(batch.expiryDate);
+    const productName = batch.product?.name || 'Produto';
+    // Envia com hora local (meio-dia) para evitar deslocamento de fuso
+    // Ex: "2026-05-12" -> "2026-05-12T12:00:00" interpretado em horário local
+    const expiryDate = `${batch.newExpiryDate}T12:00:00`;
+    await api.patch(`/batches/${batch._id}/expiry`, { expiryDate });
+    const newDateFormatted = formatDate(expiryDate);
+    showToast({
+      type: 'success',
+      title: `Vencimento atualizado: ${productName}`,
+      oldDate: oldDateFormatted,
+      newDate: newDateFormatted
+    });
+    await load();
+  } catch (error: any) {
+    console.error('Failed to update expiry date:', error);
+    showToast({
+      type: 'error',
+      title: 'Erro ao atualizar vencimento',
+      message: error?.response?.data?.message || 'Tente novamente em alguns instantes.'
+    }, 5000);
   }
 }
 
@@ -601,5 +704,128 @@ onMounted(() => {
   .batch-pricing {
     grid-template-columns: 1fr;
   }
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 320px;
+  max-width: 440px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(20, 25, 35, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  color: #fff;
+}
+
+.toast-success {
+  border-left: 4px solid #22c55e;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(20, 25, 35, 0.96));
+}
+
+.toast-error {
+  border-left: 4px solid #ef4444;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(20, 25, 35, 0.96));
+}
+
+.toast-info {
+  border-left: 4px solid #3b82f6;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(20, 25, 35, 0.96));
+}
+
+.toast-icon {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.toast-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.toast-message {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.4;
+}
+
+.toast-dates {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.toast-old {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: line-through;
+}
+
+.toast-arrow {
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 700;
+}
+
+.toast-new {
+  color: #22c55e;
+  font-weight: 700;
+  padding: 2px 8px;
+  background: rgba(34, 197, 94, 0.15);
+  border-radius: 4px;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateX(40px) scale(0.96);
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(40px) scale(0.96);
 }
 </style>
