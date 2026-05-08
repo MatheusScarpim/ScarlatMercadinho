@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calculadora</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      }
+
+      .calculadora {
+        background: #1e1e2f;
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        width: 320px;
+      }
+
+      .display {
+        background: #2a2a3d;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        text-align: right;
+        min-height: 100px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        word-break: break-all;
+      }
+
+      .display .expressao {
+        color: #8888aa;
+        font-size: 16px;
+        min-height: 24px;
+        margin-bottom: 8px;
+      }
+
+      .display .resultado {
+        color: #ffffff;
+        font-size: 36px;
+        font-weight: 700;
+      }
+
+      .display .resultado.erro {
+        color: #ff6b6b;
+        font-size: 18px;
+      }
+
+      .botoes {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+
+      .botao {
+        border: none;
+        border-radius: 12px;
+        padding: 20px;
+        font-size: 20px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        user-select: none;
+      }
+
+      .botao:active {
+        transform: scale(0.95);
+      }
+
+      .botao.numero {
+        background: #2a2a3d;
+        color: #ffffff;
+      }
+
+      .botao.numero:hover {
+        background: #3a3a4d;
+      }
+
+      .botao.operacao {
+        background: #0f3460;
+        color: #4fc3f7;
+      }
+
+      .botao.operacao:hover {
+        background: #1a4a7a;
+      }
+
+      .botao.operacao.ativo {
+        background: #4fc3f7;
+        color: #0f3460;
+      }
+
+      .botao.igual {
+        background: #4fc3f7;
+        color: #0f3460;
+        grid-row: span 2;
+      }
+
+      .botao.igual:hover {
+        background: #6dd5ff;
+      }
+
+      .botao.limpar {
+        background: #3d1f2e;
+        color: #ff6b6b;
+      }
+
+      .botao.limpar:hover {
+        background: #5a2f3e;
+      }
+
+      .botao.especial {
+        background: #2a2a3d;
+        color: #4fc3f7;
+      }
+
+      .botao.especial:hover {
+        background: #3a3a4d;
+      }
+
+      .botao.zero {
+        grid-column: span 2;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="calculadora">
+      <div class="display">
+        <div class="expressao" id="expressao"></div>
+        <div class="resultado" id="resultado">0</div>
+      </div>
+      <div class="botoes">
+        <button class="botao limpar" data-acao="limpar">AC</button>
+        <button class="botao especial" data-acao="inverter">±</button>
+        <button class="botao especial" data-acao="porcentagem">%</button>
+        <button class="botao operacao" data-acao="dividir">÷</button>
+
+        <button class="botao numero" data-valor="7">7</button>
+        <button class="botao numero" data-valor="8">8</button>
+        <button class="botao numero" data-valor="9">9</button>
+        <button class="botao operacao" data-acao="multiplicar">×</button>
+
+        <button class="botao numero" data-valor="4">4</button>
+        <button class="botao numero" data-valor="5">5</button>
+        <button class="botao numero" data-valor="6">6</button>
+        <button class="botao operacao" data-acao="subtrair">−</button>
+
+        <button class="botao numero" data-valor="1">1</button>
+        <button class="botao numero" data-valor="2">2</button>
+        <button class="botao numero" data-valor="3">3</button>
+        <button class="botao operacao" data-acao="somar">+</button>
+
+        <button class="botao numero zero" data-valor="0">0</button>
+        <button class="botao numero" data-valor=".">,</button>
+        <button class="botao igual" data-acao="igual">=</button>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        'use strict';
+
+        const displayExpressao = document.getElementById('expressao');
+        const displayResultado = document.getElementById('resultado');
+        const botoes = document.querySelector('.botoes');
+
+        let operandoAtual = '0';
+        let operandoAnterior = '';
+        let operacao = null;
+        let deveReiniciarTela = false;
+
+        function atualizarDisplay() {
+          displayResultado.textContent = operandoAtual;
+          displayResultado.classList.remove('erro');
+        }
+
+        function atualizarExpressao() {
+          if (operacao && operandoAnterior) {
+            const simbolos = { somar: '+', subtrair: '−', multiplicar: '×', dividir: '÷' };
+            displayExpressao.textContent = operandoAnterior + ' ' + (simbolos[operacao] || '');
+          } else {
+            displayExpressao.textContent = '';
+          }
+        }
+
+        function limpar() {
+          operandoAtual = '0';
+          operandoAnterior = '';
+          operacao = null;
+          deveReiniciarTela = false;
+          displayExpressao.textContent = '';
+          displayResultado.classList.remove('erro');
+          desmarcarOperacaoAtiva();
+          atualizarDisplay();
+        }
+
+        function adicionarDigito(valor) {
+          if (deveReiniciarTela) {
+            operandoAtual = '';
+            deveReiniciarTela = false;
+          }
+
+          if (valor === '.' && operandoAtual.includes('.')) {
+            return;
+          }
+
+          if (valor === '.' && (operandoAtual === '' || operandoAtual === '0')) {
+            operandoAtual = '0.';
+            atualizarDisplay();
+            return;
+          }
+
+          if (operandoAtual === '0' && valor !== '.') {
+            operandoAtual = valor;
+          } else {
+            operandoAtual += valor;
+          }
+
+          displayResultado.classList.remove('erro');
+          atualizarDisplay();
+        }
+
+        function escolherOperacao(oper) {
+          if (operacao !== null) {
+            calcular();
+          }
+
+          operacao = oper;
+          operandoAnterior = operandoAtual;
+          deveReiniciarTela = true;
+          marcarOperacaoAtiva(oper);
+          atualizarExpressao();
+        }
+
+        function calcular() {
+          if (operacao === null || deveReiniciarTela) {
+            return;
+          }
+
+          const anterior = parseFloat(operandoAnterior);
+          const atual = parseFloat(operandoAtual);
+
+          if (isNaN(anterior) || isNaN(atual)) {
+            return;
+          }
+
+          let resultado;
+
+          switch (operacao) {
+            case 'somar':
+              resultado = anterior + atual;
+              break;
+            case 'subtrair':
+              resultado = anterior - atual;
+              break;
+            case 'multiplicar':
+              resultado = anterior * atual;
+              break;
+            case 'dividir':
+              if (atual === 0) {
+                displayResultado.textContent = 'Erro: divisão por zero';
+                displayResultado.classList.add('erro');
+                operandoAtual = '0';
+                operacao = null;
+                operandoAnterior = '';
+                deveReiniciarTela = true;
+                desmarcarOperacaoAtiva();
+                displayExpressao.textContent = '';
+                return;
+              }
+              resultado = anterior / atual;
+              break;
+            default:
+              return;
+          }
+
+          const resultadoStr = formatarResultado(resultado);
+          operandoAtual = resultadoStr;
+          operacao = null;
+          operandoAnterior = '';
+          deveReiniciarTela = true;
+          desmarcarOperacaoAtiva();
+          displayExpressao.textContent = '';
+          atualizarDisplay();
+        }
+
+        function formatarResultado(valor) {
+          if (!isFinite(valor)) {
+            return '0';
+          }
+
+          const str = valor.toString();
+
+          if (str.includes('e')) {
+            return valor.toFixed(10).replace(/\.?0+$/, '');
+          }
+
+          if (str.length > 15) {
+            return valor.toPrecision(10).replace(/\.?0+$/, '');
+          }
+
+          return str;
+        }
+
+        function inverterSinal() {
+          if (operandoAtual === '0') {
+            return;
+          }
+          operandoAtual = (parseFloat(operandoAtual) * -1).toString();
+          atualizarDisplay();
+        }
+
+        function porcentagem() {
+          const valor = parseFloat(operandoAtual);
+          if (isNaN(valor)) {
+            return;
+          }
+          operandoAtual = (valor / 100).toString();
+          atualizarDisplay();
+        }
+
+        function marcarOperacaoAtiva(oper) {
+          desmarcarOperacaoAtiva();
+          const botoesOper = botoes.querySelectorAll('.operacao');
+          botoesOper.forEach(function (btn) {
+            if (btn.dataset.acao === oper) {
+              btn.classList.add('ativo');
+            }
+          });
+        }
+
+        function desmarcarOperacaoAtiva() {
+          const botoesOper = botoes.querySelectorAll('.operacao');
+          botoesOper.forEach(function (btn) {
+            btn.classList.remove('ativo');
+          });
+        }
+
+        function lidarComClique(e) {
+          const botao = e.target.closest('button');
+          if (!botao) {
+            return;
+          }
+
+          const valor = botao.dataset.valor;
+          const acao = botao.dataset.acao;
+
+          if (valor !== undefined) {
+            adicionarDigito(valor);
+            return;
+          }
+
+          if (!acao) {
+            return;
+          }
+
+          switch (acao) {
+            case 'limpar':
+              limpar();
+              break;
+            case 'inverter':
+              inverterSinal();
+              break;
+            case 'porcentagem':
+              porcentagem();
+              break;
+            case 'igual':
+              calcular();
+              break;
+            case 'somar':
+            case 'subtrair':
+            case 'multiplicar':
+            case 'dividir':
+              escolherOperacao(acao);
+              break;
+          }
+        }
+
+        function lidarComTeclado(e) {
+          const tecla = e.key;
+
+          if (/^[0-9]$/.test(tecla)) {
+            e.preventDefault();
+            adicionarDigito(tecla);
+            return;
+          }
+
+          if (tecla === '.') {
+            e.preventDefault();
+            adicionarDigito('.');
+            return;
+          }
+
+          if (tecla === 'Enter' || tecla === '=') {
+            e.preventDefault();
+            calcular();
+            return;
+          }
+
+          if (tecla === 'Backspace') {
+            e.preventDefault();
+            if (deveReiniciarTela) {
+              return;
+            }
+            if (operandoAtual.length <= 1) {
+              operandoAtual = '0';
+            } else {
+              operandoAtual = operandoAtual.slice(0, -1);
+            }
+            atualizarDisplay();
+            return;
+          }
+
+          if (tecla === 'Escape') {
+            e.preventDefault();
+            limpar();
+            return;
+          }
+
+          if (tecla === '%') {
+            e.preventDefault();
+            porcentagem();
+            return;
+          }
+
+          const mapaTeclas = {
+            '+': 'somar',
+            '-': 'subtrair',
+            '*': 'multiplicar',
+            '/': 'dividir',
+          };
+
+          if (mapaTeclas[tecla]) {
+            e.preventDefault();
+            escolherOperacao(mapaTeclas[tecla]);
+          }
+        }
+
+        botoes.addEventListener('click', lidarComClique);
+        document.addEventListener('keydown', lidarComTeclado);
+      })();
+    </script>
+  </body>
+</html>
