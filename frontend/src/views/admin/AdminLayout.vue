@@ -96,6 +96,10 @@
             <span class="icon">👥</span>
             <span>Usuários</span>
           </RouterLink>
+          <RouterLink to="/admin/calculadora" class="nav-item">
+            <span class="icon">🔢</span>
+            <span>Calculadora</span>
+          </RouterLink>
         </div>
 
         <div class="nav-section">
