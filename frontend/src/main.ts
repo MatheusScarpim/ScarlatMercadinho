@@ -11,6 +11,11 @@ applyTheme();
 const app = createApp(App);
 app.use(createPinia());
 app.use(router);
+if (import.meta.env.MODE === 'preview') {
+  const { worker } = await import('./mocks/preview/browser');
+  await worker.start({ onUnhandledRequest: 'bypass' });
+}
+
 app.mount('#app');
 
 // Carrega config do banco (não bloqueia o boot)
