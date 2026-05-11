@@ -8,6 +8,11 @@ import { fetchWhitelabel } from './services/settings';
 
 applyTheme();
 
+if (import.meta.env.VITE_ENABLE_MSW) {
+  const { worker } = await import('./mocks/browser');
+  await worker.start();
+}
+
 const app = createApp(App);
 app.use(createPinia());
 app.use(router);
