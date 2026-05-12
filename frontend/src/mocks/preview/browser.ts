@@ -1,4 +1,4 @@
-// @mathai-preview-scaffold-v3
+// @mathai-preview-scaffold-v4
 import { setupWorker } from 'msw/browser';
 import { handlers } from './handlers';
 

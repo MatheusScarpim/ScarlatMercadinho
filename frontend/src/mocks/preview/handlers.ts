@@ -1,4 +1,4 @@
-// @mathai-preview-scaffold-v3
+// @mathai-preview-scaffold-v4
 import { http, HttpResponse } from 'msw';
 
 /**
@@ -16,6 +16,19 @@ const PREVIEW_USER = {
 const PREVIEW_TOKEN = 'preview-fake-token';
 
 export const handlers = [
+  // ─── Auth status / config (apps com auth-toggle) ────────
+  // Estes handlers fazem o router guard pular o redirect pra /login.
+  http.get('*/auth/status', () => HttpResponse.json({ enabled: false })),
+  http.get('*/api/auth/status', () => HttpResponse.json({ enabled: false })),
+  http.get('*/auth/check', () =>
+    HttpResponse.json({ ok: true, authenticated: true, user: PREVIEW_USER })
+  ),
+  http.get('*/auth/session', () =>
+    HttpResponse.json({ token: PREVIEW_TOKEN, user: PREVIEW_USER, authenticated: true })
+  ),
+  http.get('*/health', () => HttpResponse.json({ ok: true })),
+  http.get('*/api/health', () => HttpResponse.json({ ok: true })),
+
   // ─── Auth ───────────────────────────────────────────────
   http.post('*/auth/login', () =>
     HttpResponse.json({ token: PREVIEW_TOKEN, user: PREVIEW_USER })
@@ -34,6 +47,9 @@ export const handlers = [
   http.get('*/me', () => HttpResponse.json(PREVIEW_USER)),
   http.get('*/api/me', () => HttpResponse.json(PREVIEW_USER)),
   http.get('*/user', () => HttpResponse.json(PREVIEW_USER)),
+  http.get('*/api/user', () => HttpResponse.json(PREVIEW_USER)),
+  http.get('*/profile', () => HttpResponse.json(PREVIEW_USER)),
+  http.get('*/api/profile', () => HttpResponse.json(PREVIEW_USER)),
 
   // ─── Catch-all final ────────────────────────────────────
   // Qualquer GET /api/* ou /api/v1/* desconhecido devolve lista/objeto vazio
