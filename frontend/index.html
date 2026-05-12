@@ -1,6 +1,63 @@
 <!doctype html>
 <html lang="pt-BR">
   <head>
+  <script data-mathai-preview-bypass="v4">
+// @mathai-preview-bypass-v4 — bypass de login em mode preview.
+// Roda sincronamente antes de qualquer modulo ESM ser avaliado.
+(function(){
+  try {
+    var FAKE_TOKEN = 'preview-fake-token';
+    var FAKE_USER_OBJ = {
+      id: 'preview-user',
+      name: 'Preview User',
+      email: 'preview@mathai.dev',
+      role: 'ADMIN',
+      permissions: ['*']
+    };
+    var FAKE_USER = JSON.stringify(FAKE_USER_OBJ);
+    var FAKE_AUTH = JSON.stringify({ token: FAKE_TOKEN, user: FAKE_USER_OBJ, authenticated: true });
+
+    // Seed: nomes comuns + heuristica de naming custom (prefix do hostname).
+    // Ex: hostname auraia.dev -> tenta 'auraia_token' tambem.
+    var hostKey = (location.hostname.split('.')[0] || 'app').toLowerCase().replace(/[^a-z0-9]/g, '');
+    var seeds = {
+      token: FAKE_TOKEN, accessToken: FAKE_TOKEN, auth_token: FAKE_TOKEN, authToken: FAKE_TOKEN,
+      jwt: FAKE_TOKEN, jwtToken: FAKE_TOKEN, bearerToken: FAKE_TOKEN, idToken: FAKE_TOKEN,
+      apiToken: FAKE_TOKEN, session: FAKE_TOKEN, sessionToken: FAKE_TOKEN,
+      user: FAKE_USER, currentUser: FAKE_USER, userInfo: FAKE_USER, profile: FAKE_USER,
+      auth: FAKE_AUTH, authState: FAKE_AUTH,
+      isAuthenticated: 'true', isLoggedIn: 'true', loggedIn: 'true'
+    };
+    // Chaves heuristicas com prefix do host (auraia_token, myapp_session, etc).
+    seeds[hostKey + '_token'] = FAKE_TOKEN;
+    seeds[hostKey + '_auth'] = FAKE_AUTH;
+    seeds[hostKey + '_user'] = FAKE_USER;
+    seeds[hostKey + '_session'] = FAKE_TOKEN;
+    for (var k in seeds) {
+      try { if (localStorage.getItem(k) === null) localStorage.setItem(k, seeds[k]); } catch (e) {}
+    }
+
+    // Monkey-patch getItem: cobre QUALQUER chave custom que match /token|auth|user|session|login/i.
+    var origGet = localStorage.getItem.bind(localStorage);
+    Storage.prototype.getItem = function(key) {
+      var v = origGet(key);
+      if (v !== null) return v;
+      if (typeof key !== 'string') return null;
+      if (/user|profile/i.test(key)) return FAKE_USER;
+      if (/auth$|^auth|authstate/i.test(key)) return FAKE_AUTH;
+      if (/token|session|jwt|bearer|login/i.test(key)) return FAKE_TOKEN;
+      if (/isauthenticated|isloggedin|loggedin/i.test(key)) return 'true';
+      return null;
+    };
+
+    // Mesmo trick em sessionStorage por seguranca.
+    var origSessionGet = sessionStorage.getItem.bind(sessionStorage);
+    var realSessionGet = Storage.prototype.getItem;
+    // (Storage.prototype.getItem ja foi sobrescrito acima — aplica pra sessionStorage tambem)
+  } catch (e) { /* ignora qualquer erro pra nao quebrar o app */ }
+})();
+</script>
+
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Carregando...</title>
