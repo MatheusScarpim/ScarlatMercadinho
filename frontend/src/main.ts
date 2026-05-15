@@ -3,9 +3,11 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 import './assets/base.css';
+import { greet } from './utils/greet';
 import { applyTheme, updateConfig } from './config/whitelabel';
 import { fetchWhitelabel } from './services/settings';
 
+console.log(greet('Mercadinho'));
 applyTheme();
 
 const app = createApp(App);
