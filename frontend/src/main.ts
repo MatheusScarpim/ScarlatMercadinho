@@ -5,6 +5,7 @@ import router from './router';
 import './assets/base.css';
 import { applyTheme, updateConfig } from './config/whitelabel';
 import { fetchWhitelabel } from './services/settings';
+import { greet } from './utils/greet';
 
 applyTheme();
 
@@ -19,6 +20,8 @@ if (import.meta.env.MODE === 'preview') {
 }
 
 app.mount('#app');
+
+console.log(greet('Auraia'));
 
 // Carrega config do banco (não bloqueia o boot)
 fetchWhitelabel()
