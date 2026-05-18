@@ -54,8 +54,8 @@ function handleClick(label: string) {
     currentInput += label;
     display.value = currentInput;
   } else if (label === ',') {
-    if (!currentInput.includes('.')) {
-      currentInput += '.';
+    if (!currentInput.includes(',')) {
+      currentInput += ',';
       display.value = currentInput;
     }
   } else if (label === 'C') {
@@ -66,34 +66,42 @@ function handleClick(label: string) {
     display.value = '0';
   } else if (label === '±') {
     if (currentInput) {
-      currentInput = String(-parseFloat(currentInput));
+      currentInput = formatResult(-parseNum(currentInput));
       display.value = currentInput;
     }
   } else if (label === '%') {
     if (currentInput) {
-      currentInput = String(parseFloat(currentInput) / 100);
+      currentInput = formatResult(parseNum(currentInput) / 100);
       display.value = currentInput;
     }
   } else if (label === '=') {
     if (operator && previousValue !== null && currentInput) {
-      const result = calculate(previousValue, parseFloat(currentInput), operator);
-      display.value = String(result);
+      const result = calculate(previousValue, parseNum(currentInput), operator);
+      display.value = formatResult(result);
       previousValue = result;
-      currentInput = String(result);
+      currentInput = formatResult(result);
       operator = null;
       resetNext = true;
     }
   } else {
     if (operator && previousValue !== null && currentInput) {
-      const result = calculate(previousValue, parseFloat(currentInput), operator);
-      display.value = String(result);
+      const result = calculate(previousValue, parseNum(currentInput), operator);
+      display.value = formatResult(result);
       previousValue = result;
     } else if (currentInput) {
-      previousValue = parseFloat(currentInput);
+      previousValue = parseNum(currentInput);
     }
     operator = label === '×' ? '*' : label === '÷' ? '/' : label;
     resetNext = true;
   }
+}
+
+function formatResult(n: number): string {
+  return String(n).replace('.', ',');
+}
+
+function parseNum(s: string): number {
+  return parseFloat(s.replace(',', '.'));
 }
 
 function calculate(a: number, b: number, op: string): number {
