@@ -30,6 +30,7 @@ import { createAdminSeed } from './services/authService';
 import { startExpiryNotificationJob } from './jobs/expiryNotificationJob';
 import { migrateBatchesWithSalePrice } from './services/batchService';
 import { configurePointDevice } from './services/paymentGatewayService';
+import { LocationModel } from './models/Location';
 
 const app = express();
 app.use(cors());
@@ -79,14 +80,28 @@ async function bootstrap() {
     console.error('[MIGRATION] Erro ao migrar lotes:', error);
   }
 
-  // Configura maquininha no modo PDV (auto-exibe pagamento)
-  configurePointDevice().then((result) => {
-    if (result.success) {
-      console.log('[POINT] Maquininha configurada no modo PDV');
-    } else {
-      console.warn('[POINT] Não foi possível configurar modo PDV:', result.error);
+  // Configura maquininhas no modo PDV (por kiosk + fallback global)
+  LocationModel.find({ active: true }).select('+mpAccessToken +mpPointDeviceId').then((locs) => {
+    for (const loc of locs) {
+      if (loc.mpAccessToken) {
+        configurePointDevice(loc.mpAccessToken, loc.mpPointDeviceId).then((result) => {
+          const tag = `[POINT][${loc.code}]`;
+          if (result.success) console.log(`${tag} Maquininha configurada no modo PDV`);
+          else console.warn(`${tag} Não foi possível configurar modo PDV:`, result.error);
+        });
+      }
     }
   });
+
+  if (env.mpAccessToken && env.mpPointDeviceId) {
+    configurePointDevice().then((result) => {
+      if (result.success) {
+        console.log('[POINT][global] Maquininha configurada no modo PDV');
+      } else {
+        console.warn('[POINT][global] Não foi possível configurar modo PDV:', result.error);
+      }
+    });
+  }
 
   // Inicia o job de notificação de produtos próximos do vencimento
   startExpiryNotificationJob();

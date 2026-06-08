@@ -24,7 +24,7 @@
     </div>
 
     <!-- Screensaver -->
-    <div v-if="showScreensaver" class="screensaver" @click="exitScreensaver">
+    <div v-if="showScreensaver" class="screensaver" :style="screensaverStyle" @click="exitScreensaver">
       <div class="screensaver-content">
         <div class="promo-carousel">
           <button v-if="promos.length > 1" class="carousel-arrow carousel-arrow-left" @click.stop="prevPromo">
@@ -515,6 +515,17 @@ const paymentOptions = [
 const cart = computed(() => store.cart);
 const subtotal = computed(() => store.subtotal);
 const totalItems = computed(() => store.totalItems);
+
+const screensaverStyle = computed(() => {
+  const loc = locations.value.find((l: any) => l.code === store.selectedLocation);
+  if (loc?.screensaverBgImageUrl) {
+    return { background: `url(${loc.screensaverBgImageUrl}) center/cover no-repeat` };
+  }
+  if (loc?.screensaverBgColor) {
+    return { background: loc.screensaverBgColor };
+  }
+  return {};
+});
 const paymentOpen = ref(false);
 const locations = ref<any[]>([]);
 const defaultLocation = import.meta.env.VITE_KIOSK_LOCATION || 'central';
@@ -924,7 +935,7 @@ async function pollPixStatus(paymentId?: string) {
     if (!paymentOpen.value) return; // cancelado pelo usuario
     let data: any;
     try {
-      const res = await api.get(`/payments/status/${paymentId}`);
+      const res = await api.get(`/payments/status/${paymentId}`, { params: { location: store.selectedLocation } });
       data = res.data;
     } catch (pollErr: any) {
       const errData = pollErr?.response?.data;
@@ -981,7 +992,7 @@ async function pollPointStatus(intentId: string): Promise<'approved' | 'error' |
 
     let data: any;
     try {
-      const res = await api.get(`/payments/point/${intentId}`);
+      const res = await api.get(`/payments/point/${intentId}`, { params: { location: store.selectedLocation } });
       data = res.data;
     } catch (pollErr: any) {
       const errData = pollErr?.response?.data;

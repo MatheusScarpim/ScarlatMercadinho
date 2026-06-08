@@ -1,6 +1,7 @@
 import { MercadoPagoConfig, Payment as MercadoPagoPayment } from 'mercadopago';
 import { env } from '../config/env';
 import { SaleModel } from '../models/Sale';
+import { LocationModel } from '../models/Location';
 import { SaleItemModel } from '../models/SaleItem';
 import { sanitizeSaleItems } from './saleService';
 import {
@@ -25,17 +26,41 @@ import {
 
 type PointPaymentType = 'credit' | 'debit';
 
+interface ResolvedCredentials {
+  accessToken: string;
+  deviceId: string;
+}
+
+export async function resolveCredentials(locationCode?: string): Promise<ResolvedCredentials> {
+  if (locationCode) {
+    const loc = await LocationModel.findOne({ code: locationCode.toUpperCase() })
+      .select('+mpAccessToken +mpPointDeviceId');
+    if (loc?.mpAccessToken) {
+      return {
+        accessToken: loc.mpAccessToken,
+        deviceId: loc.mpPointDeviceId || env.mpPointDeviceId,
+      };
+    }
+  }
+  return { accessToken: env.mpAccessToken, deviceId: env.mpPointDeviceId };
+}
+
 // ─── Configurar maquininha no modo PDV (auto-exibe pagamento) ───────────────
 
-export async function configurePointDevice(): Promise<{ success: boolean; mode?: string; error?: string }> {
-  if (!env.mpAccessToken || !env.mpPointDeviceId) {
+export async function configurePointDevice(
+  accessToken?: string,
+  deviceId?: string
+): Promise<{ success: boolean; mode?: string; error?: string }> {
+  const token = accessToken || env.mpAccessToken;
+  const device = deviceId || env.mpPointDeviceId;
+  if (!token || !device) {
     return { success: false, error: 'Access token ou device ID não configurados' };
   }
 
-  const url = `https://api.mercadopago.com/point/integration-api/devices/${env.mpPointDeviceId}`;
+  const url = `https://api.mercadopago.com/point/integration-api/devices/${device}`;
   const body = JSON.stringify({ operating_mode: 'PDV' });
   const headers = {
-    Authorization: `Bearer ${env.mpAccessToken}`,
+    Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json'
   };
 
@@ -91,11 +116,12 @@ export async function getPointDeviceStatus(): Promise<any> {
   return res.json();
 }
 
-function getMpClient() {
-  if (!env.mpAccessToken) {
+
+function getMpClient(accessToken: string) {
+  if (!accessToken) {
     throw new MissingAccessTokenError();
   }
-  return new MercadoPagoConfig({ accessToken: env.mpAccessToken });
+  return new MercadoPagoConfig({ accessToken });
 }
 
 async function ensureSaleOpen(saleId: string) {
@@ -152,6 +178,7 @@ function calcTotal(items: any[]) {
 
 export async function createPixPaymentIntent(saleId: string, cpfOverride?: string) {
   const sale = await ensureSaleOpen(saleId);
+  const creds = await resolveCredentials(sale.location);
   const { totals } = await sanitizeSaleItems(saleId);
   const items = await getSaleItemsWithProducts(saleId);
   const totalAmount = safeTotalAmount(items, saleId, totals);
@@ -171,7 +198,7 @@ export async function createPixPaymentIntent(saleId: string, cpfOverride?: strin
     payer.identification = { type: 'CPF', number: cpf };
   }
 
-  const payment = new MercadoPagoPayment(getMpClient());
+  const payment = new MercadoPagoPayment(getMpClient(creds.accessToken));
   const body = {
     transaction_amount: totalAmount,
     description: description || env.paymentDescription,
@@ -222,8 +249,9 @@ export async function createPixPaymentIntent(saleId: string, cpfOverride?: strin
 
 // ─── PIX Status ─────────────────────────────────────────────────────────────
 
-export async function getPaymentStatus(paymentId: string) {
-  const payment = new MercadoPagoPayment(getMpClient());
+export async function getPaymentStatus(paymentId: string, locationCode?: string) {
+  const creds = await resolveCredentials(locationCode);
+  const payment = new MercadoPagoPayment(getMpClient(creds.accessToken));
 
   let result: any;
   try {
@@ -269,14 +297,14 @@ export async function getPaymentStatus(paymentId: string) {
 
 // ─── Point (Maquininha) ─────────────────────────────────────────────────────
 
-async function fetchPointIntent(intentId: string) {
+async function fetchPointIntent(intentId: string, accessToken: string) {
   const url = `https://api.mercadopago.com/point/integration-api/payment-intents/${intentId}`;
 
   let res: Response;
   try {
     res = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${env.mpAccessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       }
     });
@@ -292,11 +320,11 @@ async function fetchPointIntent(intentId: string) {
   return (await res.json()) as any;
 }
 
-async function waitForPointCompletion(intentId: string, maxAttempts = 15, baseIntervalMs = 2000) {
+async function waitForPointCompletion(intentId: string, accessToken: string, maxAttempts = 15, baseIntervalMs = 2000) {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     let status: any;
     try {
-      status = await fetchPointIntent(intentId);
+      status = await fetchPointIntent(intentId, accessToken);
     } catch (err: unknown) {
       // Se for erro de rede/timeout, continua tentando
       if (err instanceof PaymentError && err.retryable && attempt < maxAttempts - 1) {
@@ -325,13 +353,14 @@ export async function createPointPaymentIntent(
   saleId: string,
   paymentType: PointPaymentType
 ) {
-  await ensureSaleOpen(saleId);
+  const sale = await ensureSaleOpen(saleId);
+  const creds = await resolveCredentials(sale.location);
   const { totals } = await sanitizeSaleItems(saleId);
   const items = await getSaleItemsWithProducts(saleId);
   const totalAmount = safeTotalAmount(items, saleId, totals);
   const description = buildDescription(items);
 
-  if (!env.mpPointDeviceId) {
+  if (!creds.deviceId) {
     throw new MissingDeviceIdError();
   }
 
@@ -349,14 +378,14 @@ export async function createPointPaymentIntent(
     }
   };
 
-  const createUrl = `https://api.mercadopago.com/point/integration-api/devices/${env.mpPointDeviceId}/payment-intents`;
+  const createUrl = `https://api.mercadopago.com/point/integration-api/devices/${creds.deviceId}/payment-intents`;
 
   let res: Response;
   try {
     res = await fetch(createUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${env.mpAccessToken}`,
+        Authorization: `Bearer ${creds.accessToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(requestData)
@@ -367,7 +396,7 @@ export async function createPointPaymentIntent(
 
   if (!res.ok) {
     const text = await res.text();
-    const error = parsePointApiError(res.status, text, `device:${env.mpPointDeviceId}`);
+    const error = parsePointApiError(res.status, text, `device:${creds.deviceId}`);
     console.error('[POINT] Erro ao criar intent:', error.code, error.message);
     throw error;
   }
@@ -383,14 +412,15 @@ export async function createPointPaymentIntent(
 
 // ─── Point Status ───────────────────────────────────────────────────────────
 
-export async function getPointIntentStatus(intentId: string) {
+export async function getPointIntentStatus(intentId: string, accessToken?: string) {
+  const token = accessToken || env.mpAccessToken;
   const url = `https://api.mercadopago.com/point/integration-api/payment-intents/${intentId}`;
 
   let res: Response;
   try {
     res = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${env.mpAccessToken}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       }
     });
@@ -413,7 +443,7 @@ export async function getPointIntentStatus(intentId: string) {
     try {
       const paymentRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
         headers: {
-          Authorization: `Bearer ${env.mpAccessToken}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -446,11 +476,14 @@ export async function getPointIntentStatus(intentId: string) {
 
 // ─── Point Cancel ───────────────────────────────────────────────────────────
 
-export async function cancelPointPaymentIntent(intentId: string) {
+export async function cancelPointPaymentIntent(intentId: string, accessToken?: string, deviceId?: string) {
+  const token = accessToken || env.mpAccessToken;
+  const device = deviceId || env.mpPointDeviceId;
+
   // 1) tenta endpoint de transaction se houver
   let intent;
   try {
-    intent = await getPointIntentStatus(intentId);
+    intent = await getPointIntentStatus(intentId, token);
     console.log('[point-cancel] intent status', JSON.stringify(intent, null, 2));
     const orderId = intent?.order?.id || intent?.order_id;
     const transactionId =
@@ -460,15 +493,15 @@ export async function cancelPointPaymentIntent(intentId: string) {
       intent?.transaction_id;
     if (orderId && transactionId) {
       console.log('[point-cancel] cancelling via order/transaction', { orderId, transactionId });
-      return await cancelOrderTransaction(orderId, transactionId);
+      return await cancelOrderTransaction(orderId, transactionId, token);
     }
   } catch (err) {
     const msg = err instanceof PaymentError ? `${err.code}: ${err.message}` : String(err);
     console.log('[point-cancel] no order/transaction, fallback', msg);
   }
 
-  const baseWithDevice = env.mpPointDeviceId
-    ? `https://api.mercadopago.com/point/integration-api/devices/${env.mpPointDeviceId}/payment-intents/${intentId}`
+  const baseWithDevice = device
+    ? `https://api.mercadopago.com/point/integration-api/devices/${device}/payment-intents/${intentId}`
     : '';
   const baseGeneric = `https://api.mercadopago.com/point/integration-api/payment-intents/${intentId}`;
 
@@ -488,7 +521,7 @@ export async function cancelPointPaymentIntent(intentId: string) {
       const res = await fetch(url, {
         method,
         headers: {
-          Authorization: `Bearer ${env.mpAccessToken}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -511,7 +544,7 @@ export async function cancelPointPaymentIntent(intentId: string) {
   let attempts = 0;
   while (attempts < 10) {
     try {
-      const status = await getPointIntentStatus(intentId);
+      const status = await getPointIntentStatus(intentId, token);
       const state = ((status as any)?.state || (status as any)?.status || '').toUpperCase();
       console.log('[point-cancel] delete loop state', state);
       if (state && state !== 'ON_TERMINAL') {
@@ -521,7 +554,7 @@ export async function cancelPointPaymentIntent(intentId: string) {
         const res = await fetch(target, {
           method: 'DELETE',
           headers: {
-            Authorization: `Bearer ${env.mpAccessToken}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
@@ -545,7 +578,7 @@ export async function cancelPointPaymentIntent(intentId: string) {
   throw new PointCancelFailedError('All cancel attempts exhausted');
 }
 
-async function cancelOrderTransaction(orderId: string, transactionId: string) {
+async function cancelOrderTransaction(orderId: string, transactionId: string, accessToken: string) {
   const url = `https://api.mercadopago.com/v1/orders/${orderId}/transactions/${transactionId}`;
 
   let res: Response;
@@ -553,7 +586,7 @@ async function cancelOrderTransaction(orderId: string, transactionId: string) {
     res = await fetch(url, {
       method: 'DELETE',
       headers: {
-        Authorization: `Bearer ${env.mpAccessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       }
     });

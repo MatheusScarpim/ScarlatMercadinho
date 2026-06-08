@@ -72,24 +72,96 @@
     </div>
 
     <BaseModal :open="showForm" :title="editingId ? 'Editar local' : 'Novo local'" :onClose="closeForm">
-      <form @submit.prevent="save" class="form-grid modal-form">
-        <label class="span-2">
-          Nome
-          <input v-model="form.name" required />
-        </label>
-        <label>
-          Código
-          <input v-model="form.code" required maxlength="12" @input="form.code = form.code.toUpperCase().trim()" />
-        </label>
-        <label class="span-2">
-          Descrição
-          <textarea v-model="form.description" rows="2" placeholder="Opcional"></textarea>
-        </label>
-        <div class="checkbox-row">
-          <input type="checkbox" v-model="form.active" />
-          <span>Ativo</span>
+      <form @submit.prevent="save" class="loc-form">
+
+        <!-- Informações básicas -->
+        <div class="form-section">
+          <div class="form-row">
+            <label class="field-grow">
+              Nome
+              <input v-model="form.name" required />
+            </label>
+            <label class="field-code">
+              Código
+              <input v-model="form.code" required maxlength="12" @input="form.code = form.code.toUpperCase().trim()" />
+            </label>
+          </div>
+          <label>
+            Descrição
+            <textarea v-model="form.description" rows="2" placeholder="Opcional"></textarea>
+          </label>
+          <div class="checkbox-row">
+            <input type="checkbox" v-model="form.active" />
+            <span>Ativo</span>
+          </div>
         </div>
-        <div class="modal-actions span-2">
+
+        <!-- Maquininha -->
+        <div class="form-section">
+          <p class="section-title">
+            <svg viewBox="0 0 20 20" fill="none" class="section-icon">
+              <rect x="3" y="4" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M7 9h6M7 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Maquininha (Mercado Pago)
+          </p>
+          <label>
+            Access Token
+            <textarea v-model="form.mpAccessToken" autocomplete="new-password" rows="3" placeholder="Deixe em branco para usar o token global" class="token-field" spellcheck="false" />
+          </label>
+          <label>
+            Device ID
+            <input v-model="form.mpPointDeviceId" type="text" autocomplete="new-password" placeholder="Ex: PAX_A910__SMARTPOS123456" class="token-field" spellcheck="false" />
+          </label>
+        </div>
+
+        <!-- Screensaver -->
+        <div class="form-section">
+          <p class="section-title">
+            <svg viewBox="0 0 20 20" fill="none" class="section-icon">
+              <rect x="2" y="3" width="16" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M7 17h6M10 14v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            Fundo do Screensaver
+          </p>
+          <div class="screensaver-layout">
+            <div class="screensaver-preview"
+              :style="form.screensaverBgImageUrl
+                ? { background: `url(${form.screensaverBgImageUrl}) center/cover no-repeat` }
+                : form.screensaverBgColor
+                  ? { background: form.screensaverBgColor }
+                  : { background: 'linear-gradient(135deg, #0c1829 0%, #1a2942 50%, #0c1829 100%)' }">
+              <span class="preview-label">Preview</span>
+            </div>
+            <div class="screensaver-fields">
+              <label>
+                Cor de fundo
+                <div class="color-row">
+                  <input type="color" v-model="form.screensaverBgColor" />
+                  <input type="text" v-model="form.screensaverBgColor" placeholder="Ex: #1a2942" />
+                  <button type="button" class="btn btn-ghost btn-sm" @click="form.screensaverBgColor = ''" v-if="form.screensaverBgColor">Limpar</button>
+                </div>
+              </label>
+              <label>
+                Imagem de fundo
+                <small class="field-hint-top">PNG, JPG ou WebP — até 5MB. Sobrepõe a cor.</small>
+                <div class="upload-row">
+                  <input type="file" accept=".png,.jpg,.jpeg,.webp" @change="uploadScreensaverImage" :disabled="screensaverUploading" />
+                </div>
+                <div class="upload-status" v-if="screensaverUploading || form.screensaverBgImageUrl">
+                  <span v-if="screensaverUploading" class="uploading-text">Enviando...</span>
+                  <div v-else-if="form.screensaverBgImageUrl" class="img-configured">
+                    <svg viewBox="0 0 16 16" fill="none" class="check-icon"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>Imagem configurada</span>
+                    <button type="button" class="btn btn-ghost btn-sm" @click="clearScreensaverImage">Remover</button>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
           <button class="btn btn-ghost" type="button" @click="closeForm">Cancelar</button>
           <button class="btn btn-primary" type="submit">Salvar</button>
         </div>
@@ -273,8 +345,32 @@ const form = reactive<any>({
   name: '',
   code: '',
   description: '',
-  active: true
+  active: true,
+  mpAccessToken: '',
+  mpPointDeviceId: '',
+  screensaverBgColor: '',
+  screensaverBgImageUrl: '',
 });
+
+const screensaverUploading = ref(false);
+
+async function uploadScreensaverImage(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  screensaverUploading.value = true;
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await api.post('/locations/upload', formData);
+    form.screensaverBgImageUrl = data.url;
+  } finally {
+    screensaverUploading.value = false;
+  }
+}
+
+function clearScreensaverImage() {
+  form.screensaverBgImageUrl = '';
+}
 
 async function load() {
   const { data } = await api.get('/locations');
@@ -284,7 +380,7 @@ async function load() {
 function openForm() {
   showForm.value = true;
   editingId.value = null;
-  Object.assign(form, { name: '', code: '', description: '', active: true });
+  Object.assign(form, { name: '', code: '', description: '', active: true, mpAccessToken: '', mpPointDeviceId: '', screensaverBgColor: '', screensaverBgImageUrl: '' });
 }
 
 function closeForm() {
@@ -299,6 +395,10 @@ function startEdit(loc: any) {
     code: loc.code,
     description: loc.description || '',
     active: loc.active,
+    mpAccessToken: '',
+    mpPointDeviceId: '',
+    screensaverBgColor: loc.screensaverBgColor || '',
+    screensaverBgImageUrl: loc.screensaverBgImageUrl || '',
   });
   showForm.value = true;
 }
@@ -1028,6 +1128,131 @@ async function submitTransfer() {
 .span-2 {
   grid-column: span 2;
 }
+.loc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.form-section:last-of-type {
+  border-bottom: none;
+}
+.form-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.field-grow {
+  flex: 1;
+}
+.field-code {
+  width: 120px;
+  flex-shrink: 0;
+}
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+.section-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+.screensaver-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.screensaver-preview {
+  width: 110px;
+  height: 74px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+}
+.preview-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+}
+.screensaver-fields {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.color-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+.color-row input[type="color"] {
+  width: 34px;
+  height: 34px;
+  padding: 2px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.color-row input[type="text"] {
+  flex: 1;
+}
+.upload-row {
+  margin-top: 4px;
+}
+.field-hint-top {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+  margin-bottom: 4px;
+}
+.upload-status {
+  margin-top: 6px;
+}
+.uploading-text {
+  font-size: 13px;
+  color: var(--muted);
+}
+.img-configured {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #22c55e;
+}
+.check-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.token-field {
+  font-family: monospace;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  resize: none;
+}
 .modal-form textarea {
   width: 100%;
   resize: vertical;
@@ -1078,4 +1303,5 @@ async function submitTransfer() {
     width: 100%;
   }
 }
+
 </style>

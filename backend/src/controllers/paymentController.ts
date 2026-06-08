@@ -9,7 +9,8 @@ import {
   getPaymentStatus,
   getPointIntentStatus,
   configurePointDevice,
-  getPointDeviceStatus
+  getPointDeviceStatus,
+  resolveCredentials
 } from '../services/paymentGatewayService';
 
 function resolvePointType(method: string, paymentType?: string) {
@@ -58,7 +59,8 @@ export async function paymentStatus(req: Request, res: Response) {
   if (!paymentId) {
     throw new PaymentMethodRequiredError();
   }
-  const status = await getPaymentStatus(paymentId);
+  const locationCode = req.query.location as string | undefined;
+  const status = await getPaymentStatus(paymentId, locationCode);
   res.json(status);
 }
 
@@ -71,7 +73,9 @@ export async function cancelPointPayment(req: Request, res: Response) {
 export async function pointIntentStatus(req: Request, res: Response) {
   const intentId = req.params.intentId;
   if (!intentId) throw new PaymentMethodRequiredError();
-  const result = await getPointIntentStatus(intentId);
+  const locationCode = req.query.location as string | undefined;
+  const creds = await resolveCredentials(locationCode);
+  const result = await getPointIntentStatus(intentId, creds.accessToken);
   res.json(result);
 }
 

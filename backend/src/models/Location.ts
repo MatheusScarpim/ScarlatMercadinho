@@ -6,6 +6,10 @@ export interface LocationDocument extends Document {
   description?: string;
   active: boolean;
   reloadRequested: boolean;
+  mpAccessToken?: string;
+  mpPointDeviceId?: string;
+  screensaverBgColor?: string;
+  screensaverBgImageUrl?: string;
 }
 
 const locationSchema = new Schema(
@@ -14,7 +18,11 @@ const locationSchema = new Schema(
     code: { type: String, required: true, unique: true, uppercase: true, trim: true },
     description: { type: String },
     active: { type: Boolean, default: true },
-    reloadRequested: { type: Boolean, default: false }
+    reloadRequested: { type: Boolean, default: false },
+    mpAccessToken: { type: String, select: false },
+    mpPointDeviceId: { type: String, select: false },
+    screensaverBgColor: { type: String },
+    screensaverBgImageUrl: { type: String },
   },
   { timestamps: true }
 );
