@@ -516,10 +516,17 @@ const cart = computed(() => store.cart);
 const subtotal = computed(() => store.subtotal);
 const totalItems = computed(() => store.totalItems);
 
+const assetBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+function resolveAssetUrl(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  return `${assetBase}${url}`;
+}
+
 const screensaverStyle = computed(() => {
   const loc = locations.value.find((l: any) => l.code === store.selectedLocation);
   if (loc?.screensaverBgImageUrl) {
-    return { background: `url(${loc.screensaverBgImageUrl}) center/cover no-repeat` };
+    return { background: `url(${resolveAssetUrl(loc.screensaverBgImageUrl)}) center/cover no-repeat` };
   }
   if (loc?.screensaverBgColor) {
     return { background: loc.screensaverBgColor };

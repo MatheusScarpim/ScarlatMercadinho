@@ -95,6 +95,34 @@ export async function configurePointDevice(
   return { success: false, error: 'Nenhum método HTTP funcionou para configurar o device' };
 }
 
+// ─── Listar maquininhas (Point devices) de uma conta ────────────────────────
+export async function listPointDevices(accessToken: string): Promise<any[]> {
+  if (!accessToken) {
+    throw new MissingAccessTokenError();
+  }
+
+  const url = 'https://api.mercadopago.com/point/integration-api/devices';
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (err: unknown) {
+    throw new PointConnectionError((err as Error)?.message || 'fetch failed');
+  }
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw parsePointApiError(res.status, text, 'devices-list');
+  }
+
+  const data = (await res.json()) as any;
+  return data?.devices || [];
+}
+
 export async function getPointDeviceStatus(): Promise<any> {
   if (!env.mpAccessToken || !env.mpPointDeviceId) {
     throw new MissingDeviceIdError();

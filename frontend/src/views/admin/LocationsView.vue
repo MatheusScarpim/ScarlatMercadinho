@@ -111,8 +111,24 @@
           </label>
           <label>
             Device ID
-            <input v-model="form.mpPointDeviceId" type="text" autocomplete="new-password" placeholder="Ex: PAX_A910__SMARTPOS123456" class="token-field" spellcheck="false" />
+            <small class="field-hint-top">Preencha o Access Token acima e clique em Buscar para detectar a maquininha automaticamente.</small>
+            <div class="device-id-row">
+              <input v-model="form.mpPointDeviceId" type="text" autocomplete="new-password" placeholder="Ex: PAX_A910__SMARTPOS123456" class="token-field" spellcheck="false" />
+              <button type="button" class="btn btn-primary btn-sm device-fetch-btn" @click="fetchDevices" :disabled="fetchingDevices">
+                <span v-if="fetchingDevices" class="mini-spinner"></span>
+                {{ fetchingDevices ? 'Buscando...' : 'Buscar' }}
+              </button>
+            </div>
           </label>
+          <p v-if="deviceMsg" class="device-msg" :class="deviceMsgType">{{ deviceMsg }}</p>
+          <div v-if="deviceOptions.length > 1" class="device-options">
+            <button type="button" v-for="d in deviceOptions" :key="d.id"
+              class="device-option" :class="{ selected: form.mpPointDeviceId === d.id }"
+              @click="form.mpPointDeviceId = d.id">
+              <span class="device-option-id">{{ d.id }}</span>
+              <span v-if="d.operating_mode" class="device-option-mode">{{ d.operating_mode }}</span>
+            </button>
+          </div>
         </div>
 
         <!-- Screensaver -->
@@ -127,7 +143,7 @@
           <div class="screensaver-layout">
             <div class="screensaver-preview"
               :style="form.screensaverBgImageUrl
-                ? { background: `url(${form.screensaverBgImageUrl}) center/cover no-repeat` }
+                ? { background: `url(${resolveAssetUrl(form.screensaverBgImageUrl)}) center/cover no-repeat` }
                 : form.screensaverBgColor
                   ? { background: form.screensaverBgColor }
                   : { background: 'linear-gradient(135deg, #0c1829 0%, #1a2942 50%, #0c1829 100%)' }">
@@ -144,16 +160,23 @@
               </label>
               <label>
                 Imagem de fundo
-                <small class="field-hint-top">PNG, JPG ou WebP — até 5MB. Sobrepõe a cor.</small>
+                <small class="field-hint-top">Tamanho ideal: 1920×1080 px (paisagem/Full HD) — tela vertical use 1080×1920. PNG, JPG ou WebP, até 5MB. A imagem cobre a tela inteira (pode cortar bordas) e sobrepõe a cor.</small>
                 <div class="upload-row">
                   <input type="file" accept=".png,.jpg,.jpeg,.webp" @change="uploadScreensaverImage" :disabled="screensaverUploading" />
                 </div>
                 <div class="upload-status" v-if="screensaverUploading || form.screensaverBgImageUrl">
                   <span v-if="screensaverUploading" class="uploading-text">Enviando...</span>
                   <div v-else-if="form.screensaverBgImageUrl" class="img-configured">
-                    <svg viewBox="0 0 16 16" fill="none" class="check-icon"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span>Imagem configurada</span>
-                    <button type="button" class="btn btn-ghost btn-sm" @click="clearScreensaverImage">Remover</button>
+                    <a :href="resolveAssetUrl(form.screensaverBgImageUrl)" target="_blank" rel="noopener" class="bg-thumb-link" title="Abrir imagem em tamanho real">
+                      <img class="bg-thumb" :src="resolveAssetUrl(form.screensaverBgImageUrl)" alt="Fundo atual em uso" />
+                    </a>
+                    <div class="img-configured-info">
+                      <span class="img-configured-label">
+                        <svg viewBox="0 0 16 16" fill="none" class="check-icon"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Imagem em uso neste local
+                      </span>
+                      <button type="button" class="btn btn-ghost btn-sm" @click="clearScreensaverImage">Remover</button>
+                    </div>
                   </div>
                 </div>
               </label>
@@ -354,6 +377,57 @@ const form = reactive<any>({
 
 const screensaverUploading = ref(false);
 
+const assetBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+function resolveAssetUrl(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  return `${assetBase}${url}`;
+}
+
+const fetchingDevices = ref(false);
+const deviceMsg = ref('');
+const deviceMsgType = ref<'ok' | 'err'>('ok');
+const deviceOptions = ref<any[]>([]);
+
+function resetDeviceSearch() {
+  fetchingDevices.value = false;
+  deviceMsg.value = '';
+  deviceOptions.value = [];
+}
+
+async function fetchDevices() {
+  const token = (form.mpAccessToken || '').trim();
+  deviceMsg.value = '';
+  deviceOptions.value = [];
+  if (!token) {
+    deviceMsgType.value = 'err';
+    deviceMsg.value = 'Preencha o Access Token acima antes de buscar.';
+    return;
+  }
+  fetchingDevices.value = true;
+  try {
+    const { data } = await api.post('/locations/devices/list', { accessToken: token });
+    const devices = data?.devices || [];
+    if (!devices.length) {
+      deviceMsgType.value = 'err';
+      deviceMsg.value = 'Nenhuma maquininha encontrada nessa conta. Verifique se ela está pareada no Mercado Pago.';
+    } else if (devices.length === 1) {
+      form.mpPointDeviceId = devices[0].id;
+      deviceMsgType.value = 'ok';
+      deviceMsg.value = 'Maquininha encontrada e preenchida automaticamente.';
+    } else {
+      deviceOptions.value = devices;
+      deviceMsgType.value = 'ok';
+      deviceMsg.value = `${devices.length} maquininhas encontradas — toque para selecionar.`;
+    }
+  } catch (err: any) {
+    deviceMsgType.value = 'err';
+    deviceMsg.value = err?.response?.data?.message || 'Erro ao buscar maquininhas. Verifique o Access Token.';
+  } finally {
+    fetchingDevices.value = false;
+  }
+}
+
 async function uploadScreensaverImage(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
@@ -380,16 +454,20 @@ async function load() {
 function openForm() {
   showForm.value = true;
   editingId.value = null;
+  resetDeviceSearch();
   Object.assign(form, { name: '', code: '', description: '', active: true, mpAccessToken: '', mpPointDeviceId: '', screensaverBgColor: '', screensaverBgImageUrl: '' });
 }
 
 function closeForm() {
   showForm.value = false;
   editingId.value = null;
+  resetDeviceSearch();
 }
 
-function startEdit(loc: any) {
+async function startEdit(loc: any) {
   editingId.value = loc._id;
+  resetDeviceSearch();
+  // Preenche já com o que veio da lista para abrir o modal sem atraso
   Object.assign(form, {
     name: loc.name,
     code: loc.code,
@@ -401,6 +479,22 @@ function startEdit(loc: any) {
     screensaverBgImageUrl: loc.screensaverBgImageUrl || '',
   });
   showForm.value = true;
+  // Busca o registro completo (inclui credenciais da maquininha) do banco
+  try {
+    const { data } = await api.get(`/locations/${loc._id}/edit`);
+    Object.assign(form, {
+      name: data.name,
+      code: data.code,
+      description: data.description || '',
+      active: data.active,
+      mpAccessToken: data.mpAccessToken || '',
+      mpPointDeviceId: data.mpPointDeviceId || '',
+      screensaverBgColor: data.screensaverBgColor || '',
+      screensaverBgImageUrl: data.screensaverBgImageUrl || '',
+    });
+  } catch {
+    // Mantém os dados da lista caso a busca completa falhe
+  }
 }
 
 async function save() {
@@ -1234,9 +1328,38 @@ async function submitTransfer() {
 .img-configured {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 12px;
   font-size: 13px;
-  color: #22c55e;
+}
+.bg-thumb-link {
+  flex-shrink: 0;
+  line-height: 0;
+}
+.bg-thumb {
+  width: 96px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: block;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.bg-thumb-link:hover .bg-thumb {
+  transform: scale(1.03);
+  box-shadow: 0 4px 14px rgba(31, 41, 55, 0.18);
+}
+.img-configured-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.img-configured-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #16a34a;
+  font-weight: 500;
 }
 .check-icon {
   width: 16px;
@@ -1247,11 +1370,146 @@ async function submitTransfer() {
   padding: 4px 10px;
   font-size: 12px;
 }
-.token-field {
-  font-family: monospace;
+.loc-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.loc-form input,
+.loc-form textarea {
+  width: 100%;
+  background: #fdfefe;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 13px 14px;
+  border-radius: 10px;
+  font-family: inherit;
+  /* 16px evita o zoom automático ao tocar em campos no tablet/celular */
+  font-size: 16px;
+  font-weight: 400;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.loc-form input:not([type="checkbox"]):not([type="color"]) {
+  min-height: 48px;
+}
+.loc-form input::placeholder,
+.loc-form textarea::placeholder {
+  color: #9aa5b5;
+}
+.loc-form input:focus,
+.loc-form textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(16, 180, 157, 0.16);
+}
+.loc-form input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.loc-form input[type="color"] {
+  padding: 2px;
+}
+.loc-form .checkbox-row {
+  font-size: 14px;
+  font-weight: 500;
+}
+.loc-form .token-field {
+  font-family: 'Courier New', monospace;
+  font-size: 15px;
   letter-spacing: 0.02em;
   resize: none;
+}
+.device-id-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.device-id-row input {
+  flex: 1;
+}
+.device-fetch-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  min-height: 48px;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+.device-fetch-btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+.mini-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.device-msg {
+  margin: 2px 0 0;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+.device-msg.ok {
+  color: #0e7a5f;
+  background: rgba(16, 180, 157, 0.1);
+  border: 1px solid rgba(16, 180, 157, 0.25);
+}
+.device-msg.err {
+  color: #b42318;
+  background: rgba(244, 63, 63, 0.08);
+  border: 1px solid rgba(244, 63, 63, 0.22);
+}
+.device-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.device-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 14px;
+  min-height: 52px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: left;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: var(--text);
+}
+.device-option:hover {
+  border-color: var(--primary);
+}
+.device-option.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(16, 180, 157, 0.18);
+}
+.device-option-mode {
+  font-family: inherit;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--surface-2);
+  padding: 2px 8px;
+  border-radius: 999px;
 }
 .modal-form textarea {
   width: 100%;
@@ -1266,6 +1524,7 @@ async function submitTransfer() {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  padding-top: 8px;
 }
 
 /* Responsive */
@@ -1276,6 +1535,53 @@ async function submitTransfer() {
 
   .transfer-arrow {
     display: none;
+  }
+}
+
+/* Tablet (retrato e telas estreitas): empilha linhas e aumenta alvos de toque */
+@media (max-width: 820px) {
+  .form-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .field-code {
+    width: 100%;
+  }
+  .device-id-row {
+    flex-direction: column;
+  }
+  .device-fetch-btn {
+    width: 100%;
+  }
+  .screensaver-layout {
+    flex-direction: column;
+  }
+  .screensaver-preview {
+    width: 100%;
+    height: 120px;
+  }
+  .color-row {
+    flex-wrap: wrap;
+  }
+  .modal-actions .btn {
+    flex: 1;
+    min-height: 50px;
+  }
+}
+
+/* Dispositivos de toque: garante alvos confortáveis independente da largura */
+@media (pointer: coarse) {
+  .device-option {
+    min-height: 56px;
+  }
+  .loc-form input[type="file"] {
+    padding: 12px;
+  }
+  .img-configured .btn-sm,
+  .color-row .btn-sm {
+    min-height: 40px;
+    padding: 8px 14px;
+    font-size: 13px;
   }
 }
 

@@ -25,7 +25,26 @@ const router = Router();
 
 // Listar/consultar locais não exige login (usado no quiosque)
 router.get('/', controller.listLocations);
+
+// Carregar local com credenciais da maquininha (somente admin) — usado no formulário de edição
+router.get(
+  '/:id/edit',
+  authMiddleware,
+  adminOnly,
+  requirePermission('LOCATIONS'),
+  controller.getLocationForEdit
+);
+
 router.get('/:id', controller.getLocation);
+
+// Buscar maquininhas (Point devices) de uma conta pelo Access Token
+router.post(
+  '/devices/list',
+  authMiddleware,
+  adminOnly,
+  requirePermission('LOCATIONS'),
+  controller.listLocationDevices
+);
 
 // Upload de imagem de screensaver
 router.post(
