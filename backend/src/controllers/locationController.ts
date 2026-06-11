@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { LocationModel } from '../models/Location';
-import { listPointDevices } from '../services/paymentGatewayService';
+import { listPointDevices, configurePointDevice } from '../services/paymentGatewayService';
 
 export async function createLocation(req: Request, res: Response) {
   const location = await LocationModel.create(req.body);
@@ -50,6 +50,23 @@ export async function listLocationDevices(req: Request, res: Response) {
   }
   const devices = await listPointDevices(accessToken);
   res.json({ devices });
+}
+
+// Ativa o modo PDV na maquininha (necessário para o sistema enviar cobranças)
+export async function configureLocationDevice(req: Request, res: Response) {
+  const accessToken = (req.body?.accessToken || '').trim();
+  const deviceId = (req.body?.deviceId || '').trim();
+  if (!accessToken) {
+    return res.status(400).json({ message: 'Informe o Access Token.' });
+  }
+  if (!deviceId) {
+    return res.status(400).json({ message: 'Informe o Device ID da maquininha.' });
+  }
+  const result = await configurePointDevice(accessToken, deviceId);
+  if (!result.success) {
+    return res.status(400).json({ message: result.error || 'Não foi possível ativar o modo PDV.' });
+  }
+  res.json({ success: true, mode: result.mode || 'PDV' });
 }
 
 export async function uploadScreensaverImage(req: Request, res: Response) {

@@ -124,11 +124,25 @@
           <div v-if="deviceOptions.length > 1" class="device-options">
             <button type="button" v-for="d in deviceOptions" :key="d.id"
               class="device-option" :class="{ selected: form.mpPointDeviceId === d.id }"
-              @click="form.mpPointDeviceId = d.id">
+              @click="selectDevice(d)">
               <span class="device-option-id">{{ d.id }}</span>
               <span v-if="d.operating_mode" class="device-option-mode">{{ d.operating_mode }}</span>
             </button>
           </div>
+
+          <div v-if="form.mpPointDeviceId" class="pdv-block">
+            <button type="button" class="pdv-btn" :class="deviceMode === 'PDV' ? 'pdv-active' : 'btn btn-primary'"
+              @click="activatePdv" :disabled="activatingPdv || deviceMode === 'PDV'">
+              <span v-if="activatingPdv" class="mini-spinner"></span>
+              <svg v-else-if="deviceMode === 'PDV'" viewBox="0 0 16 16" fill="none" class="pdv-check">
+                <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M5 8l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              {{ activatingPdv ? 'Ativando...' : deviceMode === 'PDV' ? 'Ativado' : 'Ativar modo PDV' }}
+            </button>
+            <small class="pdv-hint">O modo PDV permite que o sistema envie a cobrança direto pra maquininha.</small>
+          </div>
+          <p v-if="pdvMsg" class="device-msg" :class="pdvMsgType">{{ pdvMsg }}</p>
         </div>
 
         <!-- Screensaver -->
@@ -142,7 +156,7 @@
           </p>
           <div class="screensaver-layout">
             <div class="screensaver-preview"
-              :style="form.screensaverBgImageUrl
+              :style="(form.screensaverBgImageUrl && !imgError)
                 ? { background: `url(${resolveAssetUrl(form.screensaverBgImageUrl)}) center/cover no-repeat` }
                 : form.screensaverBgColor
                   ? { background: form.screensaverBgColor }
@@ -167,18 +181,26 @@
                 <div class="upload-status" v-if="screensaverUploading || form.screensaverBgImageUrl">
                   <span v-if="screensaverUploading" class="uploading-text">Enviando...</span>
                   <div v-else-if="form.screensaverBgImageUrl" class="img-configured">
-                    <a :href="resolveAssetUrl(form.screensaverBgImageUrl)" target="_blank" rel="noopener" class="bg-thumb-link" title="Abrir imagem em tamanho real">
-                      <img class="bg-thumb" :src="resolveAssetUrl(form.screensaverBgImageUrl)" alt="Fundo atual em uso" />
+                    <a v-if="!imgError" :href="resolveAssetUrl(form.screensaverBgImageUrl)" target="_blank" rel="noopener" class="bg-thumb-link" title="Abrir imagem em tamanho real">
+                      <img class="bg-thumb" :src="resolveAssetUrl(form.screensaverBgImageUrl)" alt="Fundo atual em uso" @error="imgError = true" @load="imgError = false" />
                     </a>
+                    <div v-else class="bg-thumb bg-thumb-missing" title="Arquivo não encontrado">
+                      <svg viewBox="0 0 24 24" fill="none" class="missing-icon"><path d="M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Z" stroke="currentColor" stroke-width="1.5"/><path d="m4 16 4-4 3 3 4-4 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="m4 4 16 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
                     <div class="img-configured-info">
-                      <span class="img-configured-label">
+                      <span v-if="!imgError" class="img-configured-label">
                         <svg viewBox="0 0 16 16" fill="none" class="check-icon"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         Imagem em uso neste local
+                      </span>
+                      <span v-else class="img-missing-label">
+                        <svg viewBox="0 0 16 16" fill="none" class="warn-icon"><path d="M8 1.5 15 14H1L8 1.5Z" stroke="#d97706" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5v3.5M8 12h.01" stroke="#d97706" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        Arquivo não encontrado no servidor — reenvie a imagem.
                       </span>
                       <button type="button" class="btn btn-ghost btn-sm" @click="clearScreensaverImage">Remover</button>
                     </div>
                   </div>
                 </div>
+                <p v-if="uploadMsg" class="device-msg" :class="uploadMsgType">{{ uploadMsg }}</p>
               </label>
             </div>
           </div>
@@ -346,7 +368,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
 import { exportToCsv } from '../../utils/export';
@@ -380,19 +402,60 @@ const screensaverUploading = ref(false);
 const assetBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 function resolveAssetUrl(url: string): string {
   if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
-  return `${assetBase}${url}`;
+  if (/^(https?:)?\/\//.test(url) || url.startsWith('data:') || url.startsWith('blob:')) return url;
+  // Remove barras finais da base e garante uma única barra inicial no path,
+  // evitando gerar "//uploads" (URL protocol-relative) quando a base é "/".
+  const base = assetBase.replace(/\/+$/, '');
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${base}${path}`;
 }
 
 const fetchingDevices = ref(false);
 const deviceMsg = ref('');
 const deviceMsgType = ref<'ok' | 'err'>('ok');
 const deviceOptions = ref<any[]>([]);
+const deviceMode = ref('');
+const activatingPdv = ref(false);
+const pdvMsg = ref('');
+const pdvMsgType = ref<'ok' | 'err'>('ok');
 
 function resetDeviceSearch() {
   fetchingDevices.value = false;
   deviceMsg.value = '';
   deviceOptions.value = [];
+  deviceMode.value = '';
+  activatingPdv.value = false;
+  pdvMsg.value = '';
+  uploadMsg.value = '';
+}
+
+function selectDevice(d: any) {
+  form.mpPointDeviceId = d.id;
+  deviceMode.value = (d.operating_mode || '').toUpperCase();
+  pdvMsg.value = '';
+}
+
+async function activatePdv() {
+  const token = (form.mpAccessToken || '').trim();
+  const device = (form.mpPointDeviceId || '').trim();
+  pdvMsg.value = '';
+  if (!token || !device) {
+    pdvMsgType.value = 'err';
+    pdvMsg.value = 'Preencha o Access Token e o Device ID antes de ativar.';
+    return;
+  }
+  activatingPdv.value = true;
+  try {
+    const { data } = await api.post('/locations/devices/configure', { accessToken: token, deviceId: device });
+    deviceMode.value = (data?.mode || 'PDV').toUpperCase();
+    pdvMsgType.value = 'ok';
+    pdvMsg.value = 'Maquininha ativada no modo PDV.';
+  } catch (err: any) {
+    pdvMsgType.value = 'err';
+    pdvMsg.value = err?.response?.data?.message || 'Não foi possível ativar o modo PDV.';
+  } finally {
+    activatingPdv.value = false;
+  }
 }
 
 async function fetchDevices() {
@@ -412,7 +475,7 @@ async function fetchDevices() {
       deviceMsgType.value = 'err';
       deviceMsg.value = 'Nenhuma maquininha encontrada nessa conta. Verifique se ela está pareada no Mercado Pago.';
     } else if (devices.length === 1) {
-      form.mpPointDeviceId = devices[0].id;
+      selectDevice(devices[0]);
       deviceMsgType.value = 'ok';
       deviceMsg.value = 'Maquininha encontrada e preenchida automaticamente.';
     } else {
@@ -428,22 +491,55 @@ async function fetchDevices() {
   }
 }
 
+const uploadMsg = ref('');
+const uploadMsgType = ref<'ok' | 'err'>('ok');
+// Detecta quando a imagem salva não carrega (arquivo ausente no servidor)
+const imgError = ref(false);
+watch(() => form.screensaverBgImageUrl, () => { imgError.value = false; });
+
 async function uploadScreensaverImage(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0];
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
   if (!file) return;
+  uploadMsg.value = '';
   screensaverUploading.value = true;
   try {
     const formData = new FormData();
     formData.append('file', file);
     const { data } = await api.post('/locations/upload', formData);
+    if (!data?.url) {
+      throw new Error('Resposta sem URL da imagem');
+    }
     form.screensaverBgImageUrl = data.url;
+    uploadMsgType.value = 'ok';
+    uploadMsg.value = 'Imagem enviada. Clique em Salvar para aplicar neste local.';
+  } catch (err: any) {
+    uploadMsgType.value = 'err';
+    uploadMsg.value = err?.response?.data?.message || 'Falha ao enviar a imagem. Tente novamente.';
   } finally {
     screensaverUploading.value = false;
+    // permite reenviar o mesmo arquivo
+    input.value = '';
   }
 }
 
 function clearScreensaverImage() {
   form.screensaverBgImageUrl = '';
+  uploadMsg.value = '';
+}
+
+// Consulta o modo atual da maquininha para já mostrar "Ativado" ao abrir o editar
+async function detectDeviceMode() {
+  const token = (form.mpAccessToken || '').trim();
+  const device = (form.mpPointDeviceId || '').trim();
+  if (!token || !device) return;
+  try {
+    const { data } = await api.post('/locations/devices/list', { accessToken: token });
+    const found = (data?.devices || []).find((d: any) => d.id === device);
+    if (found) deviceMode.value = (found.operating_mode || '').toUpperCase();
+  } catch {
+    // silencioso: se falhar, o botão fica como "Ativar modo PDV"
+  }
 }
 
 async function load() {
@@ -490,11 +586,13 @@ async function startEdit(loc: any) {
       mpAccessToken: data.mpAccessToken || '',
       mpPointDeviceId: data.mpPointDeviceId || '',
       screensaverBgColor: data.screensaverBgColor || '',
-      screensaverBgImageUrl: data.screensaverBgImageUrl || '',
+      screensaverBgImageUrl: data.screensaverBgImageUrl || loc.screensaverBgImageUrl || '',
     });
   } catch {
     // Mantém os dados da lista caso a busca completa falhe
   }
+  // Já reflete se a maquininha está em modo PDV
+  detectDeviceMode();
 }
 
 async function save() {
@@ -1361,6 +1459,32 @@ async function submitTransfer() {
   color: #16a34a;
   font-weight: 500;
 }
+.bg-thumb-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #d97706;
+}
+.missing-icon {
+  width: 28px;
+  height: 28px;
+}
+.img-missing-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #b45309;
+  font-weight: 500;
+  max-width: 240px;
+  line-height: 1.35;
+}
+.warn-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
 .check-icon {
   width: 16px;
   height: 16px;
@@ -1510,6 +1634,44 @@ async function submitTransfer() {
   background: var(--surface-2);
   padding: 2px 8px;
   border-radius: 999px;
+}
+.pdv-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.pdv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+.pdv-btn:disabled {
+  cursor: default;
+}
+.pdv-btn.pdv-active {
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #16a34a;
+  opacity: 1;
+}
+.pdv-check {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.pdv-hint {
+  color: var(--muted);
+  font-size: 12px;
 }
 .modal-form textarea {
   width: 100%;

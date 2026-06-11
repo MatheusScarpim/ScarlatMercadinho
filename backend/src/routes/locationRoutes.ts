@@ -46,6 +46,15 @@ router.post(
   controller.listLocationDevices
 );
 
+// Ativar modo PDV na maquininha
+router.post(
+  '/devices/configure',
+  authMiddleware,
+  adminOnly,
+  requirePermission('LOCATIONS'),
+  controller.configureLocationDevice
+);
+
 // Upload de imagem de screensaver
 router.post(
   '/upload',
