@@ -202,6 +202,19 @@
                 </div>
                 <p v-if="uploadMsg" class="device-msg" :class="uploadMsgType">{{ uploadMsg }}</p>
               </label>
+              <label>
+                Cor do botão "Toque para começar"
+                <small class="field-hint-top">Cor do aviso que aparece sobre o screensaver. Deixe em branco para usar a cor padrão do sistema.</small>
+                <div class="color-row">
+                  <input type="color" v-model="form.tapMessageColor" />
+                  <input type="text" v-model="form.tapMessageColor" placeholder="Ex: #5be7c4" />
+                  <button type="button" class="btn btn-ghost btn-sm" @click="form.tapMessageColor = ''" v-if="form.tapMessageColor">Limpar</button>
+                </div>
+                <div class="tap-preview" :style="tapPreviewStyle">
+                  <span class="tap-preview-dot" />
+                  Toque na tela para começar suas compras
+                </div>
+              </label>
             </div>
           </div>
         </div>
@@ -395,6 +408,7 @@ const form = reactive<any>({
   mpPointDeviceId: '',
   screensaverBgColor: '',
   screensaverBgImageUrl: '',
+  tapMessageColor: '',
 });
 
 const screensaverUploading = ref(false);
@@ -409,6 +423,22 @@ function resolveAssetUrl(url: string): string {
   const path = url.startsWith('/') ? url : `/${url}`;
   return `${base}${path}`;
 }
+
+function hexToRgba(hex: string, alpha: number): string {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec((hex || '').trim());
+  if (!m) return hex;
+  const [r, g, b] = [m[1], m[2], m[3]].map((h) => parseInt(h, 16));
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+const tapPreviewStyle = computed(() => {
+  const c = form.tapMessageColor || '#5be7c4';
+  return {
+    color: c,
+    borderColor: hexToRgba(c, 0.4),
+    background: `linear-gradient(135deg, ${hexToRgba(c, 0.2)}, ${hexToRgba(c, 0.1)})`,
+  };
+});
 
 const fetchingDevices = ref(false);
 const deviceMsg = ref('');
@@ -551,7 +581,7 @@ function openForm() {
   showForm.value = true;
   editingId.value = null;
   resetDeviceSearch();
-  Object.assign(form, { name: '', code: '', description: '', active: true, mpAccessToken: '', mpPointDeviceId: '', screensaverBgColor: '', screensaverBgImageUrl: '' });
+  Object.assign(form, { name: '', code: '', description: '', active: true, mpAccessToken: '', mpPointDeviceId: '', screensaverBgColor: '', screensaverBgImageUrl: '', tapMessageColor: '' });
 }
 
 function closeForm() {
@@ -573,6 +603,7 @@ async function startEdit(loc: any) {
     mpPointDeviceId: '',
     screensaverBgColor: loc.screensaverBgColor || '',
     screensaverBgImageUrl: loc.screensaverBgImageUrl || '',
+    tapMessageColor: loc.tapMessageColor || '',
   });
   showForm.value = true;
   // Busca o registro completo (inclui credenciais da maquininha) do banco
@@ -587,6 +618,7 @@ async function startEdit(loc: any) {
       mpPointDeviceId: data.mpPointDeviceId || '',
       screensaverBgColor: data.screensaverBgColor || '',
       screensaverBgImageUrl: data.screensaverBgImageUrl || loc.screensaverBgImageUrl || '',
+      tapMessageColor: data.tapMessageColor || '',
     });
   } catch {
     // Mantém os dados da lista caso a busca completa falhe
@@ -1405,6 +1437,24 @@ async function submitTransfer() {
 }
 .color-row input[type="text"] {
   flex: 1;
+}
+.tap-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 14px;
+  border: 2px solid;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.tap-preview-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 3px solid currentColor;
+  flex-shrink: 0;
 }
 .upload-row {
   margin-top: 4px;

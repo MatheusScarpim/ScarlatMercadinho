@@ -10,6 +10,7 @@ export interface LocationDocument extends Document {
   mpPointDeviceId?: string;
   screensaverBgColor?: string;
   screensaverBgImageUrl?: string;
+  tapMessageColor?: string;
 }
 
 const locationSchema = new Schema(
@@ -23,6 +24,7 @@ const locationSchema = new Schema(
     mpPointDeviceId: { type: String, select: false },
     screensaverBgColor: { type: String },
     screensaverBgImageUrl: { type: String },
+    tapMessageColor: { type: String },
   },
   { timestamps: true }
 );

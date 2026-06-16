@@ -72,8 +72,8 @@
           </div>
         </div>
         <div class="screensaver-footer">
-          <div class="tap-message">
-            <svg viewBox="0 0 24 24" fill="none" class="tap-icon">
+          <div class="tap-message" :style="tapMessageStyle">
+            <svg viewBox="0 0 24 24" fill="none" class="tap-icon" :style="tapIconStyle">
               <path
                 d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"
                 fill="currentColor" />
@@ -532,6 +532,30 @@ const screensaverStyle = computed(() => {
     return { background: loc.screensaverBgColor };
   }
   return {};
+});
+
+function hexToRgba(hex: string, alpha: number): string {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec((hex || '').trim());
+  if (!m) return hex;
+  const [r, g, b] = [m[1], m[2], m[3]].map((h) => parseInt(h, 16));
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+const tapMessageStyle = computed(() => {
+  const loc = locations.value.find((l: any) => l.code === store.selectedLocation);
+  const c = loc?.tapMessageColor;
+  if (!c) return {};
+  return {
+    color: c,
+    borderColor: hexToRgba(c, 0.4),
+    background: `linear-gradient(135deg, ${hexToRgba(c, 0.2)}, ${hexToRgba(c, 0.1)})`,
+    boxShadow: `0 8px 24px ${hexToRgba(c, 0.3)}`,
+  };
+});
+
+const tapIconStyle = computed(() => {
+  const loc = locations.value.find((l: any) => l.code === store.selectedLocation);
+  return loc?.tapMessageColor ? { color: loc.tapMessageColor } : {};
 });
 const paymentOpen = ref(false);
 const locations = ref<any[]>([]);
