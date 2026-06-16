@@ -203,12 +203,23 @@
                 <p v-if="uploadMsg" class="device-msg" :class="uploadMsgType">{{ uploadMsg }}</p>
               </label>
               <label>
-                Cor do botão "Toque para começar"
-                <small class="field-hint-top">Cor do aviso que aparece sobre o screensaver. Deixe em branco para usar a cor padrão do sistema.</small>
-                <div class="color-row">
-                  <input type="color" v-model="form.tapMessageColor" />
-                  <input type="text" v-model="form.tapMessageColor" placeholder="Ex: #5be7c4" />
-                  <button type="button" class="btn btn-ghost btn-sm" @click="form.tapMessageColor = ''" v-if="form.tapMessageColor">Limpar</button>
+                Botão "Toque para começar"
+                <small class="field-hint-top">Aviso que aparece sobre o screensaver. Deixe ambos em branco para usar o padrão do sistema.</small>
+                <div class="color-field">
+                  <span class="color-field-label">Cor de fundo</span>
+                  <div class="color-row">
+                    <input type="color" v-model="form.tapMessageBgColor" />
+                    <input type="text" v-model="form.tapMessageBgColor" placeholder="Ex: #0c1829" />
+                    <button type="button" class="btn btn-ghost btn-sm" @click="form.tapMessageBgColor = ''" v-if="form.tapMessageBgColor">Limpar</button>
+                  </div>
+                </div>
+                <div class="color-field">
+                  <span class="color-field-label">Cor das letras</span>
+                  <div class="color-row">
+                    <input type="color" v-model="form.tapMessageColor" />
+                    <input type="text" v-model="form.tapMessageColor" placeholder="Ex: #5be7c4" />
+                    <button type="button" class="btn btn-ghost btn-sm" @click="form.tapMessageColor = ''" v-if="form.tapMessageColor">Limpar</button>
+                  </div>
                 </div>
                 <div class="tap-preview" :style="tapPreviewStyle">
                   <span class="tap-preview-dot" />
@@ -409,6 +420,7 @@ const form = reactive<any>({
   screensaverBgColor: '',
   screensaverBgImageUrl: '',
   tapMessageColor: '',
+  tapMessageBgColor: '',
 });
 
 const screensaverUploading = ref(false);
@@ -432,11 +444,12 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 const tapPreviewStyle = computed(() => {
-  const c = form.tapMessageColor || '#5be7c4';
+  const text = form.tapMessageColor || '#5be7c4';
+  const bg = form.tapMessageBgColor;
   return {
-    color: c,
-    borderColor: hexToRgba(c, 0.4),
-    background: `linear-gradient(135deg, ${hexToRgba(c, 0.2)}, ${hexToRgba(c, 0.1)})`,
+    color: text,
+    borderColor: text,
+    background: bg || `linear-gradient(135deg, ${hexToRgba(text, 0.2)}, ${hexToRgba(text, 0.1)})`,
   };
 });
 
@@ -581,7 +594,7 @@ function openForm() {
   showForm.value = true;
   editingId.value = null;
   resetDeviceSearch();
-  Object.assign(form, { name: '', code: '', description: '', active: true, mpAccessToken: '', mpPointDeviceId: '', screensaverBgColor: '', screensaverBgImageUrl: '', tapMessageColor: '' });
+  Object.assign(form, { name: '', code: '', description: '', active: true, mpAccessToken: '', mpPointDeviceId: '', screensaverBgColor: '', screensaverBgImageUrl: '', tapMessageColor: '', tapMessageBgColor: '' });
 }
 
 function closeForm() {
@@ -604,6 +617,7 @@ async function startEdit(loc: any) {
     screensaverBgColor: loc.screensaverBgColor || '',
     screensaverBgImageUrl: loc.screensaverBgImageUrl || '',
     tapMessageColor: loc.tapMessageColor || '',
+    tapMessageBgColor: loc.tapMessageBgColor || '',
   });
   showForm.value = true;
   // Busca o registro completo (inclui credenciais da maquininha) do banco
@@ -619,6 +633,7 @@ async function startEdit(loc: any) {
       screensaverBgColor: data.screensaverBgColor || '',
       screensaverBgImageUrl: data.screensaverBgImageUrl || loc.screensaverBgImageUrl || '',
       tapMessageColor: data.tapMessageColor || '',
+      tapMessageBgColor: data.tapMessageBgColor || '',
     });
   } catch {
     // Mantém os dados da lista caso a busca completa falhe
@@ -1437,6 +1452,14 @@ async function submitTransfer() {
 }
 .color-row input[type="text"] {
   flex: 1;
+}
+.color-field {
+  margin-top: 8px;
+}
+.color-field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
 }
 .tap-preview {
   display: inline-flex;

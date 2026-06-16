@@ -543,14 +543,23 @@ function hexToRgba(hex: string, alpha: number): string {
 
 const tapMessageStyle = computed(() => {
   const loc = locations.value.find((l: any) => l.code === store.selectedLocation);
-  const c = loc?.tapMessageColor;
-  if (!c) return {};
-  return {
-    color: c,
-    borderColor: hexToRgba(c, 0.4),
-    background: `linear-gradient(135deg, ${hexToRgba(c, 0.2)}, ${hexToRgba(c, 0.1)})`,
-    boxShadow: `0 8px 24px ${hexToRgba(c, 0.3)}`,
-  };
+  const text = loc?.tapMessageColor;
+  const bg = loc?.tapMessageBgColor;
+  if (!text && !bg) return {};
+  const style: Record<string, string> = {};
+  if (text) {
+    style.color = text;
+    style.borderColor = text;
+  }
+  if (bg) {
+    style.background = bg;
+    style.boxShadow = `0 8px 24px ${hexToRgba(bg, 0.3)}`;
+  } else if (text) {
+    style.borderColor = hexToRgba(text, 0.4);
+    style.background = `linear-gradient(135deg, ${hexToRgba(text, 0.2)}, ${hexToRgba(text, 0.1)})`;
+    style.boxShadow = `0 8px 24px ${hexToRgba(text, 0.3)}`;
+  }
+  return style;
 });
 
 const tapIconStyle = computed(() => {

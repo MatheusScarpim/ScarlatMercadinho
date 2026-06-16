@@ -11,6 +11,7 @@ export interface LocationDocument extends Document {
   screensaverBgColor?: string;
   screensaverBgImageUrl?: string;
   tapMessageColor?: string;
+  tapMessageBgColor?: string;
 }
 
 const locationSchema = new Schema(
@@ -25,6 +26,7 @@ const locationSchema = new Schema(
     screensaverBgColor: { type: String },
     screensaverBgImageUrl: { type: String },
     tapMessageColor: { type: String },
+    tapMessageBgColor: { type: String },
   },
   { timestamps: true }
 );
