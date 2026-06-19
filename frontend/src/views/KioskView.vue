@@ -106,6 +106,7 @@
             <button class="ghost sm" @click="openBarcode">Digitar código</button>
             <button class="ghost sm" @click="openProductSearch">Buscar produtos</button>
             <button class="ghost sm" @click="openPromos">Promoções</button>
+            <button class="ghost sm" @click="openCalculadora">Calculadora</button>
             <button class="ghost sm" @click="showLocationModal = true">Trocar local</button>
           </div>
         </div>
@@ -1186,6 +1187,11 @@ function closeBarcode() {
 function openPromos() {
   clearInactivityTimer();
   enterScreensaver();
+}
+
+function openCalculadora() {
+  resetInactivity();
+  window.open('/calculadora', '_blank', 'noopener,noreferrer');
 }
 
 // ─── Busca de produtos ────────────────────────────────────────────
