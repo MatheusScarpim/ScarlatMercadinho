@@ -105,6 +105,14 @@
             <span>Chat</span>
           </RouterLink>
         </div>
+
+        <div class="nav-section">
+          <p class="nav-label">Ferramentas</p>
+          <RouterLink to="/admin/calculator" class="nav-item">
+            <span class="icon">🔢</span>
+            <span>Calculadora</span>
+          </RouterLink>
+        </div>
       </nav>
 
 
