@@ -106,6 +106,7 @@
             <button class="ghost sm" @click="openBarcode">Digitar código</button>
             <button class="ghost sm" @click="openProductSearch">Buscar produtos</button>
             <button class="ghost sm" @click="openPromos">Promoções</button>
+            <button class="ghost sm" @click="openCalculator">Calculadora</button>
             <button class="ghost sm" @click="showLocationModal = true">Trocar local</button>
           </div>
         </div>
@@ -452,6 +453,7 @@
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 import { useKioskStore } from '../stores/kiosk';
 import api from '../services/api';
 import wl from '../config/whitelabel';
@@ -1169,6 +1171,12 @@ onUnmounted(() => {
   stopCarousel();
   stopReloadPolling();
 });
+
+const router = useRouter();
+
+function openCalculator() {
+  router.push('/calculadora');
+}
 
 function openBarcode() {
   manualBarcodeOpen.value = true;
