@@ -11,7 +11,8 @@ export const PERMISSIONS = [
   { key: 'LOCATIONS', label: 'Locais' },
   { key: 'SETTINGS', label: 'Configurações' },
   { key: 'NFC_E', label: 'NFC-e' },
-  { key: 'FISCAL', label: 'Fiscal' }
+  { key: 'FISCAL', label: 'Fiscal' },
+  { key: 'CALCULADORA', label: 'Calculadora' }
 ] as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[number]['key'];
