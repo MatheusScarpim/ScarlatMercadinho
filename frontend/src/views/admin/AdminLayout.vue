@@ -105,6 +105,14 @@
             <span>Chat</span>
           </RouterLink>
         </div>
+
+        <div class="nav-section" v-if="showFerramentas">
+          <p class="nav-label">Ferramentas</p>
+          <RouterLink v-if="can('CALCULATOR')" to="/admin/calculator" class="nav-item">
+            <span class="icon">🧮</span>
+            <span>Calculadora</span>
+          </RouterLink>
+        </div>
       </nav>
 
 
@@ -212,6 +220,7 @@ const showOperations = computed(
 );
 const showCadastros = computed(() => can('SUPPLIERS') || can('LOCATIONS'));
 const showSystem = computed(() => can('SETTINGS') || isAdmin.value);
+const showFerramentas = computed(() => can('CALCULATOR'));
 
 function logout() {
   auth.logout();
