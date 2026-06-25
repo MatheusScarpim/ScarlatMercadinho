@@ -4,7 +4,8 @@ import { getBestPriceForProduct } from './batchService';
 import { StockMovementModel } from '../models/StockMovement';
 import { fetchCosmosProduct } from './cosmosService';
 import { getMarginPercent } from './settingsService';
-import { notifyProductAutoCreated } from './notificationService';
+import { notifyProductAutoCreated, createNotification } from './notificationService';
+import { PendingProductModel } from '../models/PendingProduct';
 
 function buildFilter(params: { search?: string; category?: string; active?: string }) {
   const filter: FilterQuery<any> = {};
@@ -77,6 +78,32 @@ export async function searchProducts(
   return docs.map((d) => applyLocation(d, location, stockMap.get(d._id.toString())));
 }
 
+async function registerPendingProduct(barcode: string, location?: string) {
+  try {
+    const existing = await PendingProductModel.findOneAndUpdate(
+      { barcode, status: 'PENDING' },
+      {
+        $inc: { count: 1 },
+        $set: { lastSeenAt: new Date(), location: location || 'default' },
+        $setOnInsert: { barcode, status: 'PENDING' },
+      },
+      { new: true, upsert: true }
+    );
+
+    // Notifica apenas na primeira ocorrência para não floodar
+    if (existing && existing.count === 1) {
+      await createNotification({
+        type: 'PRODUCT_NOT_FOUND',
+        title: '❓ Produto não encontrado',
+        message: `O código de barras ${barcode} foi escaneado mas não foi encontrado no cadastro nem na base externa. Verifique na página de Produtos Não Encontrados para validar.`,
+        location: location || 'default',
+      });
+    }
+  } catch (e: any) {
+    console.error('[PRODUCT-SERVICE] Erro ao registrar produto pendente:', e?.message);
+  }
+}
+
 export async function findByBarcode(barcode: string, location?: string) {
   let doc = await ProductModel.findOne({ barcode, active: true }).populate('category');
   let autoCreated = false;
@@ -117,6 +144,8 @@ export async function findByBarcode(barcode: string, location?: string) {
       }
     } catch (err: any) {
       console.error('[PRODUCT-SERVICE] Erro ao auto-criar produto via Cosmos:', err?.message);
+      // Cosmos falhou: registra o código como pendente para validação manual + notifica
+      await registerPendingProduct(barcode, location);
     }
   }
 

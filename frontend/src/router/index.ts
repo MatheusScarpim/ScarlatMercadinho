@@ -19,6 +19,7 @@ import FiscalView from '../views/admin/FiscalView.vue';
 import UsersView from '../views/admin/UsersView.vue';
 import ChatView from '../views/admin/ChatView.vue';
 import PriceReviewView from '../views/admin/PriceReviewView.vue';
+import NotFoundProductsView from '../views/admin/NotFoundProductsView.vue';
 import { useAuthStore } from '../stores/auth';
 import { PermissionKey } from '../constants/permissions';
 
@@ -37,6 +38,7 @@ const adminChildren: RouteRecordRaw[] = [
   { path: 'expiring-products', component: ExpiringProductsView, meta: { permission: 'EXPIRING_PRODUCTS' as PermissionKey } },
   { path: 'fiscal', component: FiscalView, meta: { permission: 'FISCAL' as PermissionKey } },
   { path: 'price-review', component: PriceReviewView, meta: { permission: 'PRODUCTS' as PermissionKey } },
+  { path: 'not-found-products', component: NotFoundProductsView, meta: { permission: 'PRODUCTS' as PermissionKey } },
   { path: 'users', component: UsersView, meta: { requiresAdmin: true } },
   { path: 'chat', component: ChatView, meta: { requiresAuth: true } }
 ];

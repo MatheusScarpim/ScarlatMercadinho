@@ -44,6 +44,10 @@
             <span class="icon">💲</span>
             <span>Revisão de Preços</span>
           </RouterLink>
+          <RouterLink v-if="can('PRODUCTS')" to="/admin/not-found-products" class="nav-item">
+            <span class="icon">❓</span>
+            <span>Não Encontrados</span>
+          </RouterLink>
           <RouterLink v-if="can('CATEGORIES')" to="/admin/categories" class="nav-item">
             <span class="icon">🏷️</span>
             <span>Categorias</span>
@@ -157,7 +161,7 @@
 
         <div class="notif-list">
           <div v-for="n in items" :key="n._id" :class="['notif-item', !n.read ? 'unread' : '', `notif-${n.type}`]"
-            @click="notifications.markRead(n._id)">
+            @click="handleNotificationClick(n)">
             <div class="notif-icon-wrapper">
               <span class="notif-icon">{{ getNotificationIcon(n.type) }}</span>
             </div>
@@ -237,9 +241,19 @@ function getNotificationIcon(type: string): string {
     'SYSTEM_ALERT': '🔔',
     'EXPIRING_PRODUCT': '⏰',
     'EXPIRED_PRODUCT': '⚠️',
-    'PRODUCT_AUTO_CREATED': '🆕'
+    'PRODUCT_AUTO_CREATED': '🆕',
+    'PRODUCT_NOT_FOUND': '❓'
   };
   return icons[type] || '📢';
+}
+
+// Marca como lida e navega para a página correspondente ao tipo
+function handleNotificationClick(n: { _id: string; type: string }) {
+  notifications.markRead(n._id);
+  if (n.type === 'PRODUCT_NOT_FOUND') {
+    showNotifications.value = false;
+    router.push('/admin/not-found-products');
+  }
 }
 
 // Formata o timestamp de forma mais amigável
