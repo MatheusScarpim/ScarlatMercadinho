@@ -7,11 +7,15 @@ import { getMarginPercent } from './settingsService';
 import { notifyProductAutoCreated, createNotification } from './notificationService';
 import { PendingProductModel } from '../models/PendingProduct';
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function buildFilter(params: { search?: string; category?: string; active?: string }) {
   const filter: FilterQuery<any> = {};
   if (params.search) {
     filter.$or = [
-      { name: { $regex: params.search, $options: 'i' } },
+      { name: { $regex: escapeRegex(params.search), $options: 'i' } },
       { barcode: params.search },
       { sku: params.search }
     ];
@@ -141,6 +145,10 @@ export async function findByBarcode(barcode: string, location?: string) {
         doc = await ProductModel.findById(created._id).populate('category');
         autoCreated = true;
         console.log('[PRODUCT-SERVICE] Produto auto-criado:', created.name, '| Preço:', salePriceWithMargin);
+      } else {
+        // Cosmos respondeu mas nenhum produto foi persistido: não perde o código,
+        // registra como pendente para validação manual.
+        await registerPendingProduct(barcode, location);
       }
     } catch (err: any) {
       console.error('[PRODUCT-SERVICE] Erro ao auto-criar produto via Cosmos:', err?.message);

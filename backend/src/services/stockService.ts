@@ -47,6 +47,8 @@ export async function registerMovement(input: {
   const product = await ProductModel.findById(productId);
   if (!product) throw new Error('Product not found for stock movement');
 
+  const previousStock = product.stockQuantity;
+
   // Atualiza o cache desnormalizado em UMA única operação atômica (pipeline update).
   // Cria o elemento do local se não existir, ajusta a quantidade e recalcula o total no servidor,
   // evitando tanto lost updates (vendas simultâneas) quanto a criação duplicada do mesmo local.
@@ -89,7 +91,11 @@ export async function registerMovement(input: {
 
   if (type === 'EXIT' || type === 'ADJUSTMENT') {
     const fresh = await ProductModel.findById(productId).select('name stockQuantity minimumStock');
-    if (fresh && fresh.stockQuantity <= fresh.minimumStock) {
+    // Notifica apenas quando o estoque CRUZA o mínimo (acima -> no/abaixo), evitando
+    // disparar uma notificação a cada venda enquanto já está abaixo do mínimo.
+    const crossedBelow =
+      !!fresh && previousStock > fresh.minimumStock && fresh.stockQuantity <= fresh.minimumStock;
+    if (fresh && crossedBelow) {
       try {
         await notifyLowStock(fresh._id, fresh.name, fresh.stockQuantity, fresh.minimumStock);
         console.log(`[NOTIFICATION] Low stock notification created for product ${fresh.name}`);
@@ -144,14 +150,33 @@ export async function transferStock(input: {
     userId: input.userId
   });
 
-  const entryMovement = await registerMovement({
-    productId: input.productId,
-    type: 'ENTRY',
-    quantity: qty,
-    reason,
-    location: input.to,
-    userId: input.userId
-  });
+  let entryMovement;
+  try {
+    entryMovement = await registerMovement({
+      productId: input.productId,
+      type: 'ENTRY',
+      quantity: qty,
+      reason,
+      location: input.to,
+      userId: input.userId
+    });
+  } catch (err) {
+    // O ENTRY no destino falhou após o EXIT já ter sido aplicado: compensa
+    // devolvendo a quantidade à origem para não "sumir" estoque.
+    try {
+      await registerMovement({
+        productId: input.productId,
+        type: 'ENTRY',
+        quantity: qty,
+        reason: `${reason} (ESTORNO - falha no destino)`,
+        location: input.from,
+        userId: input.userId
+      });
+    } catch (compErr) {
+      console.error('[STOCK] Falha ao compensar transferência na origem:', compErr);
+    }
+    throw err;
+  }
 
   return { exitMovement, entryMovement };
 }
