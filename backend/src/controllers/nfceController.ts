@@ -1,6 +1,6 @@
 ﻿import { Request, Response } from 'express';
 import PDFDocument from 'pdfkit';
-import { scrapeNfce } from '../services/nfceService';
+import { scrapeNfce, parseNfeXml } from '../services/nfceService';
 import { NfceModel } from '../models/Nfce';
 import { PurchaseModel } from '../models/Purchase';
 import { SaleModel } from '../models/Sale';
@@ -15,6 +15,69 @@ export async function getNfce(req: Request, res: Response) {
   const data = await scrapeNfce(url);
 
   // Persistimos a ultima captura para historico/fiscal.
+  try {
+    // Só fazemos match/upsert por chave quando há uma chave real; caso contrário, o $or
+    // casaria qualquer nota sem chave e sobrescreveria registros distintos.
+    const keyMatch: Record<string, string>[] = [];
+    if (data.chaveAcesso) keyMatch.push({ chaveAcesso: data.chaveAcesso });
+    if (data.chaveAcessoNumerica) keyMatch.push({ chaveAcessoNumerica: data.chaveAcessoNumerica });
+
+    if (keyMatch.length) {
+      await NfceModel.findOneAndUpdate(
+        { $or: keyMatch },
+        {
+          $set: {
+            chaveAcesso: data.chaveAcesso,
+            chaveAcessoNumerica: data.chaveAcessoNumerica,
+            data,
+            lastFetchedAt: new Date(),
+          },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+    } else {
+      await NfceModel.create({
+        chaveAcesso: data.chaveAcesso,
+        chaveAcessoNumerica: data.chaveAcessoNumerica,
+        data,
+        lastFetchedAt: new Date(),
+      });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[NFCE] Falha ao persistir', err);
+  }
+
+  res
+    .set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    .set('Pragma', 'no-cache')
+    .set('Expires', '0')
+    .set('Surrogate-Control', 'no-store')
+    .set('ETag', `${Date.now()}`) // forca ETag unico para evitar 304
+    .status(200)
+    .json(data);
+}
+
+// Importacao por upload de arquivo XML (NF-e / NFC-e).
+export async function importNfceXml(req: Request, res: Response) {
+  const fileBuffer = (req as Request & { file?: { buffer: Buffer } }).file?.buffer;
+  const rawBody = typeof req.body?.xml === 'string' ? req.body.xml : null;
+  const xml = fileBuffer ? fileBuffer.toString('utf8') : rawBody;
+
+  if (!xml || !xml.trim()) {
+    return res.status(400).json({ message: 'Envie o arquivo XML da nota (campo "file") ou o conteudo em "xml".' });
+  }
+
+  let data;
+  try {
+    data = parseNfeXml(xml);
+  } catch (err) {
+    return res.status(422).json({
+      message: err instanceof Error ? err.message : 'Nao foi possivel ler o XML da nota.',
+    });
+  }
+
+  // Persistimos a captura para historico/fiscal (mesmo padrao do getNfce).
   try {
     await NfceModel.findOneAndUpdate(
       {
@@ -35,17 +98,10 @@ export async function getNfce(req: Request, res: Response) {
     );
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error('[NFCE] Falha ao persistir', err);
+    console.error('[NFCE] Falha ao persistir XML', err);
   }
 
-  res
-    .set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-    .set('Pragma', 'no-cache')
-    .set('Expires', '0')
-    .set('Surrogate-Control', 'no-store')
-    .set('ETag', `${Date.now()}`) // forca ETag unico para evitar 304
-    .status(200)
-    .json(data);
+  res.status(200).json(data);
 }
 
 // Visao fiscal: entradas (compras), saidas (vendas) e NFC-e capturadas.

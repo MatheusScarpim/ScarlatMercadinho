@@ -48,3 +48,9 @@ export async function ignorePendingProduct(req: Request, res: Response) {
   if (!pending) return res.status(404).json({ message: 'Pendência não encontrada' });
   res.json(pending);
 }
+
+export async function deletePendingProduct(req: Request, res: Response) {
+  const pending = await PendingProductModel.findByIdAndDelete(req.params.id);
+  if (!pending) return res.status(404).json({ message: 'Pendência não encontrada' });
+  res.json({ message: 'Pendência excluída', id: req.params.id });
+}

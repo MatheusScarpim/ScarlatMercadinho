@@ -48,6 +48,26 @@
     <!-- Search -->
     <div class="filters glass">
       <input v-model="search" placeholder="Buscar por nome ou código..." class="search-input" @input="filterLocal" />
+      <div class="sort-controls">
+        <select v-model="sortBy" class="sort-select">
+          <option value="name">Nome</option>
+          <option value="salePrice">Preço de venda</option>
+          <option value="costPrice">Custo</option>
+          <option value="margin">Margem</option>
+          <option value="diffPercent">Diferença %</option>
+          <option value="minPrice">Preço mínimo</option>
+          <option value="avgPrice">Preço médio</option>
+          <option value="maxPrice">Preço máximo</option>
+          <option value="status">Status</option>
+        </select>
+        <button
+          class="btn btn-ghost btn-sm"
+          @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'"
+          :title="sortDir === 'asc' ? 'Crescente' : 'Decrescente'"
+        >
+          {{ sortDir === 'asc' ? '↑ Crescente' : '↓ Decrescente' }}
+        </button>
+      </div>
     </div>
 
     <!-- Product list -->
@@ -219,17 +239,55 @@ const items = ref<PriceItem[]>([]);
 const summary = ref<Summary | null>(null);
 const filter = ref('all');
 const search = ref('');
+const sortBy = ref('name');
+const sortDir = ref<'asc' | 'desc'>('asc');
 const loading = ref(false);
 const refreshing = ref(false);
 const refreshStatus = ref<any>(null);
 let refreshPoll: ReturnType<typeof setInterval> | null = null;
 
+function sortValue(item: PriceItem): number | string {
+  switch (sortBy.value) {
+    case 'name':
+      return item.name?.toLowerCase() || '';
+    case 'salePrice':
+      return item.salePrice ?? 0;
+    case 'costPrice':
+      return item.costPrice ?? 0;
+    case 'margin':
+      if (!item.costPrice || item.costPrice <= 0) return -Infinity;
+      return ((item.salePrice - item.costPrice) / item.costPrice) * 100;
+    case 'diffPercent':
+      return item.diffPercent ?? 0;
+    case 'minPrice':
+      return item.minPrice ?? -Infinity;
+    case 'avgPrice':
+      return item.avgPrice ?? -Infinity;
+    case 'maxPrice':
+      return item.maxPrice ?? -Infinity;
+    case 'status':
+      return item.status || '';
+    default:
+      return 0;
+  }
+}
+
 const filtered = computed(() => {
-  if (!search.value) return items.value;
-  const q = search.value.toLowerCase();
-  return items.value.filter(
-    (i) => i.name?.toLowerCase().includes(q) || i.barcode?.includes(q),
-  );
+  let list = items.value;
+  if (search.value) {
+    const q = search.value.toLowerCase();
+    list = list.filter(
+      (i) => i.name?.toLowerCase().includes(q) || i.barcode?.includes(q),
+    );
+  }
+  const dir = sortDir.value === 'asc' ? 1 : -1;
+  return [...list].sort((a, b) => {
+    const va = sortValue(a);
+    const vb = sortValue(b);
+    if (va < vb) return -1 * dir;
+    if (va > vb) return 1 * dir;
+    return 0;
+  });
 });
 
 const refreshPercent = computed(() => {

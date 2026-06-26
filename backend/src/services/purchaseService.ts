@@ -110,11 +110,9 @@ async function ensureProductForItem(item: {
     category: categoryId,
     imageUrl: defaultImage,
     costPrice: item.unitCost,
-    salePrice: Number(
-      Number.isFinite(item.salePrice)
-        ? (item.salePrice as number)
-        : (item.unitCost * item.marginMultiplier).toFixed(2)
-    ),
+    salePrice: Number.isFinite(Number(item.salePrice))
+      ? Number(item.salePrice)
+      : Number((item.unitCost * item.marginMultiplier).toFixed(2)),
     ncm: item.ncm ?? null,
     cest: item.cest ?? null,
     cfop: item.cfop ?? null,

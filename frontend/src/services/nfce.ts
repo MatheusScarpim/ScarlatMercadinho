@@ -96,6 +96,13 @@ export async function fetchNfce(url: string) {
   return response.data;
 }
 
+export async function uploadNfceXml(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await api.post<NfceData>('/nfce/import-xml', formData);
+  return response.data;
+}
+
 export async function fetchFiscalOverview() {
   const response = await api.get('/nfce/fiscal');
   return response.data as {

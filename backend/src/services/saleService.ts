@@ -181,10 +181,27 @@ export async function completeSale(saleId: string, data: { paymentMethod: string
 export async function cancelSale(saleId: string) {
   const sale = await SaleModel.findById(saleId);
   if (!sale) throw new ApiError(404, 'Sale not found');
+
+  // Se a venda já estava concluída, o estoque foi deduzido (EXIT); reverte com ENTRY.
   if (sale.status === 'COMPLETED') {
-    // We could optionally add entry adjustments to revert stock. Keep as comment for operator decision.
-    console.warn('Sale already completed. Consider manual stock adjustment if needed.');
+    const items = await SaleItemModel.find({ sale: saleId });
+    const location = sale.location || 'default';
+    for (const item of items) {
+      try {
+        await registerMovement({
+          productId: item.product,
+          type: 'ENTRY',
+          quantity: item.quantity,
+          reason: 'ESTORNO CANCELAMENTO VENDA',
+          relatedSale: sale._id,
+          location
+        });
+      } catch (err) {
+        console.error(`[SALE] Erro ao estornar estoque do produto ${item.product}:`, err);
+      }
+    }
   }
+
   sale.status = 'CANCELED';
   sale.canceledAt = new Date();
   await sale.save();

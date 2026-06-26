@@ -13,6 +13,11 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${auth.token}`;
   }
+  const kioskToken = import.meta.env.VITE_KIOSK_TOKEN;
+  if (kioskToken) {
+    config.headers = config.headers || {};
+    config.headers['x-kiosk-token'] = kioskToken;
+  }
   return config;
 });
 

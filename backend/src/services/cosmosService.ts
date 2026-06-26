@@ -14,15 +14,18 @@ const SERPAPI_KEYS = parseKeys('SERPAPI_KEY');
 const COSMOS_API_TIMEOUT = Number(process.env.COSMOS_API_TIMEOUT_MS ?? 10000);
 const SERPAPI_TIMEOUT = Number(process.env.SERPAPI_TIMEOUT_MS ?? 12000);
 
-// Round-robin simples para distribuir entre keys
+// Round-robin simples para distribuir entre keys.
 let cosmosKeyIndex = 0;
 let serpKeyIndex = 0;
 
-function nextCosmosToken(): string | null {
-  if (!COSMOS_TOKENS.length) return null;
-  const token = COSMOS_TOKENS[cosmosKeyIndex % COSMOS_TOKENS.length];
+// Retorna todas as keys reordenadas a partir do índice round-robin atual e
+// avança o ponteiro, para que tentativas subsequentes distribuam a carga e
+// possam fazer fallback entre keys quando uma estiver esgotada (429/401/403).
+function orderedCosmosTokens(): string[] {
+  if (!COSMOS_TOKENS.length) return [];
+  const start = cosmosKeyIndex % COSMOS_TOKENS.length;
   cosmosKeyIndex++;
-  return token;
+  return COSMOS_TOKENS.map((_, i) => COSMOS_TOKENS[(start + i) % COSMOS_TOKENS.length]);
 }
 
 function nextSerpKey(): string | null {
@@ -88,46 +91,58 @@ type AiProductGuess = {
 
 // ── 1. COSMOS API REAL ──────────────────────────────────────────────
 async function fetchFromCosmosApi(ean: string): Promise<CosmosApiResponse | null> {
-  const token = nextCosmosToken();
-  if (!token) {
+  const tokens = orderedCosmosTokens();
+  if (!tokens.length) {
     console.warn('[COSMOS-API] Nenhum token configurado (COSMOS_API_TOKEN)');
     return null;
   }
 
-  try {
-    console.log('[COSMOS-API] Buscando EAN:', ean);
-    const { data } = await axios.get<CosmosApiResponse>(
-      `https://api.cosmos.bluesoft.com.br/gtins/${ean}`,
-      {
-        timeout: COSMOS_API_TIMEOUT,
-        headers: {
-          'X-Cosmos-Token': token,
-          'User-Agent': 'ScarlatMercadinho/1.0',
+  console.log('[COSMOS-API] Buscando EAN:', ean);
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    try {
+      const { data } = await axios.get<CosmosApiResponse>(
+        `https://api.cosmos.bluesoft.com.br/gtins/${ean}`,
+        {
+          timeout: COSMOS_API_TIMEOUT,
+          headers: {
+            'X-Cosmos-Token': token,
+            'User-Agent': 'ScarlatMercadinho/1.0',
+          },
         },
-      },
-    );
+      );
 
-    console.log('[COSMOS-API] Resultado:', {
-      description: data.description,
-      avg_price: data.avg_price,
-      max_price: data.max_price,
-      brand: data.brand?.name,
-      category: data.category?.description,
-      ncm: data.ncm?.code,
-      gpc: data.gpc?.description,
-    });
+      console.log('[COSMOS-API] Resultado:', {
+        description: data.description,
+        avg_price: data.avg_price,
+        max_price: data.max_price,
+        brand: data.brand?.name,
+        category: data.category?.description,
+        ncm: data.ncm?.code,
+        gpc: data.gpc?.description,
+      });
 
-    return data;
-  } catch (err: any) {
-    if (err?.response?.status === 404) {
-      console.log('[COSMOS-API] Produto não encontrado no Cosmos:', ean);
-    } else if (err?.response?.status === 401 || err?.response?.status === 403) {
-      console.warn('[COSMOS-API] Token inválido ou expirado');
-    } else {
+      return data;
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 404) {
+        console.log('[COSMOS-API] Produto não encontrado no Cosmos:', ean);
+        return null;
+      }
+      // 429 (rate limit) ou 401/403 (token esgotado/inválido): tenta a próxima key.
+      if (status === 429 || status === 401 || status === 403) {
+        const hasNext = i < tokens.length - 1;
+        console.warn(
+          `[COSMOS-API] Token indisponível (status ${status}).` +
+            (hasNext ? ' Tentando próxima key…' : ' Sem mais keys disponíveis.'),
+        );
+        continue;
+      }
       console.warn('[COSMOS-API] Erro:', err?.message);
+      return null;
     }
-    return null;
   }
+  return null;
 }
 
 /**
@@ -231,12 +246,17 @@ async function analyzePricesWithAi(
 
 Sua tarefa:
 1. Identificar quais resultados são venda UNITÁRIA do EXATO mesmo produto (mesma marca, mesmo tipo, mesma gramatura/tamanho)
-2. DESCARTAR: packs, kits, caixas, multipacks, atacado, frete incluído no preço, marcas diferentes, sabores diferentes, tamanhos/gramaturas diferentes
-3. Com os preços válidos, calcular min, média e máximo
+2. DESCARTAR:
+   - Packs, kits, caixas, multipacks, atacado ("pack", "kit", "caixa", "unidades", "leve X pague Y")
+   - Marcas diferentes do produto buscado
+   - Sabores ou variantes diferentes
+   - Tamanhos/gramaturas diferentes
+   - Preços ABSURDOS: se um resultado unitário custa mais de 3x a maioria dos outros resultados unitários, é um vendedor abusivo ou produto importado — DESCARTE. Exemplo: se 3 resultados custam R$3-5 e um custa R$79, descarte o de R$79.
+3. Com os preços válidos restantes, calcular min, média e máximo
 4. Se NENHUM resultado for válido, retorne null em todos os campos
 
 Responda SOMENTE um JSON compacto:
-{"min": 3.49, "avg": 3.79, "max": 4.29, "valid_count": 3, "reason": "3 resultados unitários da mesma marca e gramatura"}
+{"min": 3.49, "avg": 3.79, "max": 4.29, "valid_count": 3, "reason": "itens 1,2,4 unitários; descartados: 3 (pack), 5 (preço absurdo)"}
 
 Se nenhum resultado for válido:
 {"min": null, "avg": null, "max": null, "valid_count": 0, "reason": "nenhum resultado compatível"}`,

@@ -12,6 +12,10 @@
           <option value="IGNORED">Ignorados</option>
           <option value="all">Todos</option>
         </select>
+        <select v-model="locationFilter">
+          <option value="all">Todas as lojas</option>
+          <option v-for="loc in locationOptions" :key="loc" :value="loc">{{ loc }}</option>
+        </select>
         <button class="btn" @click="fetchPending">Atualizar</button>
       </div>
     </header>
@@ -22,8 +26,17 @@
       <p>Nenhum produto pendente. Tudo validado!</p>
     </div>
 
-    <div v-else class="list">
-      <div v-for="item in items" :key="item._id" class="card">
+    <template v-else>
+      <div v-if="!groupedItems.length" class="state empty">
+        <div class="empty-icon">🔍</div>
+        <p>Nenhuma pendência para esta loja.</p>
+      </div>
+      <section v-for="group in groupedItems" :key="group.location" class="group">
+        <h3 class="group-title">
+          {{ group.location }}<span class="group-count">{{ group.list.length }}</span>
+        </h3>
+        <div class="list">
+          <div v-for="item in group.list" :key="item._id" class="card">
         <div class="card-head">
           <div class="barcode-block">
             <img
@@ -66,6 +79,7 @@
             </div>
           </div>
           <div class="actions">
+            <button class="btn btn-danger" @click="deleteItem(item)" :disabled="savingId === item._id">Excluir</button>
             <button class="btn btn-ghost" @click="ignoreItem(item)" :disabled="savingId === item._id">Ignorar</button>
             <button class="btn btn-primary" @click="resolveItem(item)" :disabled="savingId === item._id">
               {{ savingId === item._id ? 'Salvando...' : 'Validar e cadastrar' }}
@@ -76,14 +90,17 @@
         <div v-else class="resolved-info">
           <span v-if="item.resolvedProduct">Cadastrado como: <strong>{{ item.resolvedProduct.name }}</strong></span>
           <span v-else>Ignorado</span>
+          <button class="btn btn-danger btn-sm" @click="deleteItem(item)" :disabled="savingId === item._id">Excluir</button>
         </div>
-      </div>
-    </div>
+          </div>
+        </div>
+      </section>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import api from '../../services/api';
 
 interface PendingProduct {
@@ -107,6 +124,26 @@ const forms = reactive<Record<string, { name: string; category: string; costPric
 const loading = ref(false);
 const savingId = ref<string | null>(null);
 const statusFilter = ref('PENDING');
+const locationFilter = ref('all');
+
+const locationOptions = computed(() => {
+  const set = new Set<string>();
+  items.value.forEach((it) => set.add(it.location || 'default'));
+  return Array.from(set).sort();
+});
+
+const groupedItems = computed(() => {
+  const filtered = locationFilter.value === 'all'
+    ? items.value
+    : items.value.filter((it) => (it.location || 'default') === locationFilter.value);
+  const map = new Map<string, PendingProduct[]>();
+  filtered.forEach((it) => {
+    const loc = it.location || 'default';
+    if (!map.has(loc)) map.set(loc, []);
+    map.get(loc)!.push(it);
+  });
+  return Array.from(map.entries()).map(([location, list]) => ({ location, list }));
+});
 
 function ensureForm(item: PendingProduct) {
   if (!forms[item._id]) {
@@ -167,6 +204,19 @@ async function ignoreItem(item: PendingProduct) {
     await fetchPending();
   } catch (e) {
     alert('Erro ao ignorar.');
+  } finally {
+    savingId.value = null;
+  }
+}
+
+async function deleteItem(item: PendingProduct) {
+  if (!confirm('Excluir definitivamente este código? Esta ação não pode ser desfeita.')) return;
+  savingId.value = item._id;
+  try {
+    await api.delete(`/pending-products/${item._id}`);
+    items.value = items.value.filter((i) => i._id !== item._id);
+  } catch (e) {
+    alert('Erro ao excluir.');
   } finally {
     savingId.value = null;
   }
@@ -252,6 +302,20 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.btn-danger {
+  border-color: rgba(220, 38, 38, 0.4);
+  color: #b91c1c;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -266,6 +330,34 @@ onMounted(() => {
 .empty-icon {
   font-size: 48px;
   margin-bottom: 8px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.group-count {
+  background: var(--border);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .list {
@@ -377,6 +469,10 @@ onMounted(() => {
 }
 
 .resolved-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   font-size: 13px;
   color: var(--muted);
 }

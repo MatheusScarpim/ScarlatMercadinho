@@ -47,43 +47,55 @@ export async function registerMovement(input: {
   const product = await ProductModel.findById(productId);
   if (!product) throw new Error('Product not found for stock movement');
 
-  if (!Array.isArray(product.stockByLocation)) {
-    product.stockByLocation = [];
-  }
+  // Atualiza o cache desnormalizado em UMA única operação atômica (pipeline update).
+  // Cria o elemento do local se não existir, ajusta a quantidade e recalcula o total no servidor,
+  // evitando tanto lost updates (vendas simultâneas) quanto a criação duplicada do mesmo local.
+  const isAdjustment = type === 'ADJUSTMENT';
+  const delta = type === 'ENTRY' ? quantity : type === 'EXIT' ? -quantity : quantity;
+  await ProductModel.updateOne({ _id: productId }, [
+    {
+      $set: {
+        stockByLocation: {
+          $cond: [
+            { $in: [location, { $ifNull: ['$stockByLocation.location', []] }] },
+            {
+              $map: {
+                input: '$stockByLocation',
+                as: 'e',
+                in: {
+                  $cond: [
+                    { $eq: ['$$e.location', location] },
+                    {
+                      location: '$$e.location',
+                      quantity: isAdjustment ? quantity : { $add: ['$$e.quantity', delta] }
+                    },
+                    '$$e'
+                  ]
+                }
+              }
+            },
+            {
+              $concatArrays: [
+                { $ifNull: ['$stockByLocation', []] },
+                [{ location, quantity: isAdjustment ? quantity : delta }]
+              ]
+            }
+          ]
+        }
+      }
+    },
+    { $set: { stockQuantity: { $sum: '$stockByLocation.quantity' } } }
+  ]);
 
-  const stockEntry =
-    product.stockByLocation.find((s: any) => s.location === location) ||
-    (() => {
-      const entry = { location, quantity: 0 };
-      (product.stockByLocation as any).push(entry);
-      return entry as any;
-    })();
-
-  if (type === 'ENTRY') {
-    stockEntry.quantity = Number(stockEntry.quantity || 0) + quantity;
-  } else if (type === 'EXIT') {
-    stockEntry.quantity = Number(stockEntry.quantity || 0) - quantity;
-  } else if (type === 'ADJUSTMENT') {
-    stockEntry.quantity = quantity;
-  }
-
-  product.markModified('stockByLocation');
-  product.stockQuantity = (product.stockByLocation as any).reduce(
-    (sum: number, s: any) => sum + Number(s.quantity || 0),
-    0
-  );
-  await product.save();
-  await ProductModel.updateOne(
-    { _id: productId },
-    { stockByLocation: product.stockByLocation, stockQuantity: product.stockQuantity }
-  );
-
-  if ((type === 'EXIT' || type === 'ADJUSTMENT') && product.stockQuantity <= product.minimumStock) {
-    try {
-      await notifyLowStock(product._id, product.name, product.stockQuantity, product.minimumStock);
-      console.log(`[NOTIFICATION] Low stock notification created for product ${product.name}`);
-    } catch (error) {
-      console.error('[NOTIFICATION ERROR] Failed to create low stock notification:', error);
+  if (type === 'EXIT' || type === 'ADJUSTMENT') {
+    const fresh = await ProductModel.findById(productId).select('name stockQuantity minimumStock');
+    if (fresh && fresh.stockQuantity <= fresh.minimumStock) {
+      try {
+        await notifyLowStock(fresh._id, fresh.name, fresh.stockQuantity, fresh.minimumStock);
+        console.log(`[NOTIFICATION] Low stock notification created for product ${fresh.name}`);
+      } catch (error) {
+        console.error('[NOTIFICATION ERROR] Failed to create low stock notification:', error);
+      }
     }
   }
 

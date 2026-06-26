@@ -40,6 +40,23 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
   }
 }
 
+// Protege rotas usadas pelo Kiosk (PDV sem login) sem quebrá-lo.
+// - Se KIOSK_TOKEN não estiver configurado: mantém o comportamento atual (aberto).
+// - Se configurado: aceita o header x-kiosk-token correspondente OU um JWT válido de usuário.
+export function kioskOrAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  const kioskToken = process.env.KIOSK_TOKEN;
+  if (kioskToken && req.headers['x-kiosk-token'] === kioskToken) {
+    return next();
+  }
+  if (req.headers.authorization) {
+    return authMiddleware(req, res, next);
+  }
+  if (!kioskToken) {
+    return next();
+  }
+  return next(new ApiError(401, 'Unauthorized'));
+}
+
 export function adminOnly(req: AuthRequest, _res: Response, next: NextFunction) {
   if (!req.user) return next(new ApiError(401, 'Unauthorized'));
   if (req.user.role !== 'ADMIN') return next(new ApiError(403, 'Forbidden'));

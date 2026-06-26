@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { XMLParser } from 'fast-xml-parser';
 import puppeteer, { Browser, ConsoleMessage, HTTPRequest } from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
@@ -641,5 +642,158 @@ export async function scrapeNfce(url: string): Promise<NfceData> {
   if (dataFull.itens.length) return dataFull;
   logDebug('Sem itens na visão completa, tentando parser mobile');
   return parseNfceMobile(html);
+}
+
+// ---------------------------------------------------------------------------
+// Importação por arquivo XML (NF-e / NFC-e)
+// ---------------------------------------------------------------------------
+
+const xmlNum = (value: unknown): Nullable<number> => {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(String(value).replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+};
+
+const xmlStr = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  return s || null;
+};
+
+// Os grupos ICMS/PIS/COFINS no XML têm variações (ICMS00, ICMSSN102, PISAliq...).
+// Pegamos o primeiro objeto-filho do grupo, independente do nome.
+function firstGroup(node: unknown): Record<string, unknown> | null {
+  if (!node || typeof node !== 'object') return null;
+  const values = Object.values(node as Record<string, unknown>);
+  const obj = values.find((v) => v && typeof v === 'object');
+  return (obj as Record<string, unknown>) ?? null;
+}
+
+const asArray = <T>(value: T | T[] | undefined): T[] => {
+  if (value === undefined || value === null) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
+export function parseNfeXml(xml: string): NfceData {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    removeNSPrefix: true,
+    parseTagValue: false,
+    trimValues: true,
+  });
+  const root = parser.parse(xml) as Record<string, any>;
+
+  // Aceita <nfeProc>, <NFe> ou já o conteúdo de infNFe.
+  const nfe = root?.nfeProc?.NFe ?? root?.NFe ?? root?.nfeProc ?? root;
+  const infNFe = nfe?.infNFe ?? nfe;
+  if (!infNFe || !infNFe.det) {
+    throw new Error('XML inválido: não foi possível localizar os itens (infNFe/det).');
+  }
+
+  const ide = infNFe.ide ?? {};
+  const emit = infNFe.emit ?? {};
+  const dest = infNFe.dest ?? {};
+  const total = infNFe.total?.ICMSTot ?? {};
+  const pag = infNFe.pag ?? {};
+  const detPag = asArray<any>(pag.detPag)[0] ?? {};
+  const prot = root?.nfeProc?.protNFe?.infProt ?? {};
+
+  const emitenteEndereco = (() => {
+    const e = emit.enderEmit ?? {};
+    return (
+      [e.xLgr, e.nro, e.xBairro, e.xMun, e.UF, e.CEP]
+        .map((v: unknown) => xmlStr(v))
+        .filter(Boolean)
+        .join(', ') || null
+    );
+  })();
+
+  const itens: NfceItem[] = asArray<any>(infNFe.det).map((det) => {
+    const prod = det.prod ?? {};
+    const imposto = det.imposto ?? {};
+    const icmsGrp = firstGroup(imposto.ICMS) ?? {};
+    const pisGrp = firstGroup(imposto.PIS) ?? {};
+    const cofinsGrp = firstGroup(imposto.COFINS) ?? {};
+
+    const ean = xmlStr(prod.cEAN);
+    const eanTrib = xmlStr(prod.cEANTrib);
+    const eanValido = (v: string | null) => (v && v.toUpperCase() !== 'SEM GTIN' ? v : null);
+    const eanComercial = eanValido(ean) ?? eanValido(eanTrib);
+
+    return {
+      descricao: xmlStr(prod.xProd) ?? '',
+      codigo: xmlStr(prod.cProd),
+      quantidade: xmlNum(prod.qCom),
+      unidade: xmlStr(prod.uCom),
+      valorUnitario: xmlNum(prod.vUnCom),
+      valorTotal: xmlNum(prod.vProd),
+      ncm: xmlStr(prod.NCM),
+      cest: xmlStr(prod.CEST),
+      cfop: xmlStr(prod.CFOP),
+      eanComercial,
+      icms: {
+        baseCalculo: xmlNum(icmsGrp.vBC),
+        aliquota: xmlNum(icmsGrp.pICMS),
+        valor: xmlNum(icmsGrp.vICMS),
+        cst: xmlStr(icmsGrp.CST),
+        csosn: xmlStr(icmsGrp.CSOSN),
+        icmsStRetido: xmlNum(icmsGrp.vICMSSTRet),
+        fcpStRetido: xmlNum(icmsGrp.vFCPSTRet),
+        icmsEfetivo: xmlNum(icmsGrp.vICMSEfet),
+      },
+      pis: {
+        baseCalculo: xmlNum(pisGrp.vBC),
+        aliquota: xmlNum(pisGrp.pPIS),
+        valor: xmlNum(pisGrp.vPIS),
+        cst: xmlStr(pisGrp.CST),
+      },
+      cofins: {
+        baseCalculo: xmlNum(cofinsGrp.vBC),
+        aliquota: xmlNum(cofinsGrp.pCOFINS),
+        valor: xmlNum(cofinsGrp.vCOFINS),
+        cst: xmlStr(cofinsGrp.CST),
+      },
+      valorAproxTributos: xmlNum(prod.vTotTrib),
+    };
+  });
+
+  const chaveRaw = xmlStr(infNFe['@_Id'])?.replace(/^NFe/i, '') ?? null;
+
+  return {
+    emitente: {
+      nome: xmlStr(emit.xNome),
+      cnpj: xmlStr(emit.CNPJ),
+      endereco: emitenteEndereco,
+    },
+    itens,
+    totais: {
+      quantidadeItens: itens.length,
+      valorTotal: xmlNum(total.vNF) ?? xmlNum(total.vProd),
+      desconto: xmlNum(total.vDesc),
+      valorAPagar: xmlNum(total.vNF),
+      tributos: xmlNum(total.vTotTrib),
+      pagamento: {
+        forma: xmlStr(detPag.tPag),
+        valorPago: xmlNum(detPag.vPag),
+        troco: xmlNum(pag.vTroco),
+      },
+    },
+    info: {
+      numero: xmlStr(ide.nNF),
+      serie: xmlStr(ide.serie),
+      emissao: xmlStr(ide.dhEmi) ?? xmlStr(ide.dEmi),
+      protocolo: xmlStr(prot.nProt),
+      ambiente: xmlStr(ide.tpAmb),
+      versaoXml: xmlStr(infNFe['@_versao']),
+      versaoXslt: null,
+    },
+    chaveAcesso: chaveRaw,
+    chaveAcessoNumerica: chaveRaw ? chaveRaw.replace(/\s+/g, '') : null,
+    consumidor: {
+      cpf: xmlStr(dest.CPF) ?? xmlStr(dest.CNPJ),
+      nome: xmlStr(dest.xNome),
+    },
+  };
 }
 

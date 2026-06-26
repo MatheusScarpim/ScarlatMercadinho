@@ -223,12 +223,17 @@ async function analyzePricesWithAi(
 
 Sua tarefa:
 1. Identificar quais resultados são venda UNITÁRIA do EXATO mesmo produto (mesma marca, mesmo tipo, mesma gramatura/tamanho)
-2. DESCARTAR: packs, kits, caixas, multipacks, atacado, frete incluído no preço, marcas diferentes, sabores diferentes, tamanhos/gramaturas diferentes
-3. Com os preços válidos, calcular min, média e máximo
+2. DESCARTAR:
+   - Packs, kits, caixas, multipacks, atacado ("pack", "kit", "caixa", "unidades", "leve X pague Y")
+   - Marcas diferentes do produto buscado
+   - Sabores ou variantes diferentes
+   - Tamanhos/gramaturas diferentes
+   - Preços ABSURDOS: se um resultado unitário custa mais de 3x a maioria dos outros resultados unitários, é um vendedor abusivo ou produto importado — DESCARTE. Exemplo: se 3 resultados custam R$3-5 e um custa R$79, descarte o de R$79.
+3. Com os preços válidos restantes, calcular min, média e máximo
 4. Se NENHUM resultado for válido, retorne null em todos os campos
 
 Responda SOMENTE um JSON compacto:
-{"min": 3.49, "avg": 3.79, "max": 4.29, "valid_count": 3, "reason": "3 resultados unitários da mesma marca e gramatura"}
+{"min": 3.49, "avg": 3.79, "max": 4.29, "valid_count": 3, "reason": "itens 1,2,4 unitários; descartados: 3 (pack), 5 (preço absurdo)"}
 
 Se nenhum resultado for válido:
 {"min": null, "avg": null, "max": null, "valid_count": 0, "reason": "nenhum resultado compatível"}`,

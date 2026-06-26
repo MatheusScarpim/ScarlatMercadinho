@@ -74,6 +74,15 @@
                 <p class="muted small">Use a câmera para ler o QR da nota</p>
               </div>
             </button>
+
+            <button type="button" class="import-option" :class="{ selected: importMethod === 'xml' }"
+              @click="importMethod = 'xml'">
+              <div class="option-icon">📄</div>
+              <div class="option-content">
+                <h4>Enviar XML</h4>
+                <p class="muted small">Envie o arquivo XML da nota fiscal</p>
+              </div>
+            </button>
           </div>
 
           <!-- URL Import -->
@@ -84,6 +93,20 @@
                 {{ nfceLoading ? 'Importando...' : 'Importar e continuar' }}
               </button>
             </div>
+          </div>
+
+          <!-- XML Import -->
+          <div v-if="importMethod === 'xml'" class="import-detail">
+            <div class="input-row">
+              <input
+                ref="xmlFileInput"
+                type="file"
+                accept=".xml,text/xml,application/xml"
+                @change="importFromXml"
+                :disabled="nfceLoading"
+              />
+            </div>
+            <p class="muted small">Selecione o arquivo XML da NF-e/NFC-e para importar os itens.</p>
           </div>
 
           <!-- QR Scanner -->
@@ -331,7 +354,7 @@
             </div>
             <span class="center">{{ item.quantity }}</span>
             <span class="center">R$ {{ item.unitCost?.toFixed(2) }}</span>
-            <span class="right primary">R$ {{ (item.quantity * item.unitCost).toFixed(2) }}</span>
+            <span class="right primary">R$ {{ (Number(item.quantity) * Number(item.unitCost) || 0).toFixed(2) }}</span>
           </div>
         </div>
       </div>
@@ -370,7 +393,7 @@ import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
 import { exportToCsv } from '../../utils/export';
 import { fetchMargin } from '../../services/settings';
-import { fetchNfce } from '../../services/nfce';
+import { fetchNfce, uploadNfceXml } from '../../services/nfce';
 import { fetchCosmosProduct } from '../../services/cosmos';
 import jsQR from 'jsqr';
 
@@ -386,7 +409,8 @@ const nfceLoading = ref(false);
 const nfceError = ref('');
 const nfceLoaded = ref(false);
 const selectedPurchase = ref<any | null>(null);
-const importMethod = ref<'url' | 'qrcode' | 'manual'>('manual');
+const importMethod = ref<'url' | 'qrcode' | 'manual' | 'xml'>('manual');
+const xmlFileInput = ref<HTMLInputElement | null>(null);
 const showQRScanner = ref(false);
 const videoElement = ref<HTMLVideoElement | null>(null);
 const currentStep = ref(1);
@@ -820,6 +844,35 @@ async function importFromNfce() {
   nfceLoading.value = true;
   try {
     const data = await fetchNfce(nfceUrl.value);
+    await applyNfceData(data);
+    nfceLoaded.value = true;
+  } catch (err: any) {
+    nfceError.value = err?.response?.data?.message || err?.message || 'Erro ao importar NF-e/NFC-e';
+  } finally {
+    nfceLoading.value = false;
+  }
+}
+
+async function importFromXml(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  nfceError.value = '';
+  nfceLoaded.value = false;
+  nfceLoading.value = true;
+  try {
+    const data = await uploadNfceXml(file);
+    await applyNfceData(data);
+    nfceLoaded.value = true;
+  } catch (err: any) {
+    nfceError.value = err?.response?.data?.message || err?.message || 'Erro ao importar XML da nota';
+  } finally {
+    nfceLoading.value = false;
+    if (input) input.value = '';
+  }
+}
+
+async function applyNfceData(data: any) {
     const parsedIssueDate = parseDateToInput(data.info?.emissao);
     if (parsedIssueDate) {
       form.issueDate = parsedIssueDate;
@@ -870,12 +923,6 @@ async function importFromNfce() {
       })
     );
     form.items = mappedItems;
-    nfceLoaded.value = true;
-  } catch (err: any) {
-    nfceError.value = err?.response?.data?.message || err?.message || 'Erro ao importar NF-e/NFC-e';
-  } finally {
-    nfceLoading.value = false;
-  }
 }
 
 onUnmounted(() => {

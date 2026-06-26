@@ -15,7 +15,7 @@
       <input v-model="search" placeholder="Buscar por nome, código ou sku" @input="resetPageAndLoad" />
       <select v-model="filterCategory" @change="resetPageAndLoad">
         <option value="">Todas categorias</option>
-        <option v-for="c in categories" :key="c._id" :value="c._id">{{ c.name }}</option>
+        <option v-for="c in categoryOptions" :key="c._id" :value="c._id">{{ c.label }}</option>
       </select>
       <select v-model="filterActive" @change="resetPageAndLoad">
         <option value="">Todos</option>
@@ -47,6 +47,13 @@
           <div class="product-header">
             <h4 class="product-name">{{ p.name }}</h4>
             <p class="product-barcode">{{ p.barcode }}</p>
+          </div>
+          <div class="product-category-edit">
+            <label class="quick-cat-label">Categoria</label>
+            <select class="quick-cat-select" :value="categoryIdOf(p)" @change="quickUpdateCategory(p, $event)">
+              <option value="">Sem categoria</option>
+              <option v-for="c in categoryOptions" :key="c._id" :value="c._id">{{ c.label }}</option>
+            </select>
           </div>
           <div class="product-pricing">
             <div class="price-item">
@@ -134,7 +141,7 @@
               <label class="field-label">Categoria</label>
               <select v-model="form.category" required>
                 <option value="" disabled>Selecione a categoria</option>
-                <option v-for="c in categories" :key="c._id" :value="c._id">{{ c.name }}</option>
+                <option v-for="c in categoryOptions" :key="c._id" :value="c._id">{{ c.label }}</option>
               </select>
             </div>
           </div>
@@ -181,6 +188,23 @@
               <input v-model.number="form.minimumStock" type="number" min="0" placeholder="0" />
             </div>
           </div>
+        </div>
+
+        <div class="form-section" v-if="editingId">
+          <h4 class="section-title">Vencimento / Lotes</h4>
+          <div v-if="productBatches.length" class="batch-list">
+            <div class="batch-row" v-for="b in productBatches" :key="b._id">
+              <div class="batch-info">
+                <span class="batch-name">{{ b.batchNumber || b.lote || 'Lote' }}</span>
+                <span class="batch-qty" v-if="b.quantity != null">{{ b.quantity }} un.</span>
+              </div>
+              <input type="date" v-model="b.newExpiryDate" class="batch-date" />
+              <button class="btn btn-ghost btn-sm" type="button" @click="saveBatchExpiry(b)">Salvar</button>
+            </div>
+          </div>
+          <p v-else class="batch-empty">Nenhum lote cadastrado para este produto.</p>
+          <div v-if="batchError" class="batch-alert alert-error">{{ batchError }}</div>
+          <div v-if="batchSuccess" class="batch-alert alert-success">{{ batchSuccess }}</div>
         </div>
 
         <div class="form-section">
@@ -457,6 +481,68 @@
             {{ exitSuccess }}
           </div>
         </div>
+
+        <div class="transfer-block adjust-block">
+          <div class="transfer-header">
+            <svg viewBox="0 0 24 24" fill="none" class="transfer-icon adjust-icon">
+              <path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div>
+              <h5>Entrada / Ajuste de estoque</h5>
+              <p class="transfer-subtitle">Registre entrada de novas unidades ou ajuste a contagem do local</p>
+            </div>
+          </div>
+
+          <div class="transfer-steps">
+            <div class="transfer-step">
+              <div class="step-number adjust-step">1</div>
+              <label class="step-label">
+                <span class="label-text">Local</span>
+                <select v-model="adjustForm.location" :class="{ filled: adjustForm.location }">
+                  <option value="" disabled>Selecione o local</option>
+                  <option v-for="loc in locations" :key="loc.code" :value="loc.code">{{ loc.name }} ({{ loc.code }})</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="transfer-step">
+              <div class="step-number adjust-step">2</div>
+              <label class="step-label">
+                <span class="label-text">Operação</span>
+                <select v-model="adjustForm.mode" :class="{ filled: adjustForm.mode }">
+                  <option value="ENTRY">Entrada (somar)</option>
+                  <option value="ADJUSTMENT">Ajuste (definir total)</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="transfer-step">
+              <div class="step-number adjust-step">3</div>
+              <label class="step-label">
+                <span class="label-text">Quantidade</span>
+                <input type="number" min="0" v-model.number="adjustForm.quantity" placeholder="Quantidade" :class="{ filled: adjustForm.quantity > 0 }" />
+              </label>
+            </div>
+
+            <div class="transfer-step">
+              <div class="step-number adjust-step">4</div>
+              <label class="step-label">
+                <span class="label-text">Motivo (opcional)</span>
+                <input type="text" v-model="adjustForm.reason" placeholder="Ex: inventário, recontagem" :class="{ filled: adjustForm.reason }" />
+              </label>
+            </div>
+          </div>
+
+          <div class="transfer-actions">
+            <button class="btn btn-ghost btn-reset" @click="resetAdjust" type="button">Limpar</button>
+            <button class="btn btn-primary btn-transfer" @click="submitAdjust" type="button" :disabled="!canAdjust">
+              Registrar
+            </button>
+          </div>
+
+          <div v-if="adjustError" class="transfer-alert alert-error">{{ adjustError }}</div>
+          <div v-if="adjustSuccess" class="transfer-alert alert-success">{{ adjustSuccess }}</div>
+        </div>
       </div>
     </BaseModal>
   </div>
@@ -502,6 +588,12 @@ const transferSuccess = ref('');
 const exitForm = reactive({ location: '', quantity: 0, reason: '' });
 const exitError = ref('');
 const exitSuccess = ref('');
+const adjustForm = reactive({ location: '', mode: 'ENTRY', quantity: 0, reason: '' });
+const adjustError = ref('');
+const adjustSuccess = ref('');
+const productBatches = ref<any[]>([]);
+const batchError = ref('');
+const batchSuccess = ref('');
 const form = reactive<any>({
   name: '',
   barcode: '',
@@ -552,6 +644,30 @@ async function loadRefs() {
   locations.value = locRes.data;
   if (!form.category && categories.value.length) form.category = categories.value[0]._id;
   if (!form.unit && units.value.length) form.unit = units.value[0]._id;
+}
+
+// Opções de categoria com hierarquia "Pai > Filho"
+const categoryOptions = computed(() =>
+  categories.value.map((c: any) => {
+    const parentName = c.parent ? (typeof c.parent === 'object' ? c.parent.name : '') : '';
+    return { _id: c._id, label: parentName ? `${parentName} > ${c.name}` : c.name };
+  })
+);
+
+function categoryIdOf(product: any): string {
+  return product?.category?._id || product?.category || '';
+}
+
+async function quickUpdateCategory(product: any, event: Event) {
+  const value = (event.target as HTMLSelectElement).value;
+  if (!value || value === categoryIdOf(product)) return;
+  try {
+    await api.put(`/products/${product._id}`, { category: value });
+    await load();
+  } catch (err: any) {
+    alert(err?.response?.data?.message || 'Erro ao atualizar categoria');
+    await load();
+  }
 }
 
 async function loadGtinLookups() {
@@ -668,6 +784,7 @@ function startEdit(product: any) {
     pisRate: product.pisRate ?? 0,
     cofinsRate: product.cofinsRate ?? 0
   });
+  loadProductBatches(product._id);
   showForm.value = true;
 }
 
@@ -675,6 +792,8 @@ function openStockModal(product: any) {
   selectedProduct.value = product;
   showStockModal.value = true;
   resetTransfer();
+  resetExit();
+  resetAdjust();
 }
 
 function closeStockModal() {
@@ -800,6 +919,79 @@ async function submitExit() {
     resetExit();
   } catch (err: any) {
     exitError.value = err?.response?.data?.message || err?.message || 'Erro ao registrar saída';
+  }
+}
+
+const canAdjust = computed(() => {
+  return (
+    !!selectedProduct.value &&
+    adjustForm.location &&
+    adjustForm.quantity >= 0 &&
+    (adjustForm.mode === 'ADJUSTMENT' ? adjustForm.quantity >= 0 : adjustForm.quantity > 0)
+  );
+});
+
+function resetAdjust() {
+  adjustForm.location = '';
+  adjustForm.mode = 'ENTRY';
+  adjustForm.quantity = 0;
+  adjustForm.reason = '';
+  adjustError.value = '';
+  adjustSuccess.value = '';
+}
+
+async function submitAdjust() {
+  if (!selectedProduct.value) return;
+  adjustError.value = '';
+  adjustSuccess.value = '';
+  try {
+    await api.post('/stock-movements', {
+      productId: selectedProduct.value._id,
+      type: adjustForm.mode,
+      quantity: adjustForm.quantity,
+      reason: adjustForm.reason || (adjustForm.mode === 'ENTRY' ? 'Entrada manual' : 'Ajuste de estoque'),
+      location: adjustForm.location
+    });
+    adjustSuccess.value = adjustForm.mode === 'ENTRY'
+      ? `Entrada de ${adjustForm.quantity} unidade(s) registrada.`
+      : `Estoque ajustado para ${adjustForm.quantity} unidade(s).`;
+    await load();
+    const refreshed = products.value.find((p) => p._id === selectedProduct.value._id);
+    if (refreshed) selectedProduct.value = refreshed;
+    resetAdjust();
+  } catch (err: any) {
+    adjustError.value = err?.response?.data?.message || err?.message || 'Erro ao ajustar estoque';
+  }
+}
+
+function toInputDate(value: any): string {
+  if (!value) return '';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+}
+
+async function loadProductBatches(productId: string) {
+  productBatches.value = [];
+  batchError.value = '';
+  batchSuccess.value = '';
+  try {
+    const { data } = await api.get(`/batches/product/${productId}`);
+    productBatches.value = (data || []).map((b: any) => ({ ...b, newExpiryDate: toInputDate(b.expiryDate) }));
+  } catch (err: any) {
+    batchError.value = err?.response?.data?.message || 'Erro ao carregar lotes';
+  }
+}
+
+async function saveBatchExpiry(batch: any) {
+  batchError.value = '';
+  batchSuccess.value = '';
+  try {
+    await api.patch(`/batches/${batch._id}/expiry`, { expiryDate: batch.newExpiryDate });
+    batch.expiryDate = batch.newExpiryDate;
+    batchSuccess.value = 'Vencimento atualizado com sucesso.';
+  } catch (err: any) {
+    batchError.value = err?.response?.data?.message || 'Erro ao atualizar vencimento';
   }
 }
 
@@ -1810,6 +2002,93 @@ function prevPage() {
 
 .exit-step {
   background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+}
+
+/* Inline category quick-edit on card */
+.product-category-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.quick-cat-label {
+  font-size: 11px;
+  color: var(--muted, #9ca3af);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.quick-cat-select {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+/* Adjust stock block */
+.adjust-block {
+  border-color: rgba(91, 231, 196, 0.2) !important;
+  background: linear-gradient(135deg, rgba(91, 231, 196, 0.03), rgba(91, 231, 196, 0.01)) !important;
+}
+.adjust-icon {
+  color: var(--primary, #5be7c4) !important;
+}
+.adjust-step {
+  background: linear-gradient(135deg, var(--primary, #5be7c4), var(--primary-strong, #2bbfa0)) !important;
+  color: #0c1829 !important;
+}
+
+/* Batch / vencimento list in edit form */
+.batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.batch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.batch-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 100px;
+}
+.batch-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.batch-qty {
+  font-size: 11px;
+  color: var(--muted, #9ca3af);
+}
+.batch-date {
+  flex: 1;
+  min-width: 140px;
+}
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.batch-empty {
+  font-size: 13px;
+  color: var(--muted, #9ca3af);
+}
+.batch-alert {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.batch-alert.alert-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+.batch-alert.alert-success {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
 }
 
 .btn-danger {

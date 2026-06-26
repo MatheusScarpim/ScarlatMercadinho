@@ -18,6 +18,7 @@
         </div>
         <div class="category-content">
           <h4 class="category-name">{{ c.name }}</h4>
+          <p class="category-parent" v-if="c.parent">{{ parentName(c) }}</p>
           <div class="category-status">
             <span :class="['badge', c.active ? 'active' : 'inactive']">
               {{ c.active ? 'Ativo' : 'Inativo' }}
@@ -25,6 +26,12 @@
           </div>
         </div>
         <div class="category-actions">
+          <button class="btn btn-ghost btn-icon" @click="startEdit(c)" title="Editar">
+            <svg viewBox="0 0 20 20" fill="none" class="action-icon">
+              <path d="M12.586 3.414a2 2 0 0 1 2.828 0l1.172 1.172a2 2 0 0 1 0 2.828l-8.95 8.95-4.293 1.07 1.07-4.293 8.95-8.95Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+              <path d="M11 4.999 15 9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            </svg>
+          </button>
           <button class="btn btn-ghost btn-icon" @click="toggle(c)" :title="c.active ? 'Inativar' : 'Ativar'">
             <svg viewBox="0 0 20 20" fill="none" class="action-icon" v-if="c.active">
               <rect x="4" y="8.5" width="12" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/>
@@ -40,9 +47,15 @@
       </div>
     </div>
 
-    <BaseModal :open="showForm" title="Nova categoria" :onClose="closeForm">
+    <BaseModal :open="showForm" :title="editingId ? 'Editar categoria' : 'Nova categoria'" :onClose="closeForm">
       <form @submit.prevent="save" class="form-grid modal-form">
         <label class="span-2">Nome<input v-model="form.name" placeholder="Nome" required /></label>
+        <label class="span-2">Categoria pai (opcional)
+          <select v-model="form.parent">
+            <option value="">Nenhuma (categoria principal)</option>
+            <option v-for="c in parentOptions" :key="c._id" :value="c._id">{{ c.name }}</option>
+          </select>
+        </label>
         <div class="modal-actions span-2">
           <button class="btn btn-ghost" type="button" @click="closeForm">Cancelar</button>
           <button class="btn btn-primary" type="submit">Salvar</button>
@@ -53,14 +66,25 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
 import { exportToCsv } from '../../utils/export';
 
 const categories = ref<any[]>([]);
-const form = reactive({ name: '' });
+const form = reactive({ name: '', parent: '' });
 const showForm = ref(false);
+const editingId = ref<string | null>(null);
+
+// Categorias que podem ser "pai" (não permite escolher a própria categoria sendo editada)
+const parentOptions = computed(() => categories.value.filter((c: any) => c._id !== editingId.value));
+
+function parentName(c: any): string {
+  if (!c?.parent) return '';
+  if (typeof c.parent === 'object') return c.parent.name || '';
+  const found = categories.value.find((x: any) => x._id === c.parent);
+  return found?.name || '';
+}
 
 async function load() {
   const { data } = await api.get('/categories');
@@ -68,8 +92,12 @@ async function load() {
 }
 
 async function save() {
-  await api.post('/categories', form);
-  form.name = '';
+  const payload = { name: form.name, parent: form.parent || null };
+  if (editingId.value) {
+    await api.put(`/categories/${editingId.value}`, payload);
+  } else {
+    await api.post('/categories', payload);
+  }
   await load();
   closeForm();
 }
@@ -89,10 +117,20 @@ async function exportCategories() {
 }
 
 function openForm() {
+  editingId.value = null;
+  form.name = '';
+  form.parent = '';
+  showForm.value = true;
+}
+function startEdit(c: any) {
+  editingId.value = c._id;
+  form.name = c.name;
+  form.parent = (typeof c.parent === 'object' ? c.parent?._id : c.parent) || '';
   showForm.value = true;
 }
 function closeForm() {
   showForm.value = false;
+  editingId.value = null;
 }
 </script>
 
@@ -165,6 +203,15 @@ function closeForm() {
   font-size: 18px;
   font-weight: 600;
   color: var(--text);
+}
+
+.category-parent {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted, #9ca3af);
+}
+.category-parent::before {
+  content: '↳ ';
 }
 
 .category-status .badge {
