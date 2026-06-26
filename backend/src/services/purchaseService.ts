@@ -306,20 +306,32 @@ export async function getPurchasesWithDetails() {
     .sort({ createdAt: -1 })
     .lean();
 
+  // Coleta todos os EANs de uma vez para evitar N+1 (uma query em vez de uma por item).
+  const eans = new Set<string>();
+  for (const purchase of purchases) {
+    for (const item of purchase.items) {
+      if (item.product && typeof item.product === 'object' && 'barcode' in item.product && item.product.barcode) {
+        eans.add(item.product.barcode as string);
+      }
+    }
+  }
+  const lookups = eans.size
+    ? await GtinLookupModel.find({ ean: { $in: Array.from(eans) } }).lean()
+    : [];
+  const imageByEan = new Map<string, string | null>();
+  for (const lookup of lookups) {
+    imageByEan.set(lookup.ean, lookup.imageUrl || null);
+  }
+
   const result = [];
   for (const purchase of purchases) {
-    const itemsWithImages = [];
-    for (const item of purchase.items) {
-      let imageUrl = null;
+    const itemsWithImages = purchase.items.map((item) => {
+      let imageUrl: string | null = null;
       if (item.product && typeof item.product === 'object' && 'barcode' in item.product) {
-        const gtinLookup = await GtinLookupModel.findOne({ ean: item.product.barcode }).lean();
-        imageUrl = gtinLookup?.imageUrl || null;
+        imageUrl = imageByEan.get(item.product.barcode as string) ?? null;
       }
-      itemsWithImages.push({
-        ...item,
-        imageUrl
-      });
-    }
+      return { ...item, imageUrl };
+    });
     result.push({
       ...purchase,
       items: itemsWithImages

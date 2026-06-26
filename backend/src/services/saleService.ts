@@ -39,42 +39,45 @@ export async function addItem(
   if (!product) throw new ApiError(404, 'Product not found');
   const location = sale.location || payload.location;
 
-  // aplica melhor preço considerando lote/desconto
-  let unitPrice = product.salePrice;
-  let autoDiscount = 0;
-  try {
+  const { getFefoLineQuote } = await import('./batchService');
+
+  // Cota a linha por FEFO real: cada unidade pelo preço do lote de onde sairá.
+  const quoteLine = async (quantity: number) => {
     if (location) {
-      const { getBestPriceForProduct } = await import('./batchService');
-      const batchPriceInfo = await getBestPriceForProduct(product._id, location);
-      unitPrice = batchPriceInfo.hasBatch ? batchPriceInfo.price : product.salePrice;
-      // Não aplicamos desconto extra ao total: preço do lote já está em unitPrice.
+      try {
+        return await getFefoLineQuote(product._id, location, quantity, product.salePrice);
+      } catch (err) {
+        console.error('[SALE] Erro ao calcular preco com lote:', err);
+      }
     }
-  } catch (err) {
-    console.error('[SALE] Erro ao calcular preco com lote:', err);
-  }
+    const totalPrice = Number((quantity * product.salePrice).toFixed(2));
+    return { totalPrice, unitPrice: product.salePrice, hasBatch: false };
+  };
 
   const existing = await SaleItemModel.findOne({ sale: saleId, product: payload.productId });
   if (existing) {
     existing.quantity += payload.quantity;
+    const quote = await quoteLine(existing.quantity);
     const rawDiscount = payload.discount ?? existing.discount ?? 0;
-    const maxDiscount = existing.quantity * unitPrice;
+    const maxDiscount = quote.totalPrice;
     existing.discount = Math.min(Math.max(rawDiscount || 0, 0), maxDiscount);
-    existing.unitPrice = unitPrice;
-    existing.total = Math.max(0, existing.quantity * existing.unitPrice - (existing.discount || 0));
+    existing.unitPrice = quote.unitPrice;
+    existing.total = Math.max(0, quote.totalPrice - (existing.discount || 0));
     if (payload.weight) existing.weight = (existing.weight || 0) + payload.weight;
     await existing.save();
     const totals = await recalcTotals(saleId);
     return { item: existing, totals };
   } else {
+    const quote = await quoteLine(payload.quantity);
     const rawDiscount = payload.discount ?? 0;
-    const maxDiscount = payload.quantity * unitPrice;
-    const discount = Math.min(rawDiscount || 0, maxDiscount);
-    const total = Math.max(0, unitPrice * payload.quantity - discount);
+    const maxDiscount = quote.totalPrice;
+    const discount = Math.min(Math.max(rawDiscount || 0, 0), maxDiscount);
+    const total = Math.max(0, quote.totalPrice - discount);
     const item = await SaleItemModel.create({
       sale: saleId,
       product: product.id,
       quantity: payload.quantity,
-      unitPrice,
+      unitPrice: quote.unitPrice,
       discount,
       total,
       isWeighed: product.isWeighed,
@@ -90,11 +93,27 @@ export async function updateItem(saleId: string, itemId: string, payload: { quan
   if (!sale || sale.status !== 'OPEN') throw new ApiError(400, 'Sale not open');
   const item = await SaleItemModel.findById(itemId);
   if (!item) throw new ApiError(404, 'Item not found');
+
+  const product = await ProductModel.findById(item.product);
+  const fallbackPrice = product?.salePrice ?? item.unitPrice;
+
+  // Re-cota por FEFO com a nova quantidade (preço unitário médio ponderado).
+  let quote = { totalPrice: Number((payload.quantity * fallbackPrice).toFixed(2)), unitPrice: fallbackPrice };
+  if (sale.location) {
+    try {
+      const { getFefoLineQuote } = await import('./batchService');
+      quote = await getFefoLineQuote(item.product, sale.location, payload.quantity, fallbackPrice);
+    } catch (err) {
+      console.error('[SALE] Erro ao recalcular preco com lote:', err);
+    }
+  }
+
   item.quantity = payload.quantity;
-  const maxDiscount = item.quantity * item.unitPrice;
+  item.unitPrice = quote.unitPrice;
+  const maxDiscount = quote.totalPrice;
   const rawDiscount = payload.discount ?? item.discount ?? 0;
   item.discount = Math.min(Math.max(rawDiscount, 0), maxDiscount);
-  item.total = Math.max(0, item.quantity * item.unitPrice - item.discount);
+  item.total = Math.max(0, quote.totalPrice - item.discount);
   await item.save();
   const totals = await recalcTotals(saleId);
   return { item, totals };

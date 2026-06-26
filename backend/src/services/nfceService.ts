@@ -603,7 +603,7 @@ function parseNfceFull(html: string): NfceData {
   const pagamentoSpans = pagamentoRow.find('span');
   const totais: NfceTotais = {
     quantidadeItens: parseDecimal(findValueByLabel($, headerTable, 'Qtd. total de itens') ?? '') ||
-      parseDecimal(findValueByLabel($, totaisBox, 'Valor Total dos Produtos') ?? ''),
+      itens.length,
     valorTotal: parseDecimal(findValueByLabel($, totaisBox, 'Valor Total da NFe')),
     desconto: parseDecimal(findValueByLabel($, totaisBox, 'Valor Total dos Descontos')),
     valorAPagar: parseDecimal(findValueByLabel($, infoTable, 'Valor Total da Nota Fiscal')),

@@ -95,8 +95,8 @@ export async function consumeBatch(
 
     remaining -= toConsume;
 
-    // Remove lote se quantidade zerou
-    if (batch.quantity === 0) {
+    // Remove lote se quantidade zerou (<= 0 evita lote zumbi por arredondamento)
+    if (batch.quantity <= 0) {
       await BatchModel.deleteOne({ _id: batch._id });
     }
   }
@@ -174,6 +174,52 @@ export async function getBestPriceForProduct(
     expiryDate: null,
     hasBatch: false
   };
+}
+
+/**
+ * Cota o preço de uma linha de venda usando FEFO real: cada unidade é cotada
+ * pelo preço do lote de onde ela sairá (lotes ordenados por vencimento).
+ * A quantidade que exceder o estoque em lotes é cotada pelo preço normal do
+ * produto (a venda sem estoque é permitida). Retorna o total da linha e o
+ * preço unitário médio ponderado (total / quantidade).
+ */
+export async function getFefoLineQuote(
+  productId: Types.ObjectId | string,
+  location: string,
+  quantity: number,
+  fallbackPrice: number
+) {
+  const prodId = typeof productId === 'string' ? new Types.ObjectId(productId) : productId;
+  if (!(quantity > 0)) {
+    return { totalPrice: 0, unitPrice: fallbackPrice, hasBatch: false };
+  }
+
+  const batches = await BatchModel.find({
+    product: prodId,
+    location,
+    quantity: { $gt: 0 }
+  }).sort({ expiryDate: 1 });
+
+  let remaining = quantity;
+  let totalPrice = 0;
+  let usedBatch = false;
+
+  for (const batch of batches) {
+    if (remaining <= 0) break;
+    const take = Math.min(remaining, batch.quantity);
+    totalPrice += take * batch.currentPrice;
+    remaining -= take;
+    usedBatch = true;
+  }
+
+  // Excedente além do estoque em lotes: preço cheio do produto.
+  if (remaining > 0) {
+    totalPrice += remaining * fallbackPrice;
+  }
+
+  totalPrice = Number(totalPrice.toFixed(2));
+  const unitPrice = Number((totalPrice / quantity).toFixed(2));
+  return { totalPrice, unitPrice, hasBatch: usedBatch };
 }
 
 /**
