@@ -6,6 +6,13 @@
         Margem padrão: <strong>{{ marginPercent }}%</strong>
       </div>
       <div class="header-actions">
+        <select v-model="purchaseLocationFilter" class="loja-filter">
+          <option value="">Todas as lojas</option>
+          <option v-for="loc in locations" :key="loc._id" :value="loc.code">{{ loc.name }}</option>
+        </select>
+        <button class="btn btn-ghost" :class="{ 'btn-active': groupByLocation }" @click="groupByLocation = !groupByLocation">
+          {{ groupByLocation ? '✓ Por loja' : 'Agrupar por loja' }}
+        </button>
         <button class="btn btn-ghost" @click="exportPurchases">Exportar Excel</button>
         <button class="btn btn-primary" @click="openForm">Nova compra</button>
       </div>
@@ -290,8 +297,41 @@
       </form>
     </BaseModal>
 
-    <div class="purchases-grid">
-      <div class="purchase-card glass" v-for="p in purchases" :key="p._id">
+    <template v-if="groupByLocation">
+      <div class="loja-group" v-for="group in groupedPurchases" :key="group.code || 'none'">
+        <div class="loja-group-header">
+          <h4>🏬 {{ group.name }}</h4>
+          <span class="muted small">{{ group.list.length }} {{ group.list.length === 1 ? 'compra' : 'compras' }}</span>
+        </div>
+        <div class="purchases-grid">
+          <div class="purchase-card glass" v-for="p in group.list" :key="p._id">
+            <div class="purchase-header" @click="openPurchaseDetails(p)">
+              <div class="purchase-info">
+                <div class="purchase-date">
+                  <span class="eyebrow">{{ formatDate(p.createdAt) }}</span>
+                </div>
+                <div class="purchase-supplier">
+                  <h4>{{ p.supplier?.name }}</h4>
+                  <span class="muted">{{ p.items?.length || 0 }} {{ p.items?.length === 1 ? 'item' : 'itens' }}</span>
+                </div>
+              </div>
+              <div class="purchase-summary">
+                <div class="purchase-total">
+                  <span class="muted small">Total</span>
+                  <strong>R$ {{ p.totalAmount.toFixed(2) }}</strong>
+                </div>
+                <button class="expand-btn" type="button">
+                  <span>Ver itens</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <div class="purchases-grid" v-else>
+      <div class="purchase-card glass" v-for="p in filteredPurchases" :key="p._id">
         <div class="purchase-header" @click="openPurchaseDetails(p)">
           <div class="purchase-info">
             <div class="purchase-date">
@@ -409,6 +449,8 @@ const nfceLoading = ref(false);
 const nfceError = ref('');
 const nfceLoaded = ref(false);
 const selectedPurchase = ref<any | null>(null);
+const purchaseLocationFilter = ref('');
+const groupByLocation = ref(false);
 const importMethod = ref<'url' | 'qrcode' | 'manual' | 'xml'>('manual');
 const xmlFileInput = ref<HTMLInputElement | null>(null);
 const showQRScanner = ref(false);
@@ -459,6 +501,29 @@ async function saveQuickLocation() {
   quickLocationForm.name = '';
   quickLocationForm.code = '';
 }
+
+function locationName(code: string) {
+  if (!code) return 'Sem loja';
+  const loc = locations.value.find((l: any) => l.code === code);
+  return loc ? loc.name : code;
+}
+
+const filteredPurchases = computed(() => {
+  const f = purchaseLocationFilter.value;
+  if (!f) return purchases.value;
+  return purchases.value.filter((p: any) => (p.location || '') === f);
+});
+
+const groupedPurchases = computed(() => {
+  const groups: Record<string, any[]> = {};
+  for (const p of filteredPurchases.value) {
+    const key = p.location || '';
+    (groups[key] = groups[key] || []).push(p);
+  }
+  return Object.keys(groups)
+    .sort((a, b) => locationName(a).localeCompare(locationName(b)))
+    .map((code) => ({ code, name: locationName(code), list: groups[code] }));
+});
 
 const total = computed(() => form.items.reduce((sum: number, i: any) => sum + i.quantity * i.unitCost, 0));
 
@@ -1895,6 +1960,36 @@ onUnmounted(() => {
   padding-right: 6px;
   align-content: start;
   overflow: auto;
+}
+
+.loja-filter {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+}
+
+.btn-active {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+.loja-group {
+  margin-top: 16px;
+}
+
+.loja-group-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  margin-bottom: 6px;
+}
+
+.loja-group-header h4 {
+  margin: 0;
 }
   
   .purchases-grid::-webkit-scrollbar {
