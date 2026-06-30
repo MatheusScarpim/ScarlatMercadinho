@@ -12,6 +12,7 @@ router.post('/refresh/abort', authMiddleware, adminOnly, refreshController.refre
 router.get('/refresh/stream', authMiddleware, adminOnly, refreshController.refreshStream);
 
 router.get('/price-outliers', authMiddleware, requirePermission('PRODUCTS'), controller.listPriceOutliers);
+router.patch('/:id/price-reviewed', authMiddleware, requirePermission('PRODUCTS'), controller.setPriceReviewed);
 
 router.post('/', authMiddleware, requirePermission('PRODUCTS'), controller.createProduct);
 router.get('/', controller.listProducts);

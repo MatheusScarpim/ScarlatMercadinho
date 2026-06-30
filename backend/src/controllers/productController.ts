@@ -61,15 +61,19 @@ export async function findByBarcode(req: Request, res: Response) {
 }
 
 export async function listPriceOutliers(req: Request, res: Response) {
-  const filter = (req.query.filter as string) || 'all'; // all | above | below | no_data
+  const filter = (req.query.filter as string) || 'all'; // all | above | below | ok | no_data | reviewed
+  const category = typeof req.query.category === 'string' ? req.query.category.trim() : '';
+  const location = typeof req.query.location === 'string' ? req.query.location.trim() : '';
 
-  const products = await ProductModel.find({ active: true })
-    .populate('category')
-    .lean();
+  const query: any = { active: true };
+  if (category && category !== 'all') query.category = category;
+  // Filtra por loja: produto precisa ter estoque cadastrado na localização (code)
+  if (location && location !== 'all') query['stockByLocation.location'] = location;
 
-  const results: any[] = [];
+  const products = await ProductModel.find(query).populate('category').lean();
 
-  for (const p of products) {
+  // Monta o objeto completo de cada produto (com status calculado)
+  const scoped = products.map((p) => {
     const sale = p.salePrice;
     let min = p.minPrice ?? null;
     let avg = p.avgPrice ?? null;
@@ -86,7 +90,6 @@ export async function listPriceOutliers(req: Request, res: Response) {
     const hasRange = min !== null || max !== null;
 
     let status: 'ok' | 'above' | 'below' | 'no_data' = 'ok';
-
     if (!hasRange) {
       status = 'no_data';
     } else if (max !== null && sale > max) {
@@ -95,27 +98,38 @@ export async function listPriceOutliers(req: Request, res: Response) {
       status = 'below';
     }
 
-    if (filter === 'all' || filter === status) {
-      results.push({
-        _id: p._id,
-        name: p.name,
-        barcode: p.barcode,
-        imageUrl: p.imageUrl,
-        category: p.category,
-        salePrice: sale,
-        costPrice: p.costPrice,
-        minPrice: min,
-        avgPrice: avg,
-        maxPrice: max,
-        status,
-        diffPercent:
-          status === 'above' && max
-            ? Math.round(((sale - max) / max) * 100)
-            : status === 'below' && min
-              ? Math.round(((min - sale) / min) * 100)
-              : 0,
-      });
-    }
+    return {
+      _id: p._id,
+      name: p.name,
+      barcode: p.barcode,
+      imageUrl: p.imageUrl,
+      category: p.category,
+      salePrice: sale,
+      costPrice: p.costPrice,
+      minPrice: min,
+      avgPrice: avg,
+      maxPrice: max,
+      status,
+      reviewed: p.priceReviewed === true,
+      diffPercent:
+        status === 'above' && max
+          ? Math.round(((sale - max) / max) * 100)
+          : status === 'below' && min
+            ? Math.round(((min - sale) / min) * 100)
+            : 0,
+    };
+  });
+
+  // Itens revisados ficam separados; as views por status só mostram não revisados.
+  const pending = scoped.filter((r) => !r.reviewed);
+
+  let results: typeof scoped;
+  if (filter === 'reviewed') {
+    results = scoped.filter((r) => r.reviewed);
+  } else if (filter === 'all') {
+    results = pending;
+  } else {
+    results = pending.filter((r) => r.status === filter);
   }
 
   // Ordena: problemas primeiro (above/below), depois no_data, depois ok
@@ -123,12 +137,24 @@ export async function listPriceOutliers(req: Request, res: Response) {
   results.sort((a, b) => (order[a.status] ?? 4) - (order[b.status] ?? 4));
 
   const summary = {
-    total: products.length,
-    above: results.filter((r) => r.status === 'above').length,
-    below: results.filter((r) => r.status === 'below').length,
-    ok: results.filter((r) => r.status === 'ok').length,
-    noData: results.filter((r) => r.status === 'no_data').length,
+    total: pending.length,
+    above: pending.filter((r) => r.status === 'above').length,
+    below: pending.filter((r) => r.status === 'below').length,
+    ok: pending.filter((r) => r.status === 'ok').length,
+    noData: pending.filter((r) => r.status === 'no_data').length,
+    reviewed: scoped.filter((r) => r.reviewed).length,
   };
 
   res.json({ summary, items: results });
+}
+
+export async function setPriceReviewed(req: Request, res: Response) {
+  const reviewed = req.body?.reviewed !== false; // default true
+  const product = await ProductModel.findByIdAndUpdate(
+    req.params.id,
+    { priceReviewed: reviewed, priceReviewedAt: reviewed ? new Date() : null },
+    { new: true }
+  );
+  if (!product) return res.status(404).json({ message: 'Not found' });
+  res.json({ _id: product._id, priceReviewed: product.priceReviewed, priceReviewedAt: product.priceReviewedAt });
 }

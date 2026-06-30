@@ -31,6 +31,10 @@
         <span class="summary-value">{{ summary.noData }}</span>
         <span class="summary-label">Sem dados</span>
       </div>
+      <div class="summary-card glass card-reviewed" :class="{ active: filter === 'reviewed' }" @click="setFilter('reviewed')">
+        <span class="summary-value">{{ summary.reviewed }}</span>
+        <span class="summary-label">Revisados</span>
+      </div>
     </div>
 
     <!-- Refresh status -->
@@ -48,6 +52,23 @@
     <!-- Search -->
     <div class="filters glass">
       <input v-model="search" placeholder="Buscar por nome ou código..." class="search-input" @input="filterLocal" />
+      <div class="filter-controls">
+        <select v-model="categoryFilter" class="sort-select" @change="load">
+          <option value="all">Todas as categorias</option>
+          <option v-for="c in categories" :key="c._id" :value="c._id">{{ c.name }}</option>
+        </select>
+        <select v-model="locationFilter" class="sort-select" @change="load">
+          <option value="all">Todas as lojas</option>
+          <option v-for="l in locations" :key="l._id" :value="l.code">{{ l.name }}</option>
+        </select>
+        <select v-model="marginFilter" class="sort-select">
+          <option value="all">Toda margem</option>
+          <option value="negative">Margem negativa</option>
+          <option value="low">Margem baixa (&lt;15%)</option>
+          <option value="ok">Margem ok (15–40%)</option>
+          <option value="high">Margem alta (&gt;40%)</option>
+        </select>
+      </div>
       <div class="sort-controls">
         <select v-model="sortBy" class="sort-select">
           <option value="name">Nome</option>
@@ -190,6 +211,20 @@
           >
             Usar preço médio (R$ {{ fmt(item.avgPrice) }}) — margem {{ marginPercent(item.costPrice, item.avgPrice) }}%
           </button>
+          <button
+            v-if="!item.reviewed"
+            class="btn btn-sm btn-review"
+            @click="setReviewed(item, true)"
+          >
+            &#10003; Marcar como revisado
+          </button>
+          <button
+            v-else
+            class="btn btn-sm btn-ghost"
+            @click="setReviewed(item, false)"
+          >
+            Reabrir revisão
+          </button>
         </div>
       </div>
     </div>
@@ -224,6 +259,7 @@ interface PriceItem {
   maxPrice: number | null;
   status: 'ok' | 'above' | 'below' | 'no_data';
   diffPercent: number;
+  reviewed?: boolean;
   newPrice?: number | null;
 }
 
@@ -233,6 +269,7 @@ interface Summary {
   below: number;
   ok: number;
   noData: number;
+  reviewed: number;
 }
 
 const items = ref<PriceItem[]>([]);
@@ -241,6 +278,11 @@ const filter = ref('all');
 const search = ref('');
 const sortBy = ref('name');
 const sortDir = ref<'asc' | 'desc'>('asc');
+const categories = ref<any[]>([]);
+const locations = ref<any[]>([]);
+const categoryFilter = ref('all');
+const locationFilter = ref('all');
+const marginFilter = ref('all');
 const loading = ref(false);
 const refreshing = ref(false);
 const refreshStatus = ref<any>(null);
@@ -272,6 +314,15 @@ function sortValue(item: PriceItem): number | string {
   }
 }
 
+function marginBucket(item: PriceItem): string {
+  if (!item.costPrice || item.costPrice <= 0) return 'unknown';
+  const margin = ((item.salePrice - item.costPrice) / item.costPrice) * 100;
+  if (margin < 0) return 'negative';
+  if (margin < 15) return 'low';
+  if (margin < 40) return 'ok';
+  return 'high';
+}
+
 const filtered = computed(() => {
   let list = items.value;
   if (search.value) {
@@ -279,6 +330,9 @@ const filtered = computed(() => {
     list = list.filter(
       (i) => i.name?.toLowerCase().includes(q) || i.barcode?.includes(q),
     );
+  }
+  if (marginFilter.value !== 'all') {
+    list = list.filter((i) => marginBucket(i) === marginFilter.value);
   }
   const dir = sortDir.value === 'asc' ? 1 : -1;
   return [...list].sort((a, b) => {
@@ -342,7 +396,11 @@ async function load() {
   loading.value = true;
   try {
     const { data } = await api.get('/products/price-outliers', {
-      params: { filter: filter.value },
+      params: {
+        filter: filter.value,
+        category: categoryFilter.value,
+        location: locationFilter.value,
+      },
     });
     items.value = data.items;
     summary.value = data.summary;
@@ -350,6 +408,28 @@ async function load() {
     console.error('Failed to load price outliers:', err);
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadRefs() {
+  try {
+    const [catRes, locRes] = await Promise.all([
+      api.get('/categories'),
+      api.get('/locations'),
+    ]);
+    categories.value = catRes.data;
+    locations.value = locRes.data;
+  } catch (err) {
+    console.error('Failed to load refs:', err);
+  }
+}
+
+async function setReviewed(item: PriceItem, reviewed: boolean) {
+  try {
+    await api.patch(`/products/${item._id}/price-reviewed`, { reviewed });
+    await load();
+  } catch (err) {
+    alert('Erro ao atualizar revisão');
   }
 }
 
@@ -431,6 +511,7 @@ async function abortRefresh() {
 }
 
 onMounted(async () => {
+  await loadRefs();
   await load();
   // Check if refresh is already running
   try {
@@ -511,6 +592,25 @@ onMounted(async () => {
 .card-below .summary-value { color: #f59e0b; }
 .card-ok .summary-value { color: #22c55e; }
 .card-nodata .summary-value { color: var(--muted); }
+.card-reviewed .summary-value { color: #3b82f6; }
+
+/* Filter controls */
+.filter-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.btn-review {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.btn-review:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
 
 /* Refresh status */
 .refresh-status {
