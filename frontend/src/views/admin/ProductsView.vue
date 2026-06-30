@@ -110,6 +110,12 @@
               </svg>
               Ver estoque
             </button>
+            <button class="btn btn-ghost product-exit" @click="openStockModal(p, true)" title="Dar baixa no estoque">
+              <svg viewBox="0 0 24 24" fill="none" class="action-icon">
+                <path d="M12 19V5m0 0l-7 7m7-7l7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Saída
+            </button>
           </div>
         </div>
       </div>
@@ -389,7 +395,7 @@
           </div>
         </div>
 
-        <div class="transfer-block exit-block">
+        <div class="transfer-block exit-block" ref="exitBlockRef">
           <div class="transfer-header">
             <svg viewBox="0 0 24 24" fill="none" class="transfer-icon exit-icon">
               <path d="M12 19V5m0 0l-7 7m7-7l7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -549,7 +555,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
@@ -582,6 +588,7 @@ const showForm = ref(false);
 const editingId = ref<string | null>(null);
 const showStockModal = ref(false);
 const selectedProduct = ref<any | null>(null);
+const exitBlockRef = ref<HTMLElement | null>(null);
 const transferForm = reactive({ from: '', to: '', quantity: 0 });
 const transferError = ref('');
 const transferSuccess = ref('');
@@ -788,12 +795,17 @@ function startEdit(product: any) {
   showForm.value = true;
 }
 
-function openStockModal(product: any) {
+function openStockModal(product: any, focusExit = false) {
   selectedProduct.value = product;
   showStockModal.value = true;
   resetTransfer();
   resetExit();
   resetAdjust();
+  if (focusExit) {
+    nextTick(() => {
+      exitBlockRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
 }
 
 function closeStockModal() {
@@ -1432,6 +1444,12 @@ function prevPage() {
 .product-actions .view-stock {
   background: linear-gradient(135deg, rgba(91, 231, 196, 0.12), rgba(91, 231, 196, 0.2));
   border-color: rgba(91, 231, 196, 0.4);
+}
+
+.product-actions .product-exit {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.12), rgba(248, 113, 113, 0.2));
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #f87171;
 }
 
 .product-actions .btn {
