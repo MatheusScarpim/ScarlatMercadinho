@@ -48,6 +48,11 @@
               </div>
             </a>
 
+            <div v-if="whatsappQr" class="whatsapp-qr">
+              <img :src="whatsappQr" alt="QR code WhatsApp" />
+              <span>Aponte a câmera para falar no WhatsApp</span>
+            </div>
+
             <div class="contact-hours">
               <span class="contact-icon">🕐</span>
               <div>
@@ -115,8 +120,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch, computed } from 'vue';
+import { ref, onMounted, nextTick, watch, computed, watchEffect } from 'vue';
 import axios from 'axios';
+import QRCode from 'qrcode';
 import wl from '../config/whitelabel';
 import VirtualKeyboard from './VirtualKeyboard.vue';
 
@@ -136,6 +142,26 @@ const contactInfo = computed(() => ({
   phone: wl.contactPhone,
   email: wl.contactEmail,
 }));
+
+const whatsappQr = ref('');
+const whatsappLink = computed(() => {
+  const digits = (wl.whatsappNumber || '').replace(/\D/g, '');
+  return digits ? `https://wa.me/${digits}` : '';
+});
+
+watchEffect(() => {
+  if (!whatsappLink.value) {
+    whatsappQr.value = '';
+    return;
+  }
+  QRCode.toDataURL(whatsappLink.value, { margin: 1, width: 200 })
+    .then((url) => {
+      whatsappQr.value = url;
+    })
+    .catch(() => {
+      whatsappQr.value = '';
+    });
+});
 
 // Gera um sessionId único por sessão do browser
 const sessionId = ref(
@@ -505,6 +531,28 @@ onMounted(() => {
   font-weight: 600;
   color: var(--text, #1f2937);
   margin-top: 2px;
+}
+
+.whatsapp-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--border, #d9e2ec);
+  border-radius: 12px;
+}
+
+.whatsapp-qr img {
+  width: 160px;
+  height: 160px;
+  border-radius: 8px;
+}
+
+.whatsapp-qr span {
+  font-size: 12px;
+  color: var(--muted, #5b6577);
+  text-align: center;
 }
 
 /* Messages */
