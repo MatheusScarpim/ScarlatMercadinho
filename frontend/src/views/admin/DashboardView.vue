@@ -57,22 +57,32 @@
       <div class="panel-header">
         <h4>Produtos mais vendidos</h4>
       </div>
-      <table>
+      <table v-if="topProducts.length">
         <thead>
           <tr>
+            <th class="rank-col">#</th>
             <th>Produto</th>
             <th>Qtde</th>
             <th>Total</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="p in topProducts" :key="p.id">
-            <td>{{ p.name }}</td>
+          <tr v-for="(p, i) in topProducts" :key="p.id">
+            <td class="rank-col">
+              <span class="rank-badge" :class="`rank-${i + 1}`">{{ i + 1 }}</span>
+            </td>
+            <td>
+              <div class="product-cell">
+                <span class="product-label">{{ p.name }}</span>
+                <span class="qty-bar" :style="{ width: qtyBarWidth(p.quantity) }"></span>
+              </div>
+            </td>
             <td>{{ p.quantity }}</td>
             <td>R$ {{ p.total.toFixed(2) }}</td>
           </tr>
         </tbody>
       </table>
+      <p v-else class="muted empty">Nenhuma venda no período selecionado.</p>
     </div>
   </div>
 </template>
@@ -194,6 +204,13 @@ async function load() {
 }
 
 onMounted(load);
+
+function qtyBarWidth(quantity: number): string {
+  const max = topProducts.value.reduce((m, p) => Math.max(m, p.quantity), 0);
+  if (!max) return '0%';
+  const pct = Math.max(4, Math.round((quantity / max) * 100));
+  return `${pct}%`;
+}
 
 function paymentLabel(pay: string) {
   const map: Record<string, string> = {
@@ -356,5 +373,53 @@ td {
   .dashboard {
     max-height: calc(100vh - 80px);
   }
+}
+
+/* Ranking produtos mais vendidos */
+.rank-col {
+  width: 44px;
+  text-align: center;
+}
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 13px;
+  background: rgba(91, 231, 196, 0.12);
+  color: var(--primary);
+}
+.rank-badge.rank-1 {
+  background: #f5c518;
+  color: #4a3800;
+}
+.rank-badge.rank-2 {
+  background: #c9d1d9;
+  color: #2b2f36;
+}
+.rank-badge.rank-3 {
+  background: #d69a5c;
+  color: #3d2405;
+}
+.product-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.product-label {
+  font-weight: 500;
+}
+.qty-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--primary), var(--primary-strong));
+  transition: width 0.3s ease;
+}
+.empty {
+  padding: 16px 0;
+  text-align: center;
 }
 </style>

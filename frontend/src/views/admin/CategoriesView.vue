@@ -16,7 +16,7 @@
                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
-        <div class="category-content">
+        <div class="category-content clickable" @click="goToProducts(c)" title="Ver produtos desta categoria">
           <h4 class="category-name">{{ c.name }}</h4>
           <p class="category-parent" v-if="c.parent">{{ parentName(c) }}</p>
           <div class="category-status">
@@ -67,12 +67,18 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
 import { exportToCsv } from '../../utils/export';
 
+const router = useRouter();
 const categories = ref<any[]>([]);
 const form = reactive({ name: '', parent: '' });
+
+function goToProducts(c: any) {
+  router.push({ path: '/admin/products', query: { category: c._id } });
+}
 const showForm = ref(false);
 const editingId = ref<string | null>(null);
 
@@ -196,6 +202,12 @@ function closeForm() {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+.category-content.clickable {
+  cursor: pointer;
+}
+.category-content.clickable:hover .category-name {
+  color: var(--primary);
 }
 
 .category-name {

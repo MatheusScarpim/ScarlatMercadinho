@@ -67,7 +67,7 @@ export async function getOverview(req: Request, res: Response) {
       }
     },
     { $sort: { quantity: -1 } },
-    { $limit: 5 },
+    { $limit: 10 },
     {
       $lookup: {
         from: 'products',

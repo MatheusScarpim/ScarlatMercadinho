@@ -122,11 +122,7 @@
     </div>
     </div>
 
-    <div class="pager glass">
-      <button class="btn btn-ghost" :disabled="page === 1" @click="prevPage">Anterior</button>
-      <span class="page-info">Página {{ page }} de {{ pages }}</span>
-      <button class="btn btn-ghost" :disabled="page === pages" @click="nextPage">Próxima</button>
-    </div>
+    <Pagination :page="page" :pages="pages" @change="goToPage" />
 
     <BaseModal :open="showForm" :title="editingId ? 'Editar produto' : 'Novo produto'" :onClose="closeForm">
       <form @submit.prevent="save" @keydown.enter.prevent class="product-form">
@@ -257,7 +253,7 @@
 
         <div class="form-actions">
           <button class="btn btn-ghost" type="button" @click="closeForm">Cancelar</button>
-          <button class="btn btn-primary" type="submit">Salvar produto</button>
+          <button class="btn btn-primary" type="submit" :disabled="saving">{{ saving ? 'Salvando...' : 'Salvar produto' }}</button>
         </div>
       </form>
     </BaseModal>
@@ -559,6 +555,7 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../../services/api';
 import BaseModal from '../../components/BaseModal.vue';
+import Pagination from '../../components/Pagination.vue';
 import { exportToCsv } from '../../utils/export';
 import { ref as vueRef } from 'vue';
 
@@ -585,6 +582,7 @@ const filterCategory = ref('');
 const filterActive = ref('');
 const filterLocation = ref('');
 const showForm = ref(false);
+const saving = ref(false);
 const editingId = ref<string | null>(null);
 const showStockModal = ref(false);
 const selectedProduct = ref<any | null>(null);
@@ -719,13 +717,21 @@ const calculateMargin = computed(() => {
 });
 
 async function save() {
-  if (editingId.value) {
-    await api.put(`/products/${editingId.value}`, form);
-  } else {
-    await api.post('/products', form);
+  if (saving.value) return;
+  saving.value = true;
+  try {
+    if (editingId.value) {
+      await api.put(`/products/${editingId.value}`, form);
+    } else {
+      await api.post('/products', form);
+    }
+    await load();
+    closeForm();
+  } catch (err: any) {
+    alert(err?.response?.data?.message || 'Erro ao salvar produto. Verifique os campos e tente novamente.');
+  } finally {
+    saving.value = false;
   }
-  await load();
-  closeForm();
 }
 
 async function toggleActive(product: any) {
@@ -737,6 +743,7 @@ onMounted(() => {
   const locQuery = typeof route.query.location === 'string' ? route.query.location : '';
   search.value = typeof route.query.search === 'string' ? route.query.search : '';
   filterLocation.value = locQuery;
+  filterCategory.value = typeof route.query.category === 'string' ? route.query.category : '';
   loadRefs();
   load();
   loadGtinLookups();
@@ -750,8 +757,8 @@ function openForm() {
     barcode: '',
     costPrice: 0,
     salePrice: 0,
-    category: categories.value[0]._id || '',
-    unit: units.value[0]._id || '',
+    category: categories.value[0]?._id || '',
+    unit: units.value[0]?._id || '',
     minimumStock: 0,
     isWeighed: false,
     imageUrl: '',
@@ -1160,19 +1167,11 @@ function exportSample() {
   exportToCsv('modelo-produtos.csv', headers, rows);
 }
 
-function nextPage() {
-  if (page.value < pages.value) {
-    page.value += 1;
-    load();
-  }
+function goToPage(n: number) {
+  page.value = n;
+  load();
 }
 
-function prevPage() {
-  if (page.value > 1) {
-    page.value -= 1;
-    load();
-  }
-}
 </script>
 
 <style scoped>

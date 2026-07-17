@@ -30,6 +30,7 @@ export interface WhiteLabelConfig {
   }
   contactPhone: string
   contactEmail: string
+  whatsappNumber: string
   kioskCpfRequired: boolean
 }
 
@@ -59,6 +60,7 @@ export const defaults: WhiteLabelConfig = {
   },
   contactPhone: '',
   contactEmail: '',
+  whatsappNumber: '',
   kioskCpfRequired: true,
 }
 
@@ -87,6 +89,7 @@ export function updateConfig(cfg: Partial<WhiteLabelConfig>): void {
   if (cfg.launchDate !== undefined) wl.launchDate = cfg.launchDate
   if (cfg.contactPhone !== undefined) wl.contactPhone = cfg.contactPhone
   if (cfg.contactEmail !== undefined) wl.contactEmail = cfg.contactEmail
+  if (cfg.whatsappNumber !== undefined) wl.whatsappNumber = cfg.whatsappNumber
   if (cfg.kioskCpfRequired !== undefined) wl.kioskCpfRequired = cfg.kioskCpfRequired
   if (cfg.theme) Object.assign(wl.theme, cfg.theme)
   if (cfg.labels) Object.assign(wl.labels, cfg.labels)

@@ -220,9 +220,10 @@
                   <div class="form-item-row">
                     <div class="field-group">
                       <label class="small-label">Produto</label>
+                      <input class="product-search" v-model="item._search" placeholder="Buscar produto..." />
                       <select v-model="item.product" required>
                         <option value="" disabled>Selecione</option>
-                        <option v-for="p in products" :key="p._id" :value="p._id">{{ p.name }}</option>
+                        <option v-for="p in filteredProducts(item)" :key="p._id" :value="p._id">{{ p.name }}</option>
                       </select>
                     </div>
                     <div class="field-group small">
@@ -537,6 +538,18 @@ const canProceedFromStep1 = computed(() => {
   return nfceLoaded.value;
 });
 
+const sortedProducts = computed(() =>
+  [...products.value].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '', 'pt-BR'))
+);
+
+function filteredProducts(item: any) {
+  const term = (item?._search || '').trim().toLowerCase();
+  if (!term) return sortedProducts.value;
+  return sortedProducts.value.filter((p: any) =>
+    (p.name || '').toLowerCase().includes(term) || (p.barcode || '').includes(term)
+  );
+}
+
 function getProductImageUrl(productId: string): string | null {
   const product = products.value.find((p: any) => p._id === productId);
   if (!product || !product.barcode) return null;
@@ -560,7 +573,8 @@ function addItem() {
     unitCost: 0,
     salePrice: 0,
     batchCode: '',
-    expiryDate: ''
+    expiryDate: '',
+    _search: ''
   });
 }
 function removeItem(idx: number) {
@@ -2302,5 +2316,9 @@ onUnmounted(() => {
     width: 100%;
     height: 120px;
   }
+}
+
+.product-search {
+  margin-bottom: 6px;
 }
 </style>

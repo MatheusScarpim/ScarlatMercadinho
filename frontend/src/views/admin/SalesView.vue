@@ -72,11 +72,7 @@
       </div>
     </div>
 
-    <div class="pager glass">
-      <button class="btn btn-ghost" :disabled="page === 1" @click="prevPage">Anterior</button>
-      <span class="page-info">Página {{ page }} de {{ pages }}</span>
-      <button class="btn btn-ghost" :disabled="page === pages" @click="nextPage">Próxima</button>
-    </div>
+    <Pagination :page="page" :pages="pages" @change="goToPage" />
   </div>
 </template>
 
@@ -84,6 +80,7 @@
 import { onMounted, ref } from 'vue';
 import api from '../../services/api';
 import { exportToCsv } from '../../utils/export';
+import Pagination from '../../components/Pagination.vue';
 
 const sales = ref<any[]>([]);
 const total = ref(0);
@@ -174,17 +171,9 @@ async function exportSales() {
   exportToCsv('vendas.csv', headers, rows);
 }
 
-function nextPage() {
-  if (page.value < pages.value) {
-    page.value += 1;
-    load();
-  }
-}
-function prevPage() {
-  if (page.value > 1) {
-    page.value -= 1;
-    load();
-  }
+function goToPage(n: number) {
+  page.value = n;
+  load();
 }
 
 onMounted(load);

@@ -81,6 +81,10 @@
             </svg>
             <span>Toque na tela para começar suas compras</span>
           </div>
+          <div v-if="whatsappQr" class="whatsapp-qr" @click.stop>
+            <img :src="whatsappQr" alt="QR code WhatsApp" />
+            <span>Fale conosco no WhatsApp</span>
+          </div>
         </div>
       </div>
     </div>
@@ -451,10 +455,25 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue';
+import { onMounted, onUnmounted, ref, computed, nextTick, watchEffect } from 'vue';
+import QRCode from 'qrcode';
 import { useKioskStore } from '../stores/kiosk';
 import api from '../services/api';
 import wl from '../config/whitelabel';
+
+const whatsappQr = ref('');
+
+// Regenera o QR sempre que o número do WhatsApp mudar (carrega async da API).
+watchEffect(() => {
+  const digits = (wl.whatsappNumber || '').replace(/\D/g, '');
+  if (!digits) {
+    whatsappQr.value = '';
+    return;
+  }
+  QRCode.toDataURL(`https://wa.me/${digits}`, { margin: 1, width: 200 })
+    .then((url) => { whatsappQr.value = url; })
+    .catch(() => { whatsappQr.value = ''; });
+});
 import HelpChat from '../components/HelpChat.vue';
 import VirtualKeyboard from '../components/VirtualKeyboard.vue';
 
@@ -2735,6 +2754,29 @@ button.link:hover {
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.whatsapp-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 12px;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+.whatsapp-qr img {
+  width: 120px;
+  height: 120px;
+  display: block;
+}
+.whatsapp-qr span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #128c7e;
 }
 
 .tap-message {

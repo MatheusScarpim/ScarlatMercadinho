@@ -447,12 +447,26 @@ function inferCategoryName(nameHint: string | null | undefined) {
   return null;
 }
 
-async function ensureCategory(name: string | null) {
-  const normalized = (name || 'OUTROS').toUpperCase();
-  const existing = await CategoryModel.findOne({ name: normalized }).lean();
+const FALLBACK_CATEGORY_NAME = 'SEM CATEGORIA';
+
+async function getFallbackCategory() {
+  const existing = await CategoryModel.findOne({ name: FALLBACK_CATEGORY_NAME }).lean();
   if (existing) return { name: existing.name, id: existing._id?.toString?.() ?? null };
-  const created = await CategoryModel.create({ name: normalized, active: true });
+  const created = await CategoryModel.create({ name: FALLBACK_CATEGORY_NAME, active: true });
   return { name: created.name, id: created._id?.toString?.() ?? null };
+}
+
+// NÃO cria categorias automaticamente a partir do nome inferido/Cosmos.
+// Se já existir uma categoria com esse nome (criada manualmente), usa ela;
+// caso contrário o produto entra no balde "SEM CATEGORIA" para o usuário
+// classificar manualmente depois.
+async function ensureCategory(name: string | null) {
+  const normalized = (name || '').toUpperCase().trim();
+  if (normalized) {
+    const existing = await CategoryModel.findOne({ name: normalized }).lean();
+    if (existing) return { name: existing.name, id: existing._id?.toString?.() ?? null };
+  }
+  return getFallbackCategory();
 }
 
 async function ensureProduct(params: {

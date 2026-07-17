@@ -41,6 +41,7 @@ export interface WhiteLabelSettings {
   };
   contactPhone: string;
   contactEmail: string;
+  whatsappNumber: string;
   kioskCpfRequired: boolean;
 }
 
@@ -70,6 +71,7 @@ const DEFAULT_WHITELABEL: WhiteLabelSettings = {
   },
   contactPhone: '',
   contactEmail: '',
+  whatsappNumber: '',
   kioskCpfRequired: true,
 };
 

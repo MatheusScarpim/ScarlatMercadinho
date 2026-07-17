@@ -71,11 +71,7 @@
       </table>
     </div>
 
-    <div class="pager glass">
-      <button class="btn btn-ghost" :disabled="page === 1" @click="prevPage">← Anterior</button>
-      <span class="page-info">Página {{ page }} de {{ pages }}</span>
-      <button class="btn btn-ghost" :disabled="page === pages" @click="nextPage">Próxima →</button>
-    </div>
+    <Pagination :page="page" :pages="pages" @change="goToPage" />
     <BaseModal :open="showExitModal" title="Nova saída de estoque" :onClose="closeExitModal">
       <form @submit.prevent="submitExit" class="exit-form">
         <div class="exit-field">
@@ -134,6 +130,7 @@ import { onMounted, reactive, ref } from 'vue';
 import api from '../../services/api';
 import { exportToCsv } from '../../utils/export';
 import BaseModal from '../../components/BaseModal.vue';
+import Pagination from '../../components/Pagination.vue';
 
 const movements = ref<any[]>([]);
 const type = ref('');
@@ -269,19 +266,11 @@ async function exportMovements() {
   exportToCsv('movimentacoes.csv', headers, rows);
 }
 
-function nextPage() {
-  if (page.value < pages.value) {
-    page.value += 1;
-    load();
-  }
+function goToPage(n: number) {
+  page.value = n;
+  load();
 }
 
-function prevPage() {
-  if (page.value > 1) {
-    page.value -= 1;
-    load();
-  }
-}
 </script>
 
 <style scoped>

@@ -333,11 +333,20 @@ async function fetchSerpPrices(productName: string) {
   }
 }
 
+const FALLBACK_CATEGORY_NAME = 'SEM CATEGORIA';
+
+// NÃO cria categorias automaticamente a partir do nome inferido/Cosmos.
+// Reutiliza uma categoria existente de mesmo nome (criada manualmente) ou
+// cai no balde "SEM CATEGORIA" para classificação manual posterior.
 async function ensureCategory(name: string | null) {
-  const normalized = (name || 'OUTROS').toUpperCase();
-  const existing = await CategoryModel.findOne({ name: normalized }).lean();
-  if (existing) return existing._id?.toString() ?? null;
-  const created = await CategoryModel.create({ name: normalized, active: true });
+  const normalized = (name || '').toUpperCase().trim();
+  if (normalized) {
+    const existing = await CategoryModel.findOne({ name: normalized }).lean();
+    if (existing) return existing._id?.toString() ?? null;
+  }
+  const fallback = await CategoryModel.findOne({ name: FALLBACK_CATEGORY_NAME }).lean();
+  if (fallback) return fallback._id?.toString() ?? null;
+  const created = await CategoryModel.create({ name: FALLBACK_CATEGORY_NAME, active: true });
   return created._id?.toString() ?? null;
 }
 

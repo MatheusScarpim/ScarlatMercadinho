@@ -51,6 +51,11 @@
             <label>E-mail de contato</label>
             <input v-model="wlForm.contactEmail" type="email" placeholder="Ex: contato@loja.com" />
           </div>
+          <div class="field">
+            <label>WhatsApp (com DDD)</label>
+            <input v-model="wlForm.whatsappNumber" type="text" placeholder="Ex: 5511999999999" />
+            <small class="field-hint">Usado no QR code do totem. Digite só números, com DDI/DDD.</small>
+          </div>
         </div>
 
         <!-- Upload Logo -->
@@ -259,6 +264,7 @@ function copyToForm(cfg: WhiteLabelConfig) {
   wlForm.launchDate = cfg.launchDate || '';
   wlForm.contactPhone = cfg.contactPhone;
   wlForm.contactEmail = cfg.contactEmail;
+  wlForm.whatsappNumber = cfg.whatsappNumber ?? '';
   wlForm.kioskCpfRequired = cfg.kioskCpfRequired ?? true;
   Object.assign(wlForm.theme, cfg.theme);
   Object.assign(wlForm.labels, cfg.labels);

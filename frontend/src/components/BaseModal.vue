@@ -1,5 +1,11 @@
 <template>
-  <div v-if="open" class="modal-backdrop" :class="{ 'modal-backdrop--top': top }" @click.self="onClose">
+  <div
+    v-if="open"
+    class="modal-backdrop"
+    :class="{ 'modal-backdrop--top': top }"
+    @pointerdown="onBackdropPointerDown"
+    @click="onBackdropClick"
+  >
     <div class="modal" :class="{ 'modal--small': small }">
       <header class="modal-header">
         <h3>{{ title }}</h3>
@@ -13,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean;
   title: string;
   onClose: () => void;
@@ -23,6 +29,22 @@ withDefaults(defineProps<{
   small: false,
   top: false
 });
+
+// Só fecha ao clicar no backdrop se o gesto TAMBÉM começou no backdrop.
+// Evita o fechamento acidental no mobile quando o dedo começa num campo/scroll
+// e o "click" termina fora (arrasto/scroll).
+let pointerDownOnBackdrop = false;
+
+function onBackdropPointerDown(event: PointerEvent) {
+  pointerDownOnBackdrop = event.target === event.currentTarget;
+}
+
+function onBackdropClick(event: MouseEvent) {
+  if (event.target === event.currentTarget && pointerDownOnBackdrop) {
+    props.onClose();
+  }
+  pointerDownOnBackdrop = false;
+}
 </script>
 
 <style scoped>
