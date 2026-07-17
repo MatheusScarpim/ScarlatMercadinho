@@ -9,7 +9,12 @@ const api = axios.create({
 // Interceptor de requisição - adiciona o token
 api.interceptors.request.use((config) => {
   const auth = useAuthStore();
-  if (auth.token) {
+  const currentPath = router.currentRoute.value.path;
+  const isAdminArea = currentPath.startsWith('/admin');
+
+  // O token de admin só é enviado dentro da área administrativa.
+  // No quiosque um token de admin expirado causaria 401 nas rotas kioskOrAuth.
+  if (auth.token && isAdminArea) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${auth.token}`;
   }
@@ -28,9 +33,12 @@ api.interceptors.response.use(
     // Se receber 401 (Unauthorized), significa que o token é inválido/expirado
     if (error.response?.status === 401) {
       const auth = useAuthStore();
+      const currentPath = router.currentRoute.value.path;
+      const isAdminArea = currentPath.startsWith('/admin');
 
-      // Só faz logout se estiver autenticado (evita loops em login)
-      if (auth.token) {
+      // Só faz logout/redirect dentro da área administrativa.
+      // No quiosque (/kiosk, /calculadora) um 401 nunca deve levar à tela de login.
+      if (auth.token && isAdminArea) {
         console.warn('[AUTH] Token inválido ou expirado. Fazendo logout...');
         auth.logout();
         router.push('/admin/login');

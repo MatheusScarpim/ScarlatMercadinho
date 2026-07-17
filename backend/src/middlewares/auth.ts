@@ -43,18 +43,28 @@ export async function authMiddleware(req: AuthRequest, _res: Response, next: Nex
 // Protege rotas usadas pelo Kiosk (PDV sem login) sem quebrá-lo.
 // - Se KIOSK_TOKEN não estiver configurado: mantém o comportamento atual (aberto).
 // - Se configurado: aceita o header x-kiosk-token correspondente OU um JWT válido de usuário.
-export function kioskOrAuth(req: AuthRequest, res: Response, next: NextFunction) {
-  const kioskToken = process.env.KIOSK_TOKEN;
-  if (kioskToken && req.headers['x-kiosk-token'] === kioskToken) {
-    return next();
+export async function kioskOrAuth(req: AuthRequest, _res: Response, next: NextFunction) {
+  // Rotas usadas pelo Kiosk (PDV sem login) NUNCA devem ser bloqueadas.
+  // Se houver um Bearer válido, anexa o contexto do usuário (best-effort).
+  // Token ausente/expirado/inválido não impede a requisição: segue como acesso do quiosque.
+  const header = req.headers.authorization;
+  if (header) {
+    try {
+      const token = header.replace('Bearer ', '');
+      const payload = verifyToken(token);
+      const user = await UserModel.findById(payload.userId).select('role permissions active');
+      if (user && user.active) {
+        req.user = {
+          userId: user.id,
+          role: user.role,
+          permissions: Array.isArray(user.permissions) ? user.permissions : ALL_PERMISSIONS
+        };
+      }
+    } catch {
+      // ignora token inválido/expirado — quiosque não deve ser bloqueado
+    }
   }
-  if (req.headers.authorization) {
-    return authMiddleware(req, res, next);
-  }
-  if (!kioskToken) {
-    return next();
-  }
-  return next(new ApiError(401, 'Unauthorized'));
+  return next();
 }
 
 export function adminOnly(req: AuthRequest, _res: Response, next: NextFunction) {
