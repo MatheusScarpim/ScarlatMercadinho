@@ -229,10 +229,14 @@ export async function createPurchase(data: {
     const product = await ProductModel.findById(productId);
     if (product) {
       product.costPrice = item.unitCost;
-      const saleValue = Number.isFinite(normalizedSale)
-        ? (normalizedSale as number)
-        : Number((item.unitCost * multiplier).toFixed(2));
-      product.salePrice = saleValue;
+      if (Number.isFinite(normalizedSale)) {
+        // preço de venda informado explicitamente na nota/compra
+        product.salePrice = normalizedSale as number;
+      } else if (!Number.isFinite(product.salePrice) || Number(product.salePrice) <= 0) {
+        // produto ainda sem preço de venda definido: aplica a margem sobre o custo
+        product.salePrice = Number((item.unitCost * multiplier).toFixed(2));
+      }
+      // caso contrário mantém o preço de venda já definido manualmente
       if (item.ncm !== undefined) product.ncm = item.ncm;
       if (item.cest !== undefined) product.cest = item.cest;
       if (item.cfop !== undefined) product.cfop = item.cfop;

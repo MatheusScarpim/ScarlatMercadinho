@@ -48,9 +48,9 @@ export async function updateProduct(req: Request, res: Response) {
 }
 
 export async function deleteProduct(req: Request, res: Response) {
-  const product = await ProductModel.findByIdAndUpdate(req.params.id, { active: false }, { new: true });
+  const product = await ProductModel.findByIdAndDelete(req.params.id);
   if (!product) return res.status(404).json({ message: 'Not found' });
-  res.json(product);
+  res.json({ success: true, id: req.params.id });
 }
 
 export async function findByBarcode(req: Request, res: Response) {

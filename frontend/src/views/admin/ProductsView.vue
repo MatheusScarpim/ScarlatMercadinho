@@ -28,9 +28,32 @@
           {{ loc.name }} ({{ loc.code }})
         </option>
       </select>
+      <div class="view-toggle">
+        <button
+          :class="['view-btn', { active: viewMode === 'cards' }]"
+          @click="setViewMode('cards')"
+          title="Ver em cartões"
+        >
+          <svg viewBox="0 0 20 20" fill="none" class="view-icon">
+            <rect x="3" y="3" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5" />
+            <rect x="11" y="3" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5" />
+            <rect x="3" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5" />
+            <rect x="11" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </button>
+        <button
+          :class="['view-btn', { active: viewMode === 'list' }]"
+          @click="setViewMode('list')"
+          title="Ver em lista"
+        >
+          <svg viewBox="0 0 20 20" fill="none" class="view-icon">
+            <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
     </div>
 
-    <div class="products-grid-container">
+    <div class="products-grid-container" v-if="viewMode === 'cards'">
       <div class="products-grid">
       <div class="product-card glass" v-for="p in products" :key="p._id" :class="{ inactive: !p.active }">
         <div class="product-image">
@@ -116,10 +139,69 @@
               </svg>
               Saída
             </button>
+            <button class="btn btn-ghost product-delete" @click="removeProduct(p)" title="Excluir produto">
+              <svg viewBox="0 0 20 20" fill="none" class="action-icon">
+                <path d="M4 6h12M8.5 6V4.5h3V6M6 6l.7 9.5a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L14 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Excluir
+            </button>
           </div>
         </div>
       </div>
     </div>
+    </div>
+
+    <div class="products-list-container glass" v-else>
+      <table class="products-list">
+        <thead>
+          <tr>
+            <th>Produto</th>
+            <th>Código</th>
+            <th>Categoria</th>
+            <th class="num">Custo</th>
+            <th class="num">Venda</th>
+            <th class="num">Estoque</th>
+            <th>Status</th>
+            <th class="actions-col">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="p in products" :key="p._id" :class="{ inactive: !p.active }">
+            <td class="name-cell">
+              <div class="row-thumb">
+                <img v-if="getProductImage(p)" :src="getProductImage(p)!" :alt="p.name"
+                  @error="(e) => (e.target as HTMLImageElement).style.display = 'none'" />
+                <span v-else class="row-thumb-placeholder">📦</span>
+              </div>
+              <span class="row-name">{{ p.name }}</span>
+            </td>
+            <td class="mono">{{ p.barcode }}</td>
+            <td>
+              <select class="quick-cat-select" :value="categoryIdOf(p)" @change="quickUpdateCategory(p, $event)">
+                <option value="">Sem categoria</option>
+                <option v-for="c in categoryOptions" :key="c._id" :value="c._id">{{ c.label }}</option>
+              </select>
+            </td>
+            <td class="num cost">R$ {{ p.costPrice.toFixed(2) }}</td>
+            <td class="num sale">R$ {{ p.salePrice.toFixed(2) }}</td>
+            <td class="num" :class="{ 'stock-low': totalStock(p) <= p.minimumStock }">{{ totalStock(p) }}</td>
+            <td>
+              <span :class="p.active ? 'badge active' : 'badge inactive'">{{ p.active ? 'Ativo' : 'Inativo' }}</span>
+            </td>
+            <td class="actions-col">
+              <div class="row-actions">
+                <button class="btn btn-ghost btn-sm" @click="startEdit(p)" title="Editar">Editar</button>
+                <button :class="['btn', 'btn-ghost', 'btn-sm', !p.active ? 'activate' : 'deactivate']" @click="toggleActive(p)">
+                  {{ p.active ? 'Inativar' : 'Ativar' }}
+                </button>
+                <button class="btn btn-ghost btn-sm" @click="openStockModal(p)" title="Ver estoque por local">Estoque</button>
+                <button class="btn btn-ghost btn-sm product-exit" @click="openStockModal(p, true)" title="Dar baixa no estoque">Saída</button>
+                <button class="btn btn-ghost btn-sm product-delete" @click="removeProduct(p)" title="Excluir produto">Excluir</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <Pagination :page="page" :pages="pages" @change="goToPage" />
@@ -578,6 +660,13 @@ const locationMap = computed<Record<string, any>>(() =>
 const gtinLookups = ref<any[]>([]);
 const stockSummary = ref<Record<string, Array<{ location: string; quantity: number }>>>({});
 const search = ref('');
+const viewMode = ref<'cards' | 'list'>(
+  (localStorage.getItem('products-view-mode') as 'cards' | 'list') || 'cards'
+);
+function setViewMode(mode: 'cards' | 'list') {
+  viewMode.value = mode;
+  localStorage.setItem('products-view-mode', mode);
+}
 const filterCategory = ref('');
 const filterActive = ref('');
 const filterLocation = ref('');
@@ -737,6 +826,16 @@ async function save() {
 async function toggleActive(product: any) {
   await api.put(`/products/${product._id}`, { active: !product.active });
   await load();
+}
+
+async function removeProduct(product: any) {
+  if (!confirm(`Excluir o produto "${product.name}"? Esta ação não pode ser desfeita.`)) return;
+  try {
+    await api.delete(`/products/${product._id}`);
+    await load();
+  } catch (err) {
+    alert('Não foi possível excluir o produto. Tente novamente.');
+  }
 }
 
 onMounted(() => {
@@ -1215,6 +1314,212 @@ function goToPage(n: number) {
   display: none;
 }
 
+/* View toggle */
+.view-toggle {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.view-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-btn:hover {
+  color: var(--text);
+  background: rgba(91, 231, 196, 0.08);
+}
+
+.view-btn.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+  color: #0c1829;
+}
+
+.view-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Products List (linha) */
+.products-list-container {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+  border-radius: var(--radius);
+  padding: 0;
+}
+
+.products-list-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.products-list-container::-webkit-scrollbar-thumb {
+  background: rgba(91, 231, 196, 0.4);
+  border-radius: 4px;
+}
+
+.products-list {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.products-list thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(91, 231, 196, 0.1);
+  padding: 12px;
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+}
+
+.products-list td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.products-list tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.products-list tbody tr:hover {
+  background: rgba(91, 231, 196, 0.06);
+}
+
+.products-list .quick-cat-select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.products-list tr.inactive {
+  opacity: 0.55;
+}
+
+.products-list .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.products-list .mono {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.products-list .cost {
+  color: var(--muted);
+}
+
+.products-list .sale {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.products-list .stock-low {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 600;
+  min-width: 220px;
+}
+
+.row-thumb {
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+
+.row-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.row-thumb-placeholder {
+  font-size: 34px;
+  opacity: 0.4;
+}
+
+.row-name {
+  line-height: 1.3;
+}
+
+.products-list .quick-cat-select {
+  max-width: 170px;
+}
+
+.actions-col {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.row-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.row-actions .product-exit {
+  color: #f87171;
+}
+
+.row-actions .product-delete {
+  color: #ef4444;
+}
+
+.row-actions .product-delete:hover {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .products-list-container {
+    overflow-x: auto;
+  }
+  .products-list {
+    min-width: 760px;
+  }
+}
+
 /* Products Grid */
 
 .products-grid-container {
@@ -1434,10 +1739,22 @@ function goToPage(n: number) {
 }
 
 .product-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
+}
+
+.product-actions .product-delete {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.2));
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.product-actions .product-delete:hover {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
 }
 
 .product-actions .view-stock {
@@ -1452,7 +1769,6 @@ function goToPage(n: number) {
 }
 
 .product-actions .btn {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
