@@ -6,7 +6,7 @@
         <p class="eyebrow">{{ wl.labels.loginEyebrow }}</p>
         <h2>Entrar</h2>
       </div>
-      <form @submit.prevent="submit">
+      <form @submit.prevent="submit" @input="resetIdleTimer" @keydown="resetIdleTimer">
         <label>Email</label>
         <input v-model="email" type="email" required />
         <label>Senha</label>
@@ -19,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import wl, { resolveAssetUrl } from '../config/whitelabel';
@@ -30,12 +30,35 @@ const error = ref('');
 const auth = useAuthStore();
 const router = useRouter();
 
+// Se o tablet ficar mais de 30s parado na tela de login, volta para o quiosque.
+const IDLE_TIMEOUT = 30000;
+let idleTimer: number | null = null;
+
+function goToKiosk() {
+  router.push('/kiosk');
+}
+
+function resetIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = window.setTimeout(goToKiosk, IDLE_TIMEOUT);
+}
+
+onMounted(() => {
+  resetIdleTimer();
+});
+
+onBeforeUnmount(() => {
+  if (idleTimer) clearTimeout(idleTimer);
+});
+
 async function submit() {
+  if (idleTimer) clearTimeout(idleTimer);
   try {
     await auth.login({ email: email.value, password: password.value });
     router.push('/admin/products');
   } catch (err: any) {
     error.value = err?.response?.data?.message || 'Falha no login';
+    resetIdleTimer();
   }
 }
 </script>
