@@ -1,3 +1,4 @@
+<!-- Este é o repositório do sistema ScarlatMercadinho -->
 # Asyncx Market – Autoatendimento e Painel Admin
 
 Sistema completo de autoatendimento (quiosque) e painel administrativo para gestão de estoque, compras, produtos e vendas.
