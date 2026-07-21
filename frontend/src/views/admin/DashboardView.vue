@@ -6,12 +6,23 @@
         <h2>Dashboard</h2>
       </div>
       <div class="filters glass">
-        <label>Período</label>
-        <select v-model="period" @change="load">
-          <option value="7">Últimos 7 dias</option>
-          <option value="30">Últimos 30 dias</option>
-          <option value="90">Últimos 90 dias</option>
-        </select>
+        <div class="filter-group">
+          <label>Loja</label>
+          <select v-model="location" @change="load">
+            <option value="">Todas as lojas</option>
+            <option v-for="loc in locations" :key="loc._id" :value="loc.code">
+              {{ loc.name }}
+            </option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Período</label>
+          <select v-model="period" @change="load">
+            <option value="7">Últimos 7 dias</option>
+            <option value="30">Últimos 30 dias</option>
+            <option value="90">Últimos 90 dias</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -105,6 +116,8 @@ import {
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement);
 
 const period = ref('7');
+const location = ref('');
+const locations = ref<Array<{ _id: string; name: string; code: string }>>([]);
 const metrics = ref({
   revenue: 0,
   salesCount: 0,
@@ -175,6 +188,7 @@ async function load() {
   const from = new Date();
   from.setDate(from.getDate() - days);
   params.from = from.toISOString();
+  if (location.value) params.location = location.value;
 
   const { data } = await api.get('/metrics', { params });
 
@@ -203,7 +217,19 @@ async function load() {
   };
 }
 
-onMounted(load);
+async function loadLocations() {
+  try {
+    const { data } = await api.get('/locations');
+    locations.value = (data || []).filter((loc: any) => loc.active);
+  } catch {
+    locations.value = [];
+  }
+}
+
+onMounted(async () => {
+  await loadLocations();
+  await load();
+});
 
 function qtyBarWidth(quantity: number): string {
   const max = topProducts.value.reduce((m, p) => Math.max(m, p.quantity), 0);
@@ -265,9 +291,14 @@ function paymentLabel(pay: string) {
 .filters {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 16px;
   padding: 8px 10px;
   border-radius: 10px;
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .cards {
   display: grid;
