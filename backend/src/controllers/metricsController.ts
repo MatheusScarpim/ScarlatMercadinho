@@ -3,10 +3,12 @@ import { SaleModel } from '../models/Sale';
 import { SaleItemModel } from '../models/SaleItem';
 
 export async function getOverview(req: Request, res: Response) {
-  const { from, to, status } = req.query;
+  const { from, to, status, location } = req.query;
   const match: any = {};
   const saleStatus = typeof status === 'string' ? status.toUpperCase() : 'COMPLETED';
   match.status = saleStatus;
+  const locationFilter = typeof location === 'string' && location.trim() ? location.trim() : null;
+  if (locationFilter) match.location = locationFilter;
   if (from || to) {
     match.createdAt = {};
     if (from) match.createdAt.$gte = new Date(from as string);
@@ -42,6 +44,7 @@ export async function getOverview(req: Request, res: Response) {
   ]);
 
   const productMatch: any = { 'sale.status': saleStatus };
+  if (locationFilter) productMatch['sale.location'] = locationFilter;
   if (from || to) {
     productMatch['sale.createdAt'] = {};
     if (from) productMatch['sale.createdAt'].$gte = new Date(from as string);

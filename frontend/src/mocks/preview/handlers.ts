@@ -1,5 +1,6 @@
 // @mathai-preview-scaffold-v4
 import { http, HttpResponse } from 'msw';
+import { metricsHandlers } from './metrics';
 
 /**
  * Handlers MSW pro modo preview.
@@ -50,6 +51,9 @@ export const handlers = [
   http.get('*/api/user', () => HttpResponse.json(PREVIEW_USER)),
   http.get('*/profile', () => HttpResponse.json(PREVIEW_USER)),
   http.get('*/api/profile', () => HttpResponse.json(PREVIEW_USER)),
+
+  // ─── Dashboard (métricas + lojas/unidades) ──────────────
+  ...metricsHandlers,
 
   // ─── Catch-all final ────────────────────────────────────
   // Qualquer GET /api/* ou /api/v1/* desconhecido devolve lista/objeto vazio
