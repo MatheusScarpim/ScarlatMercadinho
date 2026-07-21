@@ -4,6 +4,6 @@ import { authMiddleware, requirePermission } from '../middlewares/auth';
 
 const router = Router();
 
-router.get('/', authMiddleware, requirePermission('DASHBOARD'), getOverview);
+router.get('/:location_id?', authMiddleware, requirePermission('DASHBOARD'), getOverview);
 
 export default router;

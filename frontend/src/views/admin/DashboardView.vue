@@ -6,6 +6,13 @@
         <h2>Dashboard</h2>
       </div>
       <div class="filters glass">
+        <label>Loja</label>
+        <select v-model="locationId" @change="load">
+          <option value="">Todas as lojas</option>
+          <option v-for="loc in locations" :key="loc._id" :value="loc._id">
+            {{ loc.name }}
+          </option>
+        </select>
         <label>Período</label>
         <select v-model="period" @change="load">
           <option value="7">Últimos 7 dias</option>
@@ -105,6 +112,8 @@ import {
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement);
 
 const period = ref('7');
+const locationId = ref('');
+const locations = ref<Array<{ _id: string; name: string }>>([]);
 const metrics = ref({
   revenue: 0,
   salesCount: 0,
@@ -175,6 +184,7 @@ async function load() {
   const from = new Date();
   from.setDate(from.getDate() - days);
   params.from = from.toISOString();
+  if (locationId.value) params.location_id = locationId.value;
 
   const { data } = await api.get('/metrics', { params });
 
@@ -203,7 +213,20 @@ async function load() {
   };
 }
 
-onMounted(load);
+async function loadLocations() {
+  try {
+    const { data } = await api.get('/locations');
+    locations.value = Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Erro ao carregar lojas:', error);
+    locations.value = [];
+  }
+}
+
+onMounted(async () => {
+  await loadLocations();
+  await load();
+});
 
 function qtyBarWidth(quantity: number): string {
   const max = topProducts.value.reduce((m, p) => Math.max(m, p.quantity), 0);

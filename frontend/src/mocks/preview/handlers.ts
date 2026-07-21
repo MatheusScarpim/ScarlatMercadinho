@@ -1,5 +1,7 @@
 // @mathai-preview-scaffold-v4
 import { http, HttpResponse } from 'msw';
+import { metricsHandlers } from './metrics';
+import { locationsHandlers } from './locations';
 
 /**
  * Handlers MSW pro modo preview.
@@ -16,6 +18,10 @@ const PREVIEW_USER = {
 const PREVIEW_TOKEN = 'preview-fake-token';
 
 export const handlers = [
+  // ─── Recursos específicos (antes do catch-all) ──────────
+  ...metricsHandlers,
+  ...locationsHandlers,
+
   // ─── Auth status / config (apps com auth-toggle) ────────
   // Estes handlers fazem o router guard pular o redirect pra /login.
   http.get('*/auth/status', () => HttpResponse.json({ enabled: false })),
