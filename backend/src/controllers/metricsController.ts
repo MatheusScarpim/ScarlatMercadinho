@@ -1,12 +1,27 @@
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import { SaleModel } from '../models/Sale';
 import { SaleItemModel } from '../models/SaleItem';
+import { LocationModel } from '../models/Location';
+
+function getStringParam(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
 
 export async function getOverview(req: Request, res: Response) {
   const { from, to, status } = req.query;
+  const locationId = getStringParam(req.query.location_id) || getStringParam(req.params.location_id);
   const match: any = {};
   const saleStatus = typeof status === 'string' ? status.toUpperCase() : 'COMPLETED';
   match.status = saleStatus;
+  if (locationId) {
+    let locationFilter = locationId;
+    if (Types.ObjectId.isValid(locationId)) {
+      const location = await LocationModel.findById(locationId).select('code').lean();
+      locationFilter = location?.code || locationId;
+    }
+    match.location = locationFilter;
+  }
   if (from || to) {
     match.createdAt = {};
     if (from) match.createdAt.$gte = new Date(from as string);
@@ -42,6 +57,7 @@ export async function getOverview(req: Request, res: Response) {
   ]);
 
   const productMatch: any = { 'sale.status': saleStatus };
+  if (locationId) productMatch['sale.location'] = match.location;
   if (from || to) {
     productMatch['sale.createdAt'] = {};
     if (from) productMatch['sale.createdAt'].$gte = new Date(from as string);

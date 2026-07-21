@@ -51,7 +51,7 @@ Seed inicial: admin@example.com / admin123
 - Compras (entries): `POST /purchases` (gera estoque), `GET /purchases`
 - Vendas: carrinho/venda `POST /sales` + itens/complete/cancel
 - Movimentações: `GET /stock-movements`, `POST /stock-movements` (ajustes)
-- Métricas: `GET /metrics?from=...&to=...&status=COMPLETED`
+- Métricas: `GET /metrics?from=...&to=...&status=COMPLETED&location_id=...` ou `GET /metrics/:location_id?from=...&to=...&status=COMPLETED`
 - Notificações: `GET /notifications`, `/unread-count`, `PUT /mark-all-read`, `PUT /:id/read`
 - Pagamentos internos (Mercado Pago): `POST /payments/sales/:saleId` (method: `PIX`, `CREDIT_CARD`, `DEBIT_CARD`), `GET /payments/status/:paymentId`
 
