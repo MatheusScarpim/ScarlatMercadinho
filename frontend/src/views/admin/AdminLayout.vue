@@ -17,7 +17,7 @@
                         <nav>
         <div class="nav-section" v-if="showOverview">
           <p class="nav-label">Visão Geral</p>
-          <RouterLink v-if="can('DASHBOARD')" to="/admin/dashboard" class="nav-item">
+          <RouterLink v-if="can('DASHBOARD')" to="/admin/dashboard" class="nav-item" aria-label="Dashboard">
             <span class="icon">📊</span>
             <span>Dashboard</span>
           </RouterLink>
@@ -25,7 +25,7 @@
 
         <div class="nav-section" v-if="showInventory">
           <p class="nav-label">Inventário</p>
-          <RouterLink v-if="can('PRODUCTS')" to="/admin/products" class="nav-item">
+          <RouterLink v-if="can('PRODUCTS')" to="/admin/products" class="nav-item" aria-label="Produtos">
             <span class="icon">📦</span>
             <span>Produtos</span>
           </RouterLink>
@@ -33,6 +33,7 @@
             v-if="can('EXPIRING_PRODUCTS')"
             to="/admin/expiring-products"
             class="nav-item expiring-link"
+            aria-label="Vencimentos"
           >
             <span class="icon">⏳</span>
             <span class="link-content">
@@ -40,19 +41,19 @@
               <span v-if="criticalBatchCount > 0" class="critical-badge">{{ criticalBatchCount }}</span>
             </span>
           </RouterLink>
-          <RouterLink v-if="can('PRODUCTS')" to="/admin/price-review" class="nav-item">
+          <RouterLink v-if="can('PRODUCTS')" to="/admin/price-review" class="nav-item" aria-label="Revisão de Preços">
             <span class="icon">💲</span>
             <span>Revisão de Preços</span>
           </RouterLink>
-          <RouterLink v-if="can('PRODUCTS')" to="/admin/not-found-products" class="nav-item">
+          <RouterLink v-if="can('PRODUCTS')" to="/admin/not-found-products" class="nav-item" aria-label="Não Encontrados">
             <span class="icon">❓</span>
             <span>Não Encontrados</span>
           </RouterLink>
-          <RouterLink v-if="can('CATEGORIES')" to="/admin/categories" class="nav-item">
+          <RouterLink v-if="can('CATEGORIES')" to="/admin/categories" class="nav-item" aria-label="Categorias">
             <span class="icon">🏷️</span>
             <span>Categorias</span>
           </RouterLink>
-          <RouterLink v-if="can('STOCK_MOVEMENTS')" to="/admin/stock-movements" class="nav-item">
+          <RouterLink v-if="can('STOCK_MOVEMENTS')" to="/admin/stock-movements" class="nav-item" aria-label="Movimentações">
             <span class="icon">📦</span>
             <span>Movimentações</span>
           </RouterLink>
@@ -60,19 +61,19 @@
 
         <div class="nav-section" v-if="showOperations">
           <p class="nav-label">Operações</p>
-          <RouterLink v-if="can('PURCHASES')" to="/admin/purchases" class="nav-item">
+          <RouterLink v-if="can('PURCHASES')" to="/admin/purchases" class="nav-item" aria-label="Compras">
             <span class="icon">🧾</span>
             <span>Compras</span>
           </RouterLink>
-          <RouterLink v-if="can('SALES')" to="/admin/sales" class="nav-item">
+          <RouterLink v-if="can('SALES')" to="/admin/sales" class="nav-item" aria-label="Vendas">
             <span class="icon">🧾</span>
             <span>Vendas</span>
           </RouterLink>
-          <RouterLink v-if="can('NFC_E')" to="/admin/nfce" class="nav-item">
+          <RouterLink v-if="can('NFC_E')" to="/admin/nfce" class="nav-item" aria-label="NFC-e">
             <span class="icon">🧾</span>
             <span>NFC-e</span>
           </RouterLink>
-          <RouterLink v-if="can('FISCAL')" to="/admin/fiscal" class="nav-item">
+          <RouterLink v-if="can('FISCAL')" to="/admin/fiscal" class="nav-item" aria-label="Fiscal">
             <span class="icon">🧾</span>
             <span>Fiscal</span>
           </RouterLink>
@@ -80,11 +81,11 @@
 
         <div class="nav-section" v-if="showCadastros">
           <p class="nav-label">Cadastros</p>
-          <RouterLink v-if="can('SUPPLIERS')" to="/admin/suppliers" class="nav-item">
+          <RouterLink v-if="can('SUPPLIERS')" to="/admin/suppliers" class="nav-item" aria-label="Fornecedores">
             <span class="icon">🚚</span>
             <span>Fornecedores</span>
           </RouterLink>
-          <RouterLink v-if="can('LOCATIONS')" to="/admin/locations" class="nav-item">
+          <RouterLink v-if="can('LOCATIONS')" to="/admin/locations" class="nav-item" aria-label="Locais">
             <span class="icon">📍</span>
             <span>Locais</span>
           </RouterLink>
@@ -92,11 +93,11 @@
 
         <div class="nav-section" v-if="showSystem">
           <p class="nav-label">Sistema</p>
-          <RouterLink v-if="can('SETTINGS')" to="/admin/settings" class="nav-item">
+          <RouterLink v-if="can('SETTINGS')" to="/admin/settings" class="nav-item" aria-label="Configurações">
             <span class="icon">⚙️</span>
             <span>Configurações</span>
           </RouterLink>
-          <RouterLink v-if="isAdmin" to="/admin/users" class="nav-item">
+          <RouterLink v-if="isAdmin" to="/admin/users" class="nav-item" aria-label="Usuários">
             <span class="icon">👥</span>
             <span>Usuários</span>
           </RouterLink>
@@ -104,7 +105,7 @@
 
         <div class="nav-section">
           <p class="nav-label">Atendimento</p>
-          <RouterLink to="/admin/chat" class="nav-item">
+          <RouterLink to="/admin/chat" class="nav-item" aria-label="Chat">
             <span class="icon">💬</span>
             <span>Chat</span>
           </RouterLink>
@@ -112,7 +113,7 @@
       </nav>
 
 
-      <button class="logout" @click="logout">
+      <button class="logout" @click="logout" aria-label="Sair">
         <span class="icon">🚪</span>
         <span>Sair</span>
       </button>
@@ -124,11 +125,11 @@
           <h2>{{ wl.labels.adminTitle }}</h2>
         </div>
         <div class="header-actions">
-          <button class="btn btn-ghost notify" @click="toggleNotifications">
+          <button class="btn btn-ghost notify" @click="toggleNotifications" aria-label="Notificações">
             Notificações
             <span v-if="unread" class="badge">{{ unread }}</span>
           </button>
-          <div class="user" v-if="user">
+          <div class="user" v-if="user" aria-label="Usuário: {{ user.name }}">
             <span>{{ user.name }}</span>
           </div>
         </div>
@@ -143,13 +144,13 @@
             <strong>Notificações</strong>
           </div>
           <div class="notif-actions">
-            <button class="btn btn-ghost btn-sm" @click="notifications.markAllRead()" title="Marcar todas como lidas">
+            <button class="btn btn-ghost btn-sm" @click="notifications.markAllRead()" title="Marcar todas como lidas" aria-label="Marcar todas como lidas">
               <span class="action-icon">✓</span>
             </button>
-            <button class="btn btn-ghost btn-sm btn-danger" @click="clearAllNotifications" title="Limpar todas">
+            <button class="btn btn-ghost btn-sm btn-danger" @click="clearAllNotifications" title="Limpar todas" aria-label="Limpar todas">
               <span class="action-icon">🗑️</span>
             </button>
-            <button class="btn-close" @click="showNotifications = false" title="Fechar">×</button>
+            <button class="btn-close" @click="showNotifications = false" title="Fechar" aria-label="Fechar painel de notificações">×</button>
           </div>
         </div>
 

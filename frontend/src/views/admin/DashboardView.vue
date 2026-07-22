@@ -3,7 +3,7 @@
     <div class="header-row">
       <div>
         <p class="eyebrow">visão geral</p>
-        <h2>Dashboard</h2>
+        <h2 class="dashboard-title">Dashboard</h2>
       </div>
       <div class="filters glass">
         <label>Período</label>
@@ -362,6 +362,12 @@ td {
   letter-spacing: 2px;
   color: var(--primary);
   margin: 0 0 4px 0;
+}
+.dashboard-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
 }
 @media (max-width: 900px) {
   .grid {
