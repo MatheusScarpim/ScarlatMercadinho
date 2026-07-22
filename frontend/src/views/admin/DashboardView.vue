@@ -1,3 +1,4 @@
+<!-- Versao 1.0.0 -->
 <template>
   <div class="dashboard">
     <div class="header-row">
