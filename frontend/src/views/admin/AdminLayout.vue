@@ -136,6 +136,9 @@
       <section class="content glass">
         <router-view />
       </section>
+      <footer class="footer-bottom">
+        © {{ year }} {{ wl.brandName }}
+      </footer>
       <div v-if="showNotifications" class="notif-panel glass">
         <div class="notif-header">
           <div class="notif-header-title">
@@ -204,6 +207,8 @@ const showNotifications = ref(false);
 
 const criticalBatchCount = ref(0);
 let criticalInterval: number | null = null;
+
+const year = new Date().getFullYear();
 
 const isAdmin = computed(() => auth.user?.role === 'ADMIN');
 const can = (permission: PermissionKey) => auth.hasPermission(permission);
@@ -594,6 +599,17 @@ main {
   padding-bottom: 8px;
 }
   
+  .footer-bottom {
+    margin-top: 8px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    max-width: 1600px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
   /* Logout Button */
   .logout {
     background: linear-gradient(135deg, #ef4444, #dc2626);
