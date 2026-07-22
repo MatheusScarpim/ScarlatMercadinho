@@ -84,6 +84,8 @@
       </table>
       <p v-else class="muted empty">Nenhuma venda no período selecionado.</p>
     </div>
+
+    <footer class="dashboard-footer">© {{ currentYear }}</footer>
   </div>
 </template>
 
@@ -104,6 +106,7 @@ import {
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement);
 
+const currentYear = new Date().getFullYear();
 const period = ref('7');
 const metrics = ref({
   revenue: 0,
@@ -421,5 +424,12 @@ td {
 .empty {
   padding: 16px 0;
   text-align: center;
+}
+.dashboard-footer {
+  flex-shrink: 0;
+  text-align: center;
+  padding: 12px 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 </style>
