@@ -5,6 +5,7 @@ import router from './router';
 import './assets/base.css';
 import { applyTheme, updateConfig } from './config/whitelabel';
 import { fetchWhitelabel } from './services/settings';
+import { greet } from './utils/greet';
 
 applyTheme();
 
@@ -24,3 +25,5 @@ app.mount('#app');
 fetchWhitelabel()
   .then((cfg) => updateConfig(cfg))
   .catch(() => { /* usa defaults */ });
+
+console.log(greet('World'));
