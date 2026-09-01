@@ -40,7 +40,8 @@ const adminChildren: RouteRecordRaw[] = [
   { path: 'price-review', component: PriceReviewView, meta: { permission: 'PRODUCTS' as PermissionKey } },
   { path: 'not-found-products', component: NotFoundProductsView, meta: { permission: 'PRODUCTS' as PermissionKey } },
   { path: 'users', component: UsersView, meta: { requiresAdmin: true } },
-  { path: 'chat', component: ChatView, meta: { requiresAuth: true } }
+  { path: 'chat', component: ChatView, meta: { requiresAuth: true } },
+  { path: 'calculadora', component: CalculadoraView, meta: { permission: 'CALCULADORA' as PermissionKey, title: 'Calculadora', icon: 'calculator' } }
 ];
 
 const router = createRouter({

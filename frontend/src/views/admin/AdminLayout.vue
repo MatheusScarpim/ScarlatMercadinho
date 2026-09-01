@@ -108,6 +108,10 @@
             <span class="icon">💬</span>
             <span>Chat</span>
           </RouterLink>
+          <RouterLink v-if="can('CALCULADORA')" to="/admin/calculadora" class="nav-item">
+            <span class="icon">🧮</span>
+            <span>Calculadora</span>
+          </RouterLink>
         </div>
       </nav>
 
