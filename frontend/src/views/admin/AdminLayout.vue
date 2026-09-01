@@ -108,6 +108,10 @@
             <span class="icon">💬</span>
             <span>Chat</span>
           </RouterLink>
+          <RouterLink to="/calculadora" class="nav-item">
+            <span class="icon">🧮</span>
+            <span>Calculadora</span>
+          </RouterLink>
         </div>
       </nav>
 
