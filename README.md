@@ -94,3 +94,5 @@ Abra `http://localhost:5173`.
 - `npm run dev` (backend ou frontend, em seus diretórios)
 - `npm run build` (frontend) / `npm run build` (backend transpila TS)
 
+Bem-vindo!
+
