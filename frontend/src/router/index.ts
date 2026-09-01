@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import KioskView from '../views/KioskView.vue';
 import LoginView from '../views/LoginView.vue';
-import CalculadoraView from '../views/CalculadoraView.vue';
+import CalculatorView from '../views/CalculatorView.vue';
 import AdminLayout from '../views/admin/AdminLayout.vue';
 import ProductsView from '../views/admin/ProductsView.vue';
 import UnitsView from '../views/admin/UnitsView.vue';
@@ -47,7 +47,8 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/kiosk', component: KioskView },
-    { path: '/calculadora', component: CalculadoraView },
+    { path: '/calculator', component: CalculatorView },
+    { path: '/calculadora', redirect: '/calculator' },
     { path: '/admin/login', component: LoginView },
     {
       path: '/admin',
